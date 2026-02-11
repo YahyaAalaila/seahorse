@@ -9,7 +9,7 @@
 />
 </p>
 
-<h1 align="center">BenchSTPP</h1>
+<h1 align="center">SeahorSTPP</h1>
 
 <p align="center">
   <strong>A flexible benchmarking toolkit for streaming Spatio-Temporal Point-Process models. BenchSTPP is a modular, research-grade framework for end-to-end development, training, and evaluation of Spatio-Temporal Point-Process (STPP) models. It couples declarative YAML configuration with PyTorch Lightning execution, Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver rapid prototyping and rigorous, reproducible benchmarking on streaming event data.</strong>
