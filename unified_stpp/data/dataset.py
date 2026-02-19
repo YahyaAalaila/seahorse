@@ -109,6 +109,9 @@ class STPPDataset(Dataset):
                 cov = (cov - self.cov_mean) / self.cov_std
             item["field_covariates"] = torch.tensor(cov, dtype=torch.float32)
 
+        if "marks" in seq and seq["marks"] is not None:
+            item["marks"] = torch.tensor(seq["marks"], dtype=torch.long)
+
         return item
 
 
@@ -133,15 +136,19 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
 
     has_event_cov = "event_covariates" in batch[0]
     has_field_cov = "field_covariates" in batch[0]
+    has_marks = "marks" in batch[0]
 
     event_covariates = None
     field_covariates = None
+    marks_out = None
     if has_event_cov:
         p = batch[0]["event_covariates"].shape[-1]
         event_covariates = torch.zeros(B, N_max, p)
     if has_field_cov:
         r = batch[0]["field_covariates"].shape[-1]
         field_covariates = torch.zeros(B, N_max, r)
+    if has_marks:
+        marks_out = torch.zeros(B, N_max, dtype=torch.long)
 
     for i, item in enumerate(batch):
         n = item["length"]
@@ -152,6 +159,8 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
         if has_field_cov and item["field_covariates"].shape[0] > 0:
             n_cov = min(n, item["field_covariates"].shape[0])
             field_covariates[i, :n_cov] = item["field_covariates"][:n_cov]
+        if has_marks:
+            marks_out[i, :n] = item["marks"]
 
     return {
         "times": times,
@@ -159,4 +168,5 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
         "lengths": lengths,
         "event_covariates": event_covariates,
         "field_covariates": field_covariates,
+        "marks": marks_out,
     }

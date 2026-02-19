@@ -178,6 +178,65 @@ class Decoder(ABC, nn.Module):
         raise NotImplementedError("Sampling not implemented for this decoder.")
 
 
+class MarkDecoder(ABC, nn.Module):
+    """
+    G^m_θ: (z(t), t, s, X_field) → log p*(k | t, s, z)
+
+    Models the conditional mark distribution given the latent state,
+    event time, and event location. The mark NLL decomposes additively
+    from the ground process NLL: no changes to existing Decoder subclasses.
+
+    Input:
+        z: (B, h)          — latent state
+        t: (B, 1)          — event time
+        s: (B, d)          — event location
+        x_field: (B, r)    — optional field covariates
+    Output:
+        log_probs: (B, K)  — log-probabilities for each mark
+    """
+
+    def __init__(self, hidden_dim: int, spatial_dim: int, n_marks: int, **kwargs):
+        ABC.__init__(self)
+        nn.Module.__init__(self)
+        self.hidden_dim = hidden_dim
+        self.spatial_dim = spatial_dim
+        self.n_marks = n_marks
+
+    @abstractmethod
+    def log_prob(
+        self,
+        z: Tensor,
+        t: Tensor,
+        s: Tensor,
+        x_field: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Returns (B, K) log-probabilities."""
+        ...
+
+    def nll(
+        self,
+        z: Tensor,
+        t: Tensor,
+        s: Tensor,
+        k: Tensor,
+        x_field: Optional[Tensor] = None,
+    ) -> Tensor:
+        """
+        NLL for observed mark k.
+
+        Args:
+            z: (B, h)
+            t: (B, 1)
+            s: (B, d)
+            k: (B,) LongTensor — observed mark indices
+            x_field: (B, r) optional
+        Returns:
+            nll: (B,)
+        """
+        log_probs = self.log_prob(z, t, s, x_field)  # (B, K)
+        return -log_probs[torch.arange(k.shape[0], device=k.device), k]  # (B,)
+
+
 class CovariateProcessor(nn.Module):
     """
     Processes and projects covariates for injection into a component.

@@ -3,14 +3,18 @@ Unified Neural STPP Model.
 
 Composes Encoder, Dynamics, Updater, Decoder with systematic covariate injection.
 
-M_X = (E_θ, D_θ, U_θ, G_θ; X^field, X^event, L_θ)
+M_X = (E_θ, D_θ, U_θ, G_θ, G^m_θ; X^field, X^event, L_θ)
+
+G^m is optional (None = unmarked). When present, marks enter via the encoder
+and updater as embedded event-level covariates; the mark NLL adds additively to
+the ground process NLL.
 """
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 from typing import Optional, Dict, Any
-from .base import Encoder, Dynamics, Updater, Decoder
+from .base import Encoder, Dynamics, Updater, Decoder, MarkDecoder
 from .dynamics.identity import IdentityDynamics
 
 
@@ -19,13 +23,15 @@ class UnifiedSTPP(nn.Module):
     The unified Neural STPP framework.
 
     Composes four modular components with covariate injection at each point.
+    Optionally models discrete marks via G^m (mark_decoder).
 
     Forward pass for a sequence of events:
-    1. Encode full history → z_0, all_states
+    1. Encode full history (including mark embeddings) → z_0, all_states
     2. For each event n:
        a. Dynamics: z(t) = D(z_n, t - t_n, X_field)
        b. Decoder: log f*(t_{n+1}, s_{n+1} | z(t_{n+1}))
-       c. Update: z_{n+1} = U(z(t⁻), t_{n+1}, s_{n+1}, X)
+       c. Mark decoder (if present): log p*(k_{n+1} | z(t_{n+1}), t, s)
+       d. Update: z_{n+1} = U(z(t⁻), t_{n+1}, s_{n+1}, X)
     3. Sum log-likelihoods
 
     In training mode (full sequence known), we can batch efficiently:
@@ -40,6 +46,8 @@ class UnifiedSTPP(nn.Module):
         updater: Updater,
         decoder: Decoder,
         lifting_map: Optional[nn.Module] = None,
+        mark_decoder: Optional[MarkDecoder] = None,
+        mark_embedding: Optional[nn.Module] = None,
     ):
         super().__init__()
         self.encoder = encoder
@@ -47,12 +55,15 @@ class UnifiedSTPP(nn.Module):
         self.updater = updater
         self.decoder = decoder
         self.lifting_map = lifting_map
+        self.mark_decoder = mark_decoder
+        self.mark_embedding = mark_embedding
 
     def forward(
         self,
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
+        marks: Optional[Tensor] = None,
         x_event: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
         x_field_fn=None,
@@ -64,6 +75,7 @@ class UnifiedSTPP(nn.Module):
             times: (B, N) — event times (padded, sorted)
             locations: (B, N, d) — event locations
             lengths: (B,) — actual sequence lengths
+            marks: (B, N) LongTensor optional — discrete mark indices
             x_event: (B, N, p) optional — event-level covariates
             x_field_at_events: (B, N, r) optional — field covariates pre-evaluated at events
             x_field_fn: callable (t, s) → (B, r) optional — field covariate function
@@ -71,29 +83,36 @@ class UnifiedSTPP(nn.Module):
         Returns:
             dict with 'nll' (scalar), 'nll_per_event' (B,), and diagnostics
         """
-        B, N = times.shape
         device = times.device
 
         # ====================================================================
-        # Step 1: Encode
+        # Step 1: Embed marks as event-level covariates (if mark_embedding set)
+        # ====================================================================
+        if marks is not None and self.mark_embedding is not None:
+            x_event_marks = self.mark_embedding(marks)  # (B, N, embed_dim)
+            if x_event is not None:
+                x_event = torch.cat([x_event, x_event_marks], dim=-1)
+            else:
+                x_event = x_event_marks
+
+        # ====================================================================
+        # Step 2: Encode
         # ====================================================================
         events = torch.cat([times.unsqueeze(-1), locations], dim=-1)
         z_final, all_states = self.encoder(events, lengths, x_event=x_event)
 
         # ====================================================================
-        # Step 2: Dispatch to batched or sequential forward
+        # Step 3: Dispatch to batched or sequential forward
         # ====================================================================
-        # For Identity dynamics, all events can be processed in a single batched
-        # decoder call (no ODE to solve — state is unchanged by dynamics).
-        # For ODE dynamics, we must process events sequentially because each
-        # event has a different dt and initial state.
         if isinstance(self.dynamics, IdentityDynamics):
             return self._forward_batched(
-                times, locations, lengths, all_states, x_field_at_events, device
+                times, locations, lengths, all_states, x_field_at_events, device,
+                marks=marks,
             )
         else:
             return self._forward_sequential(
-                times, locations, lengths, all_states, x_field_at_events, device
+                times, locations, lengths, all_states, x_field_at_events, device,
+                marks=marks,
             )
 
     def _forward_batched(
@@ -104,6 +123,7 @@ class UnifiedSTPP(nn.Module):
         all_states: Tensor,
         x_field_at_events: Optional[Tensor],
         device,
+        marks: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         """
         Batched forward for Identity dynamics.
@@ -152,11 +172,20 @@ class UnifiedSTPP(nn.Module):
             x_field_dec.reshape(B * L, -1) if x_field_dec is not None else None
         )
 
-        # Single batched decoder call
+        # Single batched ground decoder call
         nll_flat = self.decoder.nll(
             z_flat, t_flat, s_flat, t_prev_flat, x_field=x_field_flat
         )  # (B*L,)
         nll_all = nll_flat.reshape(B, L)  # (B, L)
+
+        # Mark NLL (additive, same batched pattern)
+        if self.mark_decoder is not None and marks is not None:
+            k_target = marks[:, 1:1 + L]          # (B, L)
+            k_flat   = k_target.reshape(B * L)    # (B*L,)
+            mark_nll_flat = self.mark_decoder.nll(
+                z_flat, t_flat, s_flat, k_flat, x_field=x_field_flat
+            )  # (B*L,)
+            nll_all = nll_all + mark_nll_flat.reshape(B, L)
 
         # Mask padded positions and aggregate
         nll_masked = nll_all * mask        # (B, L)
@@ -179,6 +208,7 @@ class UnifiedSTPP(nn.Module):
         all_states: Tensor,
         x_field_at_events: Optional[Tensor],
         device,
+        marks: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         """
         Sequential forward for ODE (or any non-Identity) dynamics.
@@ -237,6 +267,15 @@ class UnifiedSTPP(nn.Module):
             nll_n = self.decoder.nll(
                 z_t, t_target, s_target, t_prev, x_field=x_field_dec
             )
+
+            # Mark NLL (additive)
+            if self.mark_decoder is not None and marks is not None:
+                k_target = marks[:, n + 1]  # (B,) LongTensor
+                mark_nll = self.mark_decoder.nll(
+                    z_t, t_target, s_target, k_target, x_field=x_field_dec
+                )
+                nll_n = nll_n + mark_nll
+
             total_nll = total_nll + nll_n * active
             n_events  = n_events  + active
 
@@ -257,6 +296,7 @@ class UnifiedSTPP(nn.Module):
         n_samples: int = 1,
         t_max: float = float("inf"),
         x_event: Optional[Tensor] = None,
+        history_marks: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
         x_field_fn=None,
     ):
@@ -266,12 +306,9 @@ class UnifiedSTPP(nn.Module):
         For each step:
           1. Evolve state via dynamics (identity or ODE)
           2. Sample (t, s) from decoder
-          3. Update state with new event
-          4. Repeat
-
-        Works for all decoder types:
-          - FactorizedDecoder: temporal.sample() then spatial.sample()
-          - DiffusionDecoder: joint sample via annealed Langevin
+          3. Sample mark k from mark_decoder (if present)
+          4. Update state with new event
+          5. Repeat
 
         Args:
             history_times: (B, N) — past event times
@@ -280,23 +317,43 @@ class UnifiedSTPP(nn.Module):
             n_samples: Number of future events to sample
             t_max: Maximum time horizon
             x_event: (B, N, p) optional — event covariates for history
+            history_marks: (B, N) LongTensor optional — mark indices for history
             x_field_at_events: (B, N, r) optional — field covariates at history events
             x_field_fn: callable (t, s) → (B, r) optional — field covariate function
 
         Returns:
             sampled_times: (B, n_samples)
             sampled_locations: (B, n_samples, d)
+            mask: (B, n_samples) — True for events within t_max
+            sampled_marks: (B, n_samples) LongTensor or None
         """
         B = history_times.shape[0]
         device = history_times.device
-        d = history_locations.shape[-1]
+
+        # Embed history marks if the model has a mark embedding.
+        # Always provide embeddings (zeros if no marks given) so the encoder
+        # sees the expected input dimension (input_dim + embed_dim).
+        x_event_hist = x_event
+        if self.mark_embedding is not None:
+            B_h, N_h = history_times.shape
+            if history_marks is not None:
+                x_event_marks = self.mark_embedding(history_marks)  # (B, N, embed_dim)
+            else:
+                x_event_marks = torch.zeros(
+                    B_h, N_h, self.mark_embedding.embed_dim, device=device
+                )
+            if x_event_hist is not None:
+                x_event_hist = torch.cat([x_event_hist, x_event_marks], dim=-1)
+            else:
+                x_event_hist = x_event_marks
 
         # Encode history
         events = torch.cat([history_times.unsqueeze(-1), history_locations], dim=-1)
-        z, all_states = self.encoder(events, history_lengths, x_event=x_event)
+        z, all_states = self.encoder(events, history_lengths, x_event=x_event_hist)
 
         sampled_t = []
         sampled_s = []
+        sampled_k = []
 
         # Last event time per sequence
         t_prev = history_times[
@@ -304,14 +361,7 @@ class UnifiedSTPP(nn.Module):
         ].unsqueeze(-1)  # (B, 1)
 
         for step in range(n_samples):
-            # Dynamics: for sampling, we don't know dt yet.
-            # With identity dynamics: z(t) = z for any t, so no issue.
-            # With ODE dynamics: we'd need to integrate to each candidate t.
-            # Practical approach: use z directly (post-update state).
-            # This is exact for identity dynamics and approximate for ODE dynamics.
-            # (NeuralSTPP's original code also uses this approximation for sampling.)
-
-            # Sample next event from decoder
+            # Sample next event from ground decoder
             t_new, s_new = self.decoder.sample(z, t_prev, x_field_fn)
             # t_new: (B, 1), s_new: (B, d)
 
@@ -319,20 +369,35 @@ class UnifiedSTPP(nn.Module):
             if t_new.dim() == 1:
                 t_new = t_new.unsqueeze(-1)
 
-            # Mask events beyond t_max
-            valid = (t_new.squeeze(-1) <= t_max)
-
             sampled_t.append(t_new.squeeze(-1))
             sampled_s.append(s_new)
 
-            # Update state for next step
-            z = self.updater(z, t_new, s_new)
+            # Sample mark if mark decoder is present
+            k_new = None
+            if self.mark_decoder is not None:
+                log_probs = self.mark_decoder.log_prob(z, t_new, s_new)  # (B, K)
+                k_new = torch.distributions.Categorical(logits=log_probs).sample()  # (B,)
+                sampled_k.append(k_new)
+
+            # Update state for next step, embedding the sampled mark for the updater.
+            # If mark_embedding is set, the updater expects x_event of size embed_dim
+            # (possibly concatenated with other event covariates, but here we only
+            # have mark embeddings). Pass zeros when no marks were sampled.
+            x_event_update = None
+            if self.mark_embedding is not None:
+                if k_new is not None:
+                    x_event_update = self.mark_embedding(k_new.unsqueeze(1)).squeeze(1)  # (B, embed_dim)
+                else:
+                    x_event_update = torch.zeros(B, self.mark_embedding.embed_dim, device=device)
+            z = self.updater(z, t_new, s_new, x_event=x_event_update)
             t_prev = t_new
 
-        sampled_times = torch.stack(sampled_t, dim=1)      # (B, n_samples)
-        sampled_locs = torch.stack(sampled_s, dim=1)        # (B, n_samples, d)
+        sampled_times = torch.stack(sampled_t, dim=1)   # (B, n_samples)
+        sampled_locs  = torch.stack(sampled_s, dim=1)   # (B, n_samples, d)
+        mask = sampled_times <= t_max                    # (B, n_samples)
 
-        # Mask out events beyond t_max
-        mask = sampled_times <= t_max  # (B, n_samples)
+        sampled_marks = None
+        if sampled_k:
+            sampled_marks = torch.stack(sampled_k, dim=1)  # (B, n_samples)
 
-        return sampled_times, sampled_locs, mask
+        return sampled_times, sampled_locs, mask, sampled_marks

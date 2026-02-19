@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from train import _resolve_optimizer_hparams, _resolve_t_end
+from unified_stpp.config_utils import resolve_optimizer_hparams, resolve_t_end
 from unified_stpp.models.decoders.spatial import CNFSpatial
 from unified_stpp.training.trainer import Trainer
 
@@ -32,11 +32,11 @@ class NeuralSTPPBugfixTests(unittest.TestCase):
 
     def test_resolve_t_end_supports_legacy_T_key(self):
         cfg = {"data": {"T": 1.0}}
-        t_end = _resolve_t_end(cfg["data"], fallback_t_end=5.0)
+        t_end = resolve_t_end(cfg["data"], fallback_t_end=5.0)
         self.assertEqual(t_end, 1.0)
 
     def test_optimizer_hparams_flow_into_trainer(self):
-        lr, weight_decay, grad_clip = _resolve_optimizer_hparams(
+        lr, weight_decay, grad_clip = resolve_optimizer_hparams(
             {"lr": 1e-3, "weight_decay": 0.123, "grad_clip": 0.456},
             lr_default=1e-4,
             weight_decay_default=1e-5,

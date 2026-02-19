@@ -15,8 +15,10 @@ from .models.decoders import (
     CNFSpatial,
     GaussianMixtureSpatial,
     DiffusionDecoder,
+    MLPMarkDecoder,
+    AttentionMarkDecoder,
 )
-from .models.covariates import LiftingMap
+from .models.covariates import LiftingMap, MarkEmbedding
 from .models.unified_model import UnifiedSTPP
 
 
@@ -44,6 +46,11 @@ TEMPORAL_DECODER_REGISTRY = {
 SPATIAL_DECODER_REGISTRY = {
     "cnf": CNFSpatial,
     "gaussian_mixture": GaussianMixtureSpatial,
+}
+
+MARK_DECODER_REGISTRY = {
+    "mlp": MLPMarkDecoder,
+    "attention": AttentionMarkDecoder,
 }
 
 
@@ -93,10 +100,11 @@ def build_model(
     event_cov_dim: int = 0,
     field_cov_dim: int = 0,
     preset: Optional[str] = None,
+    n_marks: int = 0,
 ) -> UnifiedSTPP:
     """
     Build a UnifiedSTPP model from a configuration dict.
-    
+
     Args:
         config: Configuration dict (or empty if using preset).
         spatial_dim: Dimension of spatial coordinates.
@@ -104,6 +112,7 @@ def build_model(
         event_cov_dim: Dimension of event-level covariates.
         field_cov_dim: Dimension of field covariates.
         preset: Name of a preset configuration (e.g., "neural_stpp").
+        n_marks: Number of discrete mark types (0 = unmarked, no mark components).
     """
     if preset is not None:
         base_config = PRESETS[preset].copy()
@@ -113,13 +122,37 @@ def build_model(
 
     input_dim = 1 + spatial_dim  # time + space
 
-    # Build encoder
+    # ------------------------------------------------------------------ #
+    # Mark embedding: increases effective event_cov_dim seen by encoder   #
+    # and updater so mark types are visible without changing their APIs.  #
+    # ------------------------------------------------------------------ #
+    mark_embedding = None
+    mark_decoder = None
+    effective_event_cov_dim = event_cov_dim
+
+    if n_marks > 0:
+        embed_dim = min(n_marks * 2, hidden_dim // 2)
+        mark_embedding = MarkEmbedding(n_marks=n_marks, embed_dim=embed_dim)
+        effective_event_cov_dim = event_cov_dim + embed_dim
+
+        # Mark decoder: default to MLP unless overridden in config
+        mark_dec_cfg = config.get("mark_decoder", {"type": "mlp", "n_layers": 2}).copy()
+        mark_dec_type = mark_dec_cfg.pop("type", "mlp")
+        mark_decoder = MARK_DECODER_REGISTRY[mark_dec_type](
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            n_marks=n_marks,
+            field_cov_dim=field_cov_dim,
+            **mark_dec_cfg,
+        )
+
+    # Build encoder (uses effective_event_cov_dim to see mark embeddings)
     enc_cfg = config["encoder"]
     enc_type = enc_cfg.pop("type")
     encoder = ENCODER_REGISTRY[enc_type](
         input_dim=input_dim,
         hidden_dim=hidden_dim,
-        event_cov_dim=event_cov_dim,
+        event_cov_dim=effective_event_cov_dim,
         **enc_cfg,
     )
     enc_cfg["type"] = enc_type  # restore
@@ -134,13 +167,13 @@ def build_model(
     )
     dyn_cfg["type"] = dyn_type
 
-    # Build updater
+    # Build updater (uses effective_event_cov_dim to see mark embeddings)
     upd_cfg = config["updater"]
     upd_type = upd_cfg.pop("type")
     updater = UPDATER_REGISTRY[upd_type](
         hidden_dim=hidden_dim,
         spatial_dim=spatial_dim,
-        event_cov_dim=event_cov_dim,
+        event_cov_dim=effective_event_cov_dim,
         field_cov_dim=field_cov_dim,
         **upd_cfg,
     )
@@ -201,10 +234,9 @@ def build_model(
     # Build lifting map if needed
     lifting_map = None
     if event_cov_dim > 0 and field_cov_dim == 0:
-        # Need to lift event covariates to field
         lifting_map = LiftingMap(
             event_cov_dim=event_cov_dim,
-            output_dim=event_cov_dim,  # keep same dim
+            output_dim=event_cov_dim,
             spatial_dim=spatial_dim,
         )
 
@@ -214,6 +246,8 @@ def build_model(
         updater=updater,
         decoder=decoder,
         lifting_map=lifting_map,
+        mark_decoder=mark_decoder,
+        mark_embedding=mark_embedding,
     )
 
     return model

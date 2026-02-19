@@ -107,6 +107,30 @@ class LiftingMap(nn.Module):
             return contrib.sum(dim=1) / (mask.sum(dim=-1, keepdim=True) + 1e-8)
 
 
+class MarkEmbedding(nn.Module):
+    """
+    Embeds discrete mark indices into dense vectors for injection as x_event.
+
+    Use this to feed mark types into the encoder and updater via the
+    existing event-level covariate path (x_event), without modifying
+    any Encoder or Updater signatures.
+    """
+
+    def __init__(self, n_marks: int, embed_dim: int):
+        super().__init__()
+        self.embedding = nn.Embedding(n_marks, embed_dim)
+        self.embed_dim = embed_dim
+
+    def forward(self, marks: Tensor) -> Tensor:
+        """
+        Args:
+            marks: (B, N) LongTensor — mark indices
+        Returns:
+            (B, N, embed_dim) float embeddings
+        """
+        return self.embedding(marks)
+
+
 class FieldCovariateEncoder(nn.Module):
     """
     Encodes field covariates X^field(t, s) ∈ R^r into a representation

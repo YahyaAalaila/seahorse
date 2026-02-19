@@ -46,6 +46,7 @@ class Trainer:
                 times=batch["times"],
                 locations=batch["locations"],
                 lengths=batch["lengths"],
+                marks=batch.get("marks"),
                 x_event=batch.get("event_covariates"),
                 x_field_at_events=batch.get("field_covariates"),
             )
@@ -78,6 +79,7 @@ class Trainer:
                 times=batch["times"],
                 locations=batch["locations"],
                 lengths=batch["lengths"],
+                marks=batch.get("marks"),
                 x_event=batch.get("event_covariates"),
                 x_field_at_events=batch.get("field_covariates"),
             )

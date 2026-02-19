@@ -30,6 +30,7 @@ from unified_stpp.data.synthetic import (
     generate_hawkes_stpp,
     generate_inhomogeneous_stpp,
     generate_moving_hotspot_stpp,
+    generate_marked_hawkes_stpp,
     moving_hotspot_intensity,
     moving_hotspot_covariates,
     InhomogeneousPoissonSyntheticDataset,
@@ -40,6 +41,7 @@ from unified_stpp.data.regime_gated_hawkes import (
     covariates_at as regime_gated_covariates_at,
     intensity_from_history as regime_gated_intensity_from_history,
 )
+from unified_stpp.config_utils import resolve_optimizer_hparams, resolve_t_end
 from unified_stpp.training import Trainer
 from unified_stpp.models import IntensityEvaluator
 
@@ -277,39 +279,6 @@ def _save_epoch_metrics(
     return csv_path, jsonl_path, run_dir
 
 
-def _resolve_t_end(data_cfg: dict, fallback_t_end: float) -> float:
-    """Resolve time horizon from modern `t_end` or legacy `T` config keys."""
-    t_end_cfg = data_cfg.get("t_end", None)
-    legacy_t = data_cfg.get("T", None)
-
-    if t_end_cfg is not None:
-        if legacy_t is not None and not np.isclose(float(t_end_cfg), float(legacy_t)):
-            print(
-                "Warning: both data.t_end and legacy data.T are set with different values; "
-                f"using data.t_end={float(t_end_cfg):.6g} over data.T={float(legacy_t):.6g}."
-            )
-        return float(t_end_cfg)
-
-    if legacy_t is not None:
-        return float(legacy_t)
-
-    return float(fallback_t_end)
-
-
-def _resolve_optimizer_hparams(
-    training_cfg: dict,
-    *,
-    lr_default: float,
-    weight_decay_default: float,
-    grad_clip_default: float,
-):
-    """Resolve optimizer/training scalars with CLI defaults as fallback."""
-    lr = float(training_cfg.get("lr", lr_default))
-    weight_decay = float(training_cfg.get("weight_decay", weight_decay_default))
-    grad_clip = float(training_cfg.get("grad_clip", grad_clip_default))
-    return lr, weight_decay, grad_clip
-
-
 def _cli_arg_provided(flag: str) -> bool:
     """Return True if a CLI flag is explicitly present (e.g. --n_epochs or --n_epochs=2)."""
     argv = sys.argv[1:]
@@ -327,7 +296,9 @@ def main():
     parser.add_argument("--event_cov_dim", type=int, default=0)
     parser.add_argument("--field_cov_dim", type=int, default=0)
     parser.add_argument("--data", type=str, default="hawkes",
-                        choices=["hawkes", "inhomogeneous", "inhomogeneous_class", "sthp_class", "moving_hotspot", "regime_gated_hawkes"])
+                        choices=["hawkes", "inhomogeneous", "inhomogeneous_class", "sthp_class", "moving_hotspot", "regime_gated_hawkes", "marked_hawkes"])
+    parser.add_argument("--n_marks", type=int, default=0,
+                        help="Number of discrete mark types (0 = unmarked).")
     parser.add_argument("--n_train", type=int, default=200)
     parser.add_argument("--n_val", type=int, default=50)
     parser.add_argument("--t_end", type=float, default=5.0)
@@ -411,10 +382,11 @@ def main():
         spatial_dim = cfg.get("model", {}).get("spatial_dim", args.spatial_dim)
         event_cov_dim = cfg.get("model", {}).get("event_cov_dim", args.event_cov_dim)
         field_cov_dim = cfg.get("model", {}).get("field_cov_dim", args.field_cov_dim)
+        n_marks = args.n_marks if _cli_arg_provided("--n_marks") else cfg.get("model", {}).get("n_marks", args.n_marks)
         overrides = cfg.get("model", {}).get("overrides", {})
         n_epochs = args.n_epochs if _cli_arg_provided("--n_epochs") else training_cfg.get("n_epochs", args.n_epochs)
         batch_size = args.batch_size if _cli_arg_provided("--batch_size") else training_cfg.get("batch_size", args.batch_size)
-        lr, weight_decay, grad_clip = _resolve_optimizer_hparams(
+        lr, weight_decay, grad_clip = resolve_optimizer_hparams(
             training_cfg,
             lr_default=args.lr,
             weight_decay_default=args.weight_decay,
@@ -430,7 +402,7 @@ def main():
         data_type = data_cfg.get("type", args.data)
         n_train = data_cfg.get("n_train", args.n_train)
         n_val = data_cfg.get("n_val", args.n_val)
-        t_end = _resolve_t_end(data_cfg, args.t_end)
+        t_end = resolve_t_end(data_cfg, args.t_end)
         if _cli_arg_provided("--t_end"):
             t_end = float(args.t_end)
         base_rate = data_cfg.get("base_rate", args.base_rate)
@@ -476,6 +448,7 @@ def main():
         spatial_dim = args.spatial_dim
         event_cov_dim = args.event_cov_dim
         field_cov_dim = args.field_cov_dim
+        n_marks = args.n_marks
         overrides = {}
         n_epochs = args.n_epochs
         batch_size = args.batch_size
@@ -660,6 +633,15 @@ def main():
                 max_events_per_seq=rg_max_events_per_seq,
                 seed=data_seed,
             )
+        elif data_type == "marked_hawkes":
+            all_seqs = generate_marked_hawkes_stpp(
+                n_sequences=n_train + n_val,
+                T=t_end,
+                spatial_bounds=(spatial_min, spatial_max),
+                spatial_dim=spatial_dim,
+                n_marks=max(n_marks, 3),  # default K=3 if --n_marks not set
+                seed=data_seed,
+            )
         else:
             raise ValueError(f"Unknown data type: {data_type}")
 
@@ -698,7 +680,8 @@ def main():
     # Build model
     # ========================================================================
     print(f"Building model: preset={preset}, hidden={hidden_dim}, "
-          f"spatial={spatial_dim}, event_cov={event_cov_dim}, field_cov={field_cov_dim}")
+          f"spatial={spatial_dim}, event_cov={event_cov_dim}, field_cov={field_cov_dim}, "
+          f"n_marks={n_marks}")
 
     model = build_model(
         config=overrides,
@@ -707,6 +690,7 @@ def main():
         event_cov_dim=event_cov_dim,
         field_cov_dim=field_cov_dim,
         preset=preset,
+        n_marks=n_marks,
     )
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

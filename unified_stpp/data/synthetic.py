@@ -910,3 +910,139 @@ class STHPDataset(SyntheticDataset):
             }
             sequences.append(seq)
         return sequences
+
+
+# ============================================================================
+# Marked Hawkes process generator
+# ============================================================================
+
+def generate_marked_hawkes_stpp(
+    n_sequences: int = 100,
+    T: float = 10.0,
+    spatial_bounds: Tuple[float, float] = (-5.0, 5.0),
+    spatial_dim: int = 2,
+    n_marks: int = 3,
+    mu: float = 1.0,
+    alpha: float = 0.5,
+    beta: float = 1.0,
+    sigma_s: float = 1.0,
+    excitation_matrix: Optional[np.ndarray] = None,
+    background_probs: Optional[np.ndarray] = None,
+    seed: int = 42,
+) -> List[Dict]:
+    """
+    Generate sequences from a marked spatiotemporal Hawkes process.
+
+    The ground process (t, s) is a standard Hawkes process. The mark k
+    for each event is drawn from a conditional categorical distribution:
+
+      Background event:  k ~ Categorical(background_probs)
+      Triggered by event j with mark k_j:
+                         k ~ Categorical(excitation_matrix[k_j])
+
+    This produces cross-excitation patterns where marks cluster in
+    predictable ways — useful for testing mark decoder generalisation.
+
+    Args:
+        n_sequences: Number of sequences to generate.
+        T: Time horizon.
+        spatial_bounds: (min, max) for each spatial dimension.
+        spatial_dim: Number of spatial dimensions.
+        n_marks: Number of discrete mark types (K).
+        mu: Background rate.
+        alpha: Excitation magnitude (must be < 1 for stability).
+        beta: Temporal decay rate.
+        sigma_s: Spatial influence kernel bandwidth.
+        excitation_matrix: (K, K) row-stochastic matrix. excitation_matrix[k, j]
+            is the probability that a child triggered by a type-k parent gets
+            type j. Defaults to a slightly-biased-toward-self matrix.
+        background_probs: (K,) probability vector for background events.
+            Defaults to uniform.
+        seed: Random seed.
+
+    Returns:
+        List of dicts, each with keys:
+            'times':     (N,) float32
+            'locations': (N, d) float32
+            'marks':     (N,) int64 — mark indices in [0, K)
+    """
+    rng = np.random.RandomState(seed)
+
+    # Default excitation matrix: self-exciting with small cross-excitation
+    if excitation_matrix is None:
+        diag_weight = 0.6
+        off_diag_weight = (1.0 - diag_weight) / max(n_marks - 1, 1)
+        excitation_matrix = np.full((n_marks, n_marks), off_diag_weight)
+        np.fill_diagonal(excitation_matrix, diag_weight)
+
+    excitation_matrix = np.asarray(excitation_matrix, dtype=np.float64)
+    # Row-normalise to ensure valid distribution
+    row_sums = excitation_matrix.sum(axis=1, keepdims=True)
+    excitation_matrix = excitation_matrix / np.maximum(row_sums, 1e-12)
+
+    if background_probs is None:
+        background_probs = np.ones(n_marks, dtype=np.float64) / n_marks
+    background_probs = np.asarray(background_probs, dtype=np.float64)
+    background_probs = background_probs / background_probs.sum()
+
+    sequences = []
+    for _ in range(n_sequences):
+        times = []
+        locs = []
+        marks = []
+        parent_marks = []  # mark of the triggering event (None = background)
+
+        t = 0.0
+        lambda_bar = mu + 10.0
+
+        while t < T:
+            dt = rng.exponential(1.0 / lambda_bar)
+            t = t + dt
+            if t >= T:
+                break
+
+            s_candidate = rng.uniform(spatial_bounds[0], spatial_bounds[1], size=spatial_dim)
+
+            lam = mu
+            for ti, si in zip(times, locs):
+                temporal = alpha * beta * np.exp(-beta * (t - ti))
+                spatial = np.exp(-np.sum((s_candidate - si) ** 2) / (2 * sigma_s ** 2))
+                spatial /= (2 * np.pi * sigma_s ** 2) ** (spatial_dim / 2)
+                lam += temporal * spatial
+
+            if rng.uniform() < lam / lambda_bar:
+                # Determine which event triggered this one (background vs parent)
+                # Compute contribution of each past event to lam
+                contribs = []
+                for ti, si in zip(times, locs):
+                    temporal = alpha * beta * np.exp(-beta * (t - ti))
+                    spatial = np.exp(-np.sum((s_candidate - si) ** 2) / (2 * sigma_s ** 2))
+                    spatial /= (2 * np.pi * sigma_s ** 2) ** (spatial_dim / 2)
+                    contribs.append(temporal * spatial)
+                total_excitation = sum(contribs)
+                bg_prob = mu / (mu + total_excitation + 1e-12)
+
+                if len(contribs) == 0 or rng.uniform() < bg_prob:
+                    # Background event
+                    k = rng.choice(n_marks, p=background_probs)
+                else:
+                    # Triggered: sample parent proportional to contributions
+                    contribs_arr = np.array(contribs)
+                    parent_probs = contribs_arr / (contribs_arr.sum() + 1e-12)
+                    parent_idx = rng.choice(len(contribs), p=parent_probs)
+                    parent_mark = marks[parent_idx]
+                    k = rng.choice(n_marks, p=excitation_matrix[parent_mark])
+
+                times.append(t)
+                locs.append(s_candidate)
+                marks.append(k)
+
+            lambda_bar = max(lambda_bar, lam * 1.5)
+
+        sequences.append({
+            "times": np.array(times, dtype=np.float32),
+            "locations": np.array(locs, dtype=np.float32).reshape(-1, spatial_dim),
+            "marks": np.array(marks, dtype=np.int64),
+        })
+
+    return sequences
