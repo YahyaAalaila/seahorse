@@ -1,0 +1,35 @@
+# NeuralSTPP configuration
+# Encoder: GRU, Dynamics: Neural ODE, Updater: GRU Jump
+# Decoder: Factorized — cumulative hazard (temporal) + CNF (spatial)
+
+model:
+  preset: neural_stpp
+  hidden_dim: 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  overrides:
+    encoder:
+      num_layers: 1
+    dynamics:
+      solver: dopri5
+      atol: 1.0e-5
+      rtol: 1.0e-5
+    decoder:
+      temporal:
+        n_quad_points: 20
+      spatial:
+        solver: dopri5
+
+training:
+  lr: 0.001
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 100
+  batch_size: 32
+
+data:
+  type: hawkes
+  n_train: 200
+  n_val: 50
+  T: 10.0

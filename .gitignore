@@ -1,0 +1,40 @@
+# Python caches and virtualenvs
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Tooling/IDE
+.idea/
+.vscode/
+.DS_Store
+.claude/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project outputs
+runs/
+artifacts/
+wandb/
+ray_results/
+*.log
+*.gif
+*.png
+
+# Model/data artifacts
+*.pkl
+*.pt
+*.pth
+*.ckpt
+
+# Local junk
+{unified_stpp/

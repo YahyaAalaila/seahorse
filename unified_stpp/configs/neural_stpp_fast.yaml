@@ -1,0 +1,68 @@
+# NeuralSTPP — regime-gated, recovery-oriented fast configuration
+#
+# Key changes vs. neural_stpp.yaml:
+#   - hidden_dim kept moderate (64) for stronger spatial-temporal capacity
+#   - field covariates enabled (dim 9) for regime-gated benchmark recovery
+#   - Euler solver with 30 fixed steps (vs. dopri5 with adaptive steps)
+#   - Looser tolerances (1e-3 vs 1e-5) as safety net for adaptive solvers
+#   - use_adjoint=true  → O(1)-memory backprop through ODE
+#   - augmented=false   → use 8-point GL quadrature for Λ* (more accurate
+#                         than Euler+augmented; use augmented=true only with
+#                         dopri5/rk4 where the ODE solver resolves Λ faithfully)
+#   - n_quad_points=12  → better temporal fidelity than minimal 8-point setting
+#
+# This config targets a practical quality/speed balance on CPU.
+
+model:
+  preset: neural_stpp
+  hidden_dim: 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  overrides:
+    encoder:
+      num_layers: 1
+    dynamics:
+      solver: euler
+      atol: 1.0e-3
+      rtol: 1.0e-3
+      n_steps: 30
+      use_adjoint: true
+      augmented: false   # Euler+augmented underestimates Λ* (left-Riemann bias)
+                         # causing NLL instability. GL quadrature below is more accurate.
+    decoder:
+      temporal:
+        n_quad_points: 12
+      spatial:
+        solver: euler
+        atol: 1.0e-3
+        rtol: 1.0e-3
+        n_steps: 30
+        use_adjoint: true
+
+training:
+  lr: 0.0005
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 30
+  batch_size: 32
+
+data:
+  type: regime_gated_hawkes
+  seed: 42
+  dataset_cache: unified_stpp/data_cache/regime_gated_hawkes_shared.pkl
+  n_train: 160
+  n_val: 40
+  t_end: 6.0
+  spatial_min: -5.0
+  spatial_max: 5.0
+  rg_num_marks: 3
+  rg_num_regimes: 3
+  rg_env_dim: 4
+  rg_sigma_reg: 0.18
+  rg_switch_rate: 1.4
+  rg_sigma_hotspot: 0.95
+  rg_lambda_bg: 0.02
+  rg_tau_t: 0.85
+  rg_sigma_exc: 0.95
+  rg_max_events_per_seq: 220

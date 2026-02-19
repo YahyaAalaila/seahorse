@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unified-stpp"
+version = "0.1.0"
+description = "Unified neural spatiotemporal point process framework"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Local Developer" }]
+dependencies = [
+  "torch>=2.0.0",
+  "numpy>=1.24.0",
+  "PyYAML>=6.0",
+  "matplotlib>=3.7.0",
+  "tqdm>=4.65.0",
+  "torchdiffeq>=0.2.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.6.0",
+  "pre-commit>=3.7.0",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["runs", "artifacts", ".venv", "unified_stpp/data_cache"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+

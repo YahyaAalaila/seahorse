@@ -1,0 +1,49 @@
+# Same raw regime-gated benchmark as regime_gated_hawkes_neural_with_covariates.yaml
+# but with field covariates disabled for baseline comparison.
+
+model:
+  preset: neural_stpp
+  hidden_dim: 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  overrides:
+    encoder:
+      num_layers: 1
+    dynamics:
+      solver: dopri5
+      atol: 1.0e-5
+      rtol: 1.0e-5
+    decoder:
+      temporal:
+        n_quad_points: 20
+      spatial:
+        solver: dopri5
+
+training:
+  lr: 0.001
+  n_epochs: 40
+  batch_size: 32
+  metrics_dir: runs
+  run_name: regime_gated_hawkes_neural_demo
+  save_metrics: true
+
+data:
+  type: regime_gated_hawkes
+  seed: 42
+  dataset_cache: unified_stpp/data_cache/regime_gated_hawkes_shared.pkl
+  n_train: 160
+  n_val: 40
+  t_end: 6.0
+  spatial_min: -5.0
+  spatial_max: 5.0
+  rg_num_marks: 3
+  rg_num_regimes: 3
+  rg_env_dim: 4
+  rg_sigma_reg: 0.18
+  rg_switch_rate: 1.4
+  rg_sigma_hotspot: 0.95
+  rg_lambda_bg: 0.02
+  rg_tau_t: 0.85
+  rg_sigma_exc: 0.95
+  rg_max_events_per_seq: 220

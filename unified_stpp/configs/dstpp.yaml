@@ -1,0 +1,31 @@
+# DSTPP configuration
+# Encoder: Transformer, Dynamics: Identity, Updater: Attention
+# Decoder: Diffusion (joint spatiotemporal density)
+
+model:
+  preset: dstpp
+  hidden_dim: 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  overrides:
+    encoder:
+      num_heads: 4
+      num_layers: 2
+    decoder:
+      n_noise_levels: 50
+      sigma_min: 0.01
+      sigma_max: 5.0
+
+training:
+  lr: 0.001
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 100
+  batch_size: 32
+
+data:
+  type: hawkes
+  n_train: 200
+  n_val: 50
+  T: 10.0

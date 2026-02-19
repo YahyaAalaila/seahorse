@@ -1,0 +1,24 @@
+# Covariate-augmented DeepSTPP
+# Same architecture as DeepSTPP but with field covariates injected
+# at all four points (I-IV).
+
+model:
+  preset: deep_stpp
+  hidden_dim: 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 1      # <-- e.g., 1D environmental covariate
+  overrides: {}
+
+training:
+  lr: 0.001
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 100
+  batch_size: 32
+
+data:
+  type: inhomogeneous    # <-- uses covariate-dependent intensity
+  n_train: 200
+  n_val: 50
+  T: 10.0
