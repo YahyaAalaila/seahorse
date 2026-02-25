@@ -1,0 +1,25 @@
+model:
+  preset: deep_stpp
+  hidden_dim: 64
+  spatial_dim: 2
+  n_marks: 0
+
+training:
+  lr: 0.001
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  max_epochs: 100
+  batch_size: 32
+  early_stopping_patience: 20
+
+trainer:
+  accelerator: auto
+  devices: 1
+  logger: csv
+  log_dir: logs/
+
+data:
+  type: hawkes
+  n_train: 200
+  n_val: 50
+  T: 10.0

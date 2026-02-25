@@ -61,7 +61,17 @@ MARK_DECODER_REGISTRY = {
 PRESETS: Dict[str, Dict[str, Any]] = {
     "neural_stpp": {
         "encoder": {"type": "gru", "num_layers": 1},
-        "dynamics": {"type": "neural_ode", "solver": "dopri5"},
+        "dynamics": {
+            "type": "neural_ode",
+            "solver": "dopri5",
+            # Jointly integrate [z(t), Λ(t)] in one ODE solve so the compensator
+            # uses the actually-evolved state z(τ) at each quadrature point τ,
+            # not z frozen at the event time (which causes NLL explosion).
+            "augmented": True,
+            # Standard backprop through ODE steps rather than adjoint; avoids the
+            # second backward ODE pass, halving training time on CPU.
+            "use_adjoint": False,
+        },
         "updater": {"type": "gru_jump"},
         "decoder": {
             "type": "factorized",

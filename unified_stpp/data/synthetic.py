@@ -1046,3 +1046,168 @@ def generate_marked_hawkes_stpp(
         })
 
     return sequences
+
+
+# ============================================================================
+# Pinwheel-Hawkes dataset — replicates the PinwheelHawkes benchmark from
+# Chen et al. (2021) "Neural Spatio-Temporal Point Processes" (ICLR 2021).
+#
+# Data generation parameters exactly match the original (toy_datasets.py):
+#   num_classes = 10, mu = 0.05/class, alpha circular 0.6, omega = 10, T = 30
+# ============================================================================
+
+def _pinwheel_locations(n_per_arm: int, num_arms: int, rng: np.random.RandomState) -> np.ndarray:
+    """Generate 2-D pinwheel spatial samples.
+
+    Replicates the ``pinwheel`` function from the original repository
+    (toy_datasets.py, MIT license, Facebook Research).
+
+    Args:
+        n_per_arm: number of samples per arm.
+        num_arms: number of pinwheel arms.
+        rng: numpy RandomState for reproducibility.
+
+    Returns:
+        locations: (num_arms * n_per_arm, 2)
+    """
+    radial_std = 0.3
+    tangential_std = 0.1
+    rate = 0.25
+    rads = np.linspace(0, 2 * np.pi, num_arms, endpoint=False)
+
+    features = rng.randn(num_arms * n_per_arm, 2) * np.array([radial_std, tangential_std])
+    features[:, 0] += 1.0
+    labels = np.repeat(np.arange(num_arms), n_per_arm)
+
+    angles = rads[labels] + rate * np.exp(features[:, 0])
+    cos_a = np.cos(angles)
+    sin_a = np.sin(angles)
+    rotations = np.stack([cos_a, -sin_a, sin_a, cos_a], axis=-1).reshape(-1, 2, 2)  # (N, 2, 2)
+    return 2.0 * np.einsum("ti,tij->tj", features, rotations)  # (N, 2)
+
+
+def _generate_mhp_sequence(
+    T: float,
+    mu: np.ndarray,
+    alpha: np.ndarray,
+    omega: float,
+    rng: np.random.RandomState,
+) -> tuple:
+    """Ogata thinning for a multivariate Hawkes process.
+
+    Adapted from MHP.py in the original repository (MIT license, Steve Morse).
+
+    Returns:
+        event_times: list of float
+        event_classes: list of int
+    """
+    dim = len(mu)
+    data = []
+    Istar = np.sum(mu)
+    s = rng.exponential(1.0 / Istar)
+    n0 = rng.choice(dim, p=mu / Istar)
+    data.append((s, n0))
+
+    lastrates = mu.copy()
+    dec_Istar = False
+
+    while True:
+        tj, uj = data[-1]
+        if dec_Istar:
+            Istar = np.sum(rates)
+            dec_Istar = False
+        else:
+            Istar = np.sum(lastrates) + omega * np.sum(alpha[:, uj])
+
+        s += rng.exponential(1.0 / max(Istar, 1e-10))
+        rates = mu + np.exp(-omega * (s - tj)) * (alpha[:, uj].flatten() * omega + lastrates - mu)
+
+        diff = Istar - np.sum(rates)
+        probs = np.append(np.maximum(rates, 0.0), max(diff, 0.0))
+        probs_sum = probs.sum()
+        if probs_sum <= 0:
+            break
+        n0 = rng.choice(dim + 1, p=probs / probs_sum)
+
+        if n0 < dim:
+            data.append((s, n0))
+            lastrates = rates.copy()
+        else:
+            dec_Istar = True
+
+        if s >= T:
+            break
+
+    event_times = [t for t, _ in data if t < T]
+    event_classes = [c for t, c in data if t < T]
+    return event_times, event_classes
+
+
+def generate_pinwheel_hawkes_stpp(
+    n_sequences: int = 2000,
+    T: float = 30.0,
+    num_arms: int = 10,
+    mu_per_arm: float = 0.05,
+    alpha_offdiag: float = 0.6,
+    omega: float = 10.0,
+    seed: int = 13579,
+) -> List[Dict]:
+    """Generate the PinwheelHawkes benchmark dataset.
+
+    Exactly replicates ``PinwheelHawkes`` from Chen et al. (2021)
+    ``toy_datasets.py``:
+      - Multivariate Hawkes process with circular excitation matrix
+      - Spatial locations drawn from the pinwheel distribution per class
+      - 10 arms, mu=0.05, alpha_offdiag=0.6, omega=10, T=30
+
+    Args:
+        n_sequences: number of sequences to generate.
+        T: time horizon.
+        num_arms: number of pinwheel arms / Hawkes classes.
+        mu_per_arm: background rate per class.
+        alpha_offdiag: off-diagonal excitation strength (circular).
+        omega: temporal decay rate.
+        seed: random seed for reproducibility (original uses 13579).
+
+    Returns:
+        List of dicts with keys ``times`` (N,), ``locations`` (N, 2),
+        ``marks`` (N,) containing the arm index of each event.
+    """
+    mu = np.array([mu_per_arm] * num_arms)
+    # Circular excitation: each class excites the next (and wraps around)
+    alpha = (
+        np.diag([alpha_offdiag] * (num_arms - 1), k=-1)
+        + np.diag([alpha_offdiag], k=num_arms - 1)
+        + np.diag([0.0] * num_arms, k=0)
+    )
+
+    rng = np.random.RandomState(seed)
+    sequences = []
+
+    for _ in range(n_sequences):
+        event_times, event_classes = _generate_mhp_sequence(T, mu, alpha, omega, rng)
+        n = len(event_times)
+
+        if n == 0:
+            sequences.append({
+                "times": np.array([], dtype=np.float32),
+                "locations": np.zeros((0, 2), dtype=np.float32),
+                "marks": np.array([], dtype=np.int64),
+            })
+            continue
+
+        # Generate n spatial samples per arm, then pick the sample for each
+        # event's arm (matching the original's generate() function exactly).
+        all_locs = _pinwheel_locations(n_per_arm=n, num_arms=num_arms, rng=rng)
+        # all_locs shape: (num_arms * n, 2); arm k occupies rows [k*n, (k+1)*n)
+        locs = np.zeros((n, 2), dtype=np.float64)
+        for i, k in enumerate(event_classes):
+            locs[i] = all_locs[k * n + i]
+
+        sequences.append({
+            "times": np.array(event_times, dtype=np.float32),
+            "locations": locs.astype(np.float32),
+            "marks": np.array(event_classes, dtype=np.int64),
+        })
+
+    return sequences

@@ -4,6 +4,7 @@ from .synthetic import (
     generate_inhomogeneous_stpp,
     generate_moving_hotspot_stpp,
     generate_marked_hawkes_stpp,
+    generate_pinwheel_hawkes_stpp,
     SyntheticDataset,
     InhomogeneousPoissonSyntheticDataset,
     STHPDataset,

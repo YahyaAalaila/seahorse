@@ -2,9 +2,12 @@
 Temporal Decoders — model f*(t | H) or equivalently λ*(t) and S*(t).
 
 1. CumulativeHazardTemporal (NeuralSTPP):
-   - λ*(t) = softplus(w · z(t) + b)
+   - λ*(t) = sigmoid(w · z(t) + b - 2) * max_rate   (bounded, prevents explosion)
    - Λ*(t) = ∫_{t_n}^{t} λ*(τ) dτ  (via numerical quadrature)
    - f*(t) = λ*(t) · exp(-Λ*(t))
+
+   The original Chen et al. 2021 uses sigmoid(net(z)-2)*50 to bound λ*.
+   Our softplus variant was unbounded, causing intensities of 1e11 during training.
 
 2. LogNormalMixtureTemporal (DeepSTPP):
    - f*(τ) = Σ_k π_k · LogNormal(τ; μ_k, σ_k)  where τ = t - t_n
@@ -44,16 +47,18 @@ class CumulativeHazardTemporal(nn.Module):
         hidden_dim: int,
         field_cov_dim: int = 0,
         n_quad_points: int = 20,
+        max_rate: float = 50.0,
         **kwargs,
     ):
         super().__init__()
         input_dim = hidden_dim + 1 + field_cov_dim  # z + elapsed time + covariates
+        # Output raw logits; bounded activation applied in _intensity.
         self.intensity_net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(input_dim, hidden_dim * 4),
             nn.Softplus(),
+            nn.Linear(hidden_dim * 4, 1),
         )
+        self.max_rate = max_rate
         self.n_quad = n_quad_points
         self.field_cov_dim = field_cov_dim
         # Side channel: set by UnifiedSTPP when augmented ODE provides Λ.
@@ -62,12 +67,18 @@ class CumulativeHazardTemporal(nn.Module):
     def _intensity(
         self, z: Tensor, elapsed: Tensor, x_field: Optional[Tensor] = None
     ) -> Tensor:
-        """Compute λ*(t) given state z and elapsed time."""
+        """Compute λ*(t) given state z and elapsed time.
+
+        Uses sigmoid(net(z, elapsed) - 2) * max_rate to bound intensity in
+        (0, max_rate). The -2 bias initialises intensity ≈ 0.12 * max_rate,
+        matching the original NeuralSTPP (Chen et al. 2021, Eq. A.3).
+        """
         parts = [z, elapsed]
         if x_field is not None and self.field_cov_dim > 0:
             parts.append(x_field)
         inp = torch.cat(parts, dim=-1)
-        return self.intensity_net(inp).squeeze(-1)  # (B,)
+        logit = self.intensity_net(inp).squeeze(-1)  # (B,)
+        return torch.sigmoid(logit - 2.0) * self.max_rate
 
     def _cumulative_hazard(
         self, z: Tensor, dt: Tensor, x_field: Optional[Tensor] = None

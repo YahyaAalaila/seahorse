@@ -18,7 +18,7 @@ model:
   hidden_dim: 64
   spatial_dim: 2
   event_cov_dim: 0
-  field_cov_dim: 0
+  field_cov_dim: 9
   overrides:
     encoder:
       num_layers: 1
@@ -46,6 +46,9 @@ training:
   grad_clip: 5.0
   n_epochs: 30
   batch_size: 32
+  early_stopping_patience: 20
+  early_stopping_min_delta: 0.0
+  restore_best: true
 
 data:
   type: regime_gated_hawkes

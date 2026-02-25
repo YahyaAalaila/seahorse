@@ -2,9 +2,10 @@
 Train a unified STPP model.
 
 Usage:
-    python train.py --config configs/deep_stpp.yaml
+    python train.py --config configs/deep_stpp_lightning.yaml
     python train.py --preset neural_stpp
     python train.py --preset deep_stpp --field_cov_dim 1 --data inhomogeneous
+    python train.py --preset deep_stpp --logger tensorboard --n_epochs 5
 """
 
 import argparse
@@ -31,6 +32,7 @@ from unified_stpp.data.synthetic import (
     generate_inhomogeneous_stpp,
     generate_moving_hotspot_stpp,
     generate_marked_hawkes_stpp,
+    generate_pinwheel_hawkes_stpp,
     moving_hotspot_intensity,
     moving_hotspot_covariates,
     InhomogeneousPoissonSyntheticDataset,
@@ -44,6 +46,21 @@ from unified_stpp.data.regime_gated_hawkes import (
 from unified_stpp.config_utils import resolve_optimizer_hparams, resolve_t_end
 from unified_stpp.training import Trainer
 from unified_stpp.models import IntensityEvaluator
+
+# Optional Lightning imports — package works without them (falls back to Trainer).
+try:
+    import pytorch_lightning as pl
+    from pytorch_lightning.callbacks import (
+        ModelCheckpoint,
+        EarlyStopping,
+        LearningRateMonitor,
+    )
+    from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
+    from unified_stpp.training.lightning_module import STPPLightningModule
+    from unified_stpp.training.data_module import STPPDataModule
+    HAS_LIGHTNING = True
+except ImportError:
+    HAS_LIGHTNING = False
 
 
 def _default_covariates(t: np.ndarray, s: np.ndarray, covariate_dim: int) -> np.ndarray:
@@ -296,7 +313,7 @@ def main():
     parser.add_argument("--event_cov_dim", type=int, default=0)
     parser.add_argument("--field_cov_dim", type=int, default=0)
     parser.add_argument("--data", type=str, default="hawkes",
-                        choices=["hawkes", "inhomogeneous", "inhomogeneous_class", "sthp_class", "moving_hotspot", "regime_gated_hawkes", "marked_hawkes"])
+                        choices=["hawkes", "inhomogeneous", "inhomogeneous_class", "sthp_class", "moving_hotspot", "regime_gated_hawkes", "marked_hawkes", "pinwheel"])
     parser.add_argument("--n_marks", type=int, default=0,
                         help="Number of discrete mark types (0 = unmarked).")
     parser.add_argument("--n_train", type=int, default=200)
@@ -334,6 +351,15 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight_decay", type=float, default=1e-5)
     parser.add_argument("--grad_clip", type=float, default=5.0)
+    parser.add_argument("--early_stopping_patience", type=int, default=0,
+                        help="Stop if validation NLL does not improve for this many epochs (0 disables).")
+    parser.add_argument("--early_stopping_min_delta", type=float, default=0.0,
+                        help="Minimum decrease in val NLL to count as an improvement.")
+    parser.add_argument("--restore_best", dest="restore_best", action="store_true",
+                        help="Restore best validation checkpoint after training.")
+    parser.add_argument("--no_restore_best", dest="restore_best", action="store_false",
+                        help="Do not restore best validation checkpoint after training.")
+    parser.set_defaults(restore_best=True)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--plot_intensity_3d", action="store_true",
                         help="After training, save 3D plot of estimated vs true intensity.")
@@ -364,6 +390,24 @@ def main():
     parser.add_argument("--rg_tau_t", type=float, default=0.8)
     parser.add_argument("--rg_sigma_exc", type=float, default=0.9)
     parser.add_argument("--rg_max_events_per_seq", type=int, default=250)
+    # Pinwheel-Hawkes (Chen et al. 2021 benchmark)
+    parser.add_argument("--pw_num_arms", type=int, default=10)
+    parser.add_argument("--pw_mu", type=float, default=0.05)
+    parser.add_argument("--pw_alpha", type=float, default=0.6)
+    parser.add_argument("--pw_omega", type=float, default=10.0)
+    # ---- Lightning-specific args ----
+    parser.add_argument("--accelerator", type=str, default="auto",
+                        choices=["auto", "cpu", "gpu", "mps"],
+                        help="Hardware accelerator for Lightning Trainer.")
+    parser.add_argument("--devices", type=int, default=1,
+                        help="Number of devices for Lightning Trainer.")
+    parser.add_argument("--logger", type=str, default="csv",
+                        choices=["csv", "tensorboard"],
+                        help="Logger backend for Lightning Trainer.")
+    parser.add_argument("--log_dir", type=str, default="logs/",
+                        help="Root directory for Lightning logs.")
+    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints/",
+                        help="Directory for Lightning model checkpoints.")
     args = parser.parse_args()
 
     # ========================================================================
@@ -371,11 +415,13 @@ def main():
     # ========================================================================
     training_cfg = {}
     data_cfg = {}
+    trainer_cfg = {}
     if args.config is not None:
         with open(args.config) as f:
             cfg = yaml.safe_load(f)
         training_cfg = cfg.get("training", {})
         data_cfg = cfg.get("data", {})
+        trainer_cfg = cfg.get("trainer", {})
 
         preset = cfg.get("model", {}).get("preset", args.preset)
         hidden_dim = cfg.get("model", {}).get("hidden_dim", args.hidden_dim)
@@ -384,7 +430,7 @@ def main():
         field_cov_dim = cfg.get("model", {}).get("field_cov_dim", args.field_cov_dim)
         n_marks = args.n_marks if _cli_arg_provided("--n_marks") else cfg.get("model", {}).get("n_marks", args.n_marks)
         overrides = cfg.get("model", {}).get("overrides", {})
-        n_epochs = args.n_epochs if _cli_arg_provided("--n_epochs") else training_cfg.get("n_epochs", args.n_epochs)
+        n_epochs = args.n_epochs if _cli_arg_provided("--n_epochs") else training_cfg.get("max_epochs", training_cfg.get("n_epochs", args.n_epochs))
         batch_size = args.batch_size if _cli_arg_provided("--batch_size") else training_cfg.get("batch_size", args.batch_size)
         lr, weight_decay, grad_clip = resolve_optimizer_hparams(
             training_cfg,
@@ -398,6 +444,21 @@ def main():
             weight_decay = float(args.weight_decay)
         if _cli_arg_provided("--grad_clip"):
             grad_clip = float(args.grad_clip)
+        early_stopping_patience = int(
+            args.early_stopping_patience
+            if _cli_arg_provided("--early_stopping_patience")
+            else training_cfg.get("early_stopping_patience", args.early_stopping_patience)
+        )
+        early_stopping_min_delta = float(
+            args.early_stopping_min_delta
+            if _cli_arg_provided("--early_stopping_min_delta")
+            else training_cfg.get("early_stopping_min_delta", args.early_stopping_min_delta)
+        )
+        restore_best = bool(
+            args.restore_best
+            if (_cli_arg_provided("--restore_best") or _cli_arg_provided("--no_restore_best"))
+            else training_cfg.get("restore_best", args.restore_best)
+        )
 
         data_type = data_cfg.get("type", args.data)
         n_train = data_cfg.get("n_train", args.n_train)
@@ -442,6 +503,16 @@ def main():
         rg_tau_t = data_cfg.get("rg_tau_t", args.rg_tau_t)
         rg_sigma_exc = data_cfg.get("rg_sigma_exc", args.rg_sigma_exc)
         rg_max_events_per_seq = data_cfg.get("rg_max_events_per_seq", args.rg_max_events_per_seq)
+        pw_num_arms = data_cfg.get("pw_num_arms", args.pw_num_arms)
+        pw_mu = data_cfg.get("pw_mu", args.pw_mu)
+        pw_alpha = data_cfg.get("pw_alpha", args.pw_alpha)
+        pw_omega = data_cfg.get("pw_omega", args.pw_omega)
+        # Lightning trainer config (YAML trainer section overrides CLI defaults)
+        accelerator = trainer_cfg.get("accelerator", args.accelerator)
+        devices = trainer_cfg.get("devices", args.devices)
+        logger_type = trainer_cfg.get("logger", args.logger)
+        log_dir = trainer_cfg.get("log_dir", args.log_dir)
+        checkpoint_dir = trainer_cfg.get("checkpoint_dir", args.checkpoint_dir)
     else:
         preset = args.preset or "deep_stpp"
         hidden_dim = args.hidden_dim
@@ -455,6 +526,9 @@ def main():
         lr = args.lr
         weight_decay = args.weight_decay
         grad_clip = args.grad_clip
+        early_stopping_patience = args.early_stopping_patience
+        early_stopping_min_delta = args.early_stopping_min_delta
+        restore_best = args.restore_best
         data_type = args.data
         n_train = args.n_train
         n_val = args.n_val
@@ -494,6 +568,15 @@ def main():
         rg_tau_t = args.rg_tau_t
         rg_sigma_exc = args.rg_sigma_exc
         rg_max_events_per_seq = args.rg_max_events_per_seq
+        pw_num_arms = args.pw_num_arms
+        pw_mu = args.pw_mu
+        pw_alpha = args.pw_alpha
+        pw_omega = args.pw_omega
+        accelerator = args.accelerator
+        devices = args.devices
+        logger_type = args.logger
+        log_dir = args.log_dir
+        checkpoint_dir = args.checkpoint_dir
 
     if args.config is not None:
         metrics_dir = training_cfg.get("metrics_dir", args.metrics_dir)
@@ -507,7 +590,7 @@ def main():
     config_payload = cfg if args.config is not None else vars(args)
     config_hash = _compute_config_hash(config_payload)
 
-    # Device
+    # Device (used for legacy path and post-training code)
     if args.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     else:
@@ -515,8 +598,20 @@ def main():
     print(f"Device: {device}")
     print(
         "Resolved settings: "
-        f"t_end={float(t_end):.6g}, weight_decay={float(weight_decay):.6g}, grad_clip={float(grad_clip):.6g}"
+        f"t_end={float(t_end):.6g}, weight_decay={float(weight_decay):.6g}, grad_clip={float(grad_clip):.6g}, "
+        f"early_stopping_patience={int(early_stopping_patience)}, "
+        f"early_stopping_min_delta={float(early_stopping_min_delta):.6g}, restore_best={bool(restore_best)}"
     )
+    if HAS_LIGHTNING:
+        print(f"Lightning available: using Lightning Trainer (accelerator={accelerator}, logger={logger_type})")
+    else:
+        print("Lightning not available: using legacy Trainer")
+
+    if data_type == "regime_gated_hawkes" and int(field_cov_dim) == 0:
+        print(
+            "Warning: running regime_gated_hawkes with field_cov_dim=0 removes exogenous regime/context "
+            "inputs; early-time hotspot recovery is expected to be weak."
+        )
 
     # ========================================================================
     # Generate data
@@ -642,6 +737,16 @@ def main():
                 n_marks=max(n_marks, 3),  # default K=3 if --n_marks not set
                 seed=data_seed,
             )
+        elif data_type == "pinwheel":
+            all_seqs = generate_pinwheel_hawkes_stpp(
+                n_sequences=n_train + n_val,
+                T=t_end,
+                num_arms=pw_num_arms,
+                mu_per_arm=pw_mu,
+                alpha_offdiag=pw_alpha,
+                omega=pw_omega,
+                seed=data_seed,
+            )
         else:
             raise ValueError(f"Unknown data type: {data_type}")
 
@@ -652,29 +757,12 @@ def main():
             print(f"Saved dataset cache to: {dataset_cache}")
 
     # If the model is configured without field covariates, drop them from data.
-    # This enables fair "with vs without covariates" comparisons on the same generator.
     if field_cov_dim == 0:
         for seq in all_seqs:
             seq.pop("field_covariates", None)
 
     train_seqs = all_seqs[:n_train]
     val_seqs = all_seqs[n_train:]
-
-    train_dataset = STPPDataset(train_seqs)
-    # Val dataset reuses train normalization stats so the model sees the same
-    # feature scale at evaluation time as during training.
-    val_dataset = STPPDataset(
-        val_seqs,
-        cov_mean=train_dataset.cov_mean,
-        cov_std=train_dataset.cov_std,
-    )
-
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
-    )
 
     # ========================================================================
     # Build model
@@ -704,45 +792,144 @@ def main():
     # ========================================================================
     # Train
     # ========================================================================
-    trainer = Trainer(
-        model,
-        lr=lr,
-        weight_decay=weight_decay,
-        grad_clip=grad_clip,
-        device=device,
-    )
-    print(f"\nTraining for {n_epochs} epochs...")
-    history = trainer.train(
-        train_loader, val_loader, n_epochs=n_epochs, log_every=5
-    )
-
     covariates_enabled = field_cov_dim > 0
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_id = run_name or f"{data_type}_{preset}_{timestamp}_{config_hash[:8]}"
-    csv_metrics_path, jsonl_metrics_path, _ = _save_epoch_metrics(
-        history=history,
-        metrics_dir=metrics_dir,
-        run_name=run_id,
-        covariates_enabled=covariates_enabled,
-        seed=data_seed,
-        config_hash=config_hash,
-        data_type=data_type,
-    )
 
-    if save_metrics:
-        print(f"Saved per-epoch metrics CSV:   {csv_metrics_path}")
-        print(f"Saved per-epoch metrics JSONL: {jsonl_metrics_path}")
-    else:
-        print(
-            "Saved per-epoch metrics (always on for reproducibility): "
-            f"{csv_metrics_path}"
+    if HAS_LIGHTNING:
+        # ---- Lightning training path ----
+        data_module = STPPDataModule(
+            train_seqs, val_seqs,
+            batch_size=batch_size,
+            num_workers=0,
+        )
+        # Setup datasets now so we can access them for post-training analysis.
+        data_module.setup()
+        train_dataset = data_module._train_dataset
+        val_dataset = data_module._val_dataset
+
+        lightning_module = STPPLightningModule(
+            model, lr=lr, weight_decay=weight_decay, grad_clip=grad_clip
         )
 
-    print("\nDone!")
-    print(f"Final train NLL: {history['train_nll'][-1]:.4f}")
-    if history['val_nll']:
-        print(f"Final val NLL:   {history['val_nll'][-1]:.4f}")
+        # Logger
+        if logger_type == "tensorboard":
+            pl_logger = TensorBoardLogger(save_dir=log_dir, name=run_id)
+        else:
+            pl_logger = CSVLogger(save_dir=log_dir, name=run_id)
 
+        # Callbacks
+        callbacks = [
+            ModelCheckpoint(
+                dirpath=os.path.join(checkpoint_dir, run_id),
+                monitor="val/nll",
+                mode="min",
+                save_top_k=2,
+                filename="epoch{epoch:03d}-val_nll{val/nll:.4f}",
+                auto_insert_metric_name=False,
+            ),
+            LearningRateMonitor(logging_interval="epoch"),
+        ]
+        if early_stopping_patience > 0:
+            callbacks.append(
+                EarlyStopping(
+                    monitor="val/nll",
+                    patience=early_stopping_patience,
+                    mode="min",
+                    min_delta=early_stopping_min_delta,
+                )
+            )
+
+        print(f"\nTraining for up to {n_epochs} epochs with Lightning...")
+        pl_trainer = pl.Trainer(
+            max_epochs=n_epochs,
+            accelerator=accelerator,
+            devices=devices,
+            callbacks=callbacks,
+            logger=pl_logger,
+            enable_progress_bar=True,
+        )
+        pl_trainer.fit(lightning_module, data_module)
+
+        # Print final metrics from callback_metrics
+        print("\nDone!")
+        train_nll_final = pl_trainer.callback_metrics.get("train/nll")
+        val_nll_final = pl_trainer.callback_metrics.get("val/nll")
+        if train_nll_final is not None:
+            print(f"Final train NLL: {float(train_nll_final):.4f}")
+        if val_nll_final is not None:
+            print(f"Final val NLL:   {float(val_nll_final):.4f}")
+        print(f"Logs saved to:        {pl_logger.log_dir}")
+        print(f"Checkpoints saved to: {os.path.join(checkpoint_dir, run_id)}")
+
+    else:
+        # ---- Legacy training path ----
+        train_dataset = STPPDataset(train_seqs)
+        val_dataset = STPPDataset(
+            val_seqs,
+            cov_mean=train_dataset.cov_mean,
+            cov_std=train_dataset.cov_std,
+        )
+        train_loader = DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn
+        )
+        val_loader = DataLoader(
+            val_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
+        )
+
+        legacy_trainer = Trainer(
+            model,
+            lr=lr,
+            weight_decay=weight_decay,
+            grad_clip=grad_clip,
+            device=device,
+        )
+        print(f"\nTraining for {n_epochs} epochs (legacy Trainer)...")
+        history = legacy_trainer.train(
+            train_loader,
+            val_loader,
+            n_epochs=n_epochs,
+            log_every=5,
+            early_stopping_patience=early_stopping_patience,
+            early_stopping_min_delta=early_stopping_min_delta,
+            restore_best=restore_best,
+        )
+
+        csv_metrics_path, jsonl_metrics_path, _ = _save_epoch_metrics(
+            history=history,
+            metrics_dir=metrics_dir,
+            run_name=run_id,
+            covariates_enabled=covariates_enabled,
+            seed=data_seed,
+            config_hash=config_hash,
+            data_type=data_type,
+        )
+
+        print("\nDone!")
+        print(f"Final train NLL: {history['train_nll'][-1]:.4f}")
+        if history['val_nll']:
+            print(f"Final val NLL:   {history['val_nll'][-1]:.4f}")
+        if history.get("best_epoch") is not None:
+            print(
+                f"Best val NLL:    {float(history['best_val_nll']):.4f} "
+                f"(epoch {int(history['best_epoch'])}, restore_best={bool(restore_best)})"
+            )
+
+        if save_metrics:
+            print(f"Saved per-epoch metrics CSV:   {csv_metrics_path}")
+            print(f"Saved per-epoch metrics JSONL: {jsonl_metrics_path}")
+        else:
+            print(
+                "Saved per-epoch metrics (always on for reproducibility): "
+                f"{csv_metrics_path}"
+            )
+
+    # Move model to device for post-training analysis
+    model.to(device)
+
+    # ========================================================================
+    # Post-training: intensity plots
+    # ========================================================================
     if args.plot_intensity_3d or args.plot_intensity_gif:
         if spatial_dim != 2:
             print("Skipping intensity plot: only spatial_dim=2 is supported.")
@@ -774,18 +961,14 @@ def main():
                 ].unsqueeze(-1)
             return IntensityEvaluator(model, z=z_hist, t_prev=t_prev_hist)
 
-        # Default evaluator uses full available history.
         evaluator = build_evaluator_with_history(seq_item["length"])
 
         loc_mean = train_dataset.loc_mean
         loc_std = train_dataset.loc_std
         time_mean = train_dataset.time_mean
         time_std = train_dataset.time_std
-        # Covariate normalization stats from the training split — used to
-        # standardise the covariate function output at inference time so that
-        # the model sees the same feature scale it was trained on.
-        cov_mean = train_dataset.cov_mean   # np.ndarray or None
-        cov_std  = train_dataset.cov_std    # np.ndarray or None
+        cov_mean = train_dataset.cov_mean
+        cov_std  = train_dataset.cov_std
 
         all_locs = np.concatenate([s["locations"] for s in train_dataset.sequences + val_dataset.sequences], axis=0)
         s_min = all_locs.min(axis=0)
@@ -802,130 +985,80 @@ def main():
         xx, yy = np.meshgrid(x, y, indexing="ij")
         s_orig = np.stack([xx, yy], axis=-1)
 
-        # Model grid in normalized coordinates
         s_min_norm = torch.tensor((s_min - loc_mean) / loc_std, dtype=torch.float32, device=device)
         s_max_norm = torch.tensor((s_max - loc_mean) / loc_std, dtype=torch.float32, device=device)
+
         def x_field_fn_norm(t_norm_tensor, s_norm_tensor):
-            # Denormalise model inputs back to original scale before computing covariates.
             t_np = (t_norm_tensor.squeeze(-1).detach().cpu().numpy() * time_std + time_mean)
             s_np = (s_norm_tensor.detach().cpu().numpy() * loc_std + loc_mean)
             if data_type == "moving_hotspot":
                 x_np = _moving_hotspot_covariates(
-                    t_np,
-                    s_np,
-                    t_end=t_end,
-                    switch_frac=hotspot_switch_frac,
-                    covariate_dim=max(1, field_cov_dim),
-                    switch_time=hotspot_switch_time,
-                    move_duration=hotspot_move_duration,
-                    spatial_bounds=(spatial_min, spatial_max),
-                    sigma=hotspot_sigma,
-                    t1_frac=hotspot_t1_frac,
-                    t2_frac=hotspot_t2_frac,
-                    jitter_radius=hotspot_jitter_radius,
-                    jitter_f1=hotspot_jitter_f1,
-                    jitter_f2=hotspot_jitter_f2,
-                    amp0=hotspot_amp0,
-                    amp1=hotspot_amp1,
-                    amp_noise=hotspot_amp_noise,
-                    seed=data_seed,
-                    n_noise_knots=hotspot_noise_knots,
+                    t_np, s_np, t_end=t_end, switch_frac=hotspot_switch_frac,
+                    covariate_dim=max(1, field_cov_dim), switch_time=hotspot_switch_time,
+                    move_duration=hotspot_move_duration, spatial_bounds=(spatial_min, spatial_max),
+                    sigma=hotspot_sigma, t1_frac=hotspot_t1_frac, t2_frac=hotspot_t2_frac,
+                    jitter_radius=hotspot_jitter_radius, jitter_f1=hotspot_jitter_f1,
+                    jitter_f2=hotspot_jitter_f2, amp0=hotspot_amp0, amp1=hotspot_amp1,
+                    amp_noise=hotspot_amp_noise, seed=data_seed, n_noise_knots=hotspot_noise_knots,
                 )
             elif data_type == "regime_gated_hawkes":
                 x_np = regime_gated_covariates_at(
-                    t=t_np,
-                    x=s_np,
-                    T=t_end,
-                    n_regimes=rg_num_regimes,
+                    t=t_np, x=s_np, T=t_end, n_regimes=rg_num_regimes,
                     regime_change_times=np.asarray(raw_seq["regime_change_times"], dtype=np.float64),
                     regime_states=np.asarray(raw_seq["regime_states"], dtype=np.int64),
-                    env_dim=rg_env_dim,
-                    spatial_bounds=(spatial_min, spatial_max),
-                    sigma_reg=0.0,
-                    apply_tanh=True,
-                    rng=None,
+                    env_dim=rg_env_dim, spatial_bounds=(spatial_min, spatial_max),
+                    sigma_reg=0.0, apply_tanh=True, rng=None,
                 )
             else:
                 x_np = _default_covariates(t_np, s_np, covariate_dim=max(1, field_cov_dim))
-            # Apply the same z-score normalisation used on the training data so
-            # that the model receives covariates in the exact same scale as
-            # during training.
             if cov_mean is not None and cov_std is not None:
                 x_np = (x_np - cov_mean) / cov_std
             return torch.tensor(x_np, dtype=torch.float32, device=t_norm_tensor.device)
 
         x_field_fn = x_field_fn_norm if field_cov_dim > 0 else None
 
-        def compute_intensities_for_time(t_query: float, evaluator_local: IntensityEvaluator = None):
+        def compute_intensities_for_time(t_query: float, evaluator_local=None):
             evaluator_use = evaluator if evaluator_local is None else evaluator_local
             t_norm_local = float((t_query - time_mean) / time_std)
             _, _, lam_model_norm_local = evaluator_use.intensity_grid(
-                t=t_norm_local,
-                s_min=s_min_norm,
-                s_max=s_max_norm,
-                n_grid=n_grid,
-                x_field_fn=x_field_fn,
+                t=t_norm_local, s_min=s_min_norm, s_max=s_max_norm,
+                n_grid=n_grid, x_field_fn=x_field_fn,
             )
             lam_model_local = (
                 lam_model_norm_local.detach().cpu().numpy() / (time_std * np.prod(loc_std))
             )
             lam_true_local = _true_intensity(
-                data_type,
-                raw_seq,
-                t_query,
-                s_orig,
-                t_end=t_end,
-                spatial_bounds=(spatial_min, spatial_max),
-                base_rate=base_rate,
-                covariate_dim=field_cov_dim,
-                sthp_alpha=sthp_alpha,
-                sthp_beta=sthp_beta,
-                sthp_mu=sthp_mu,
-                hotspot_weight=hotspot_weight,
-                hotspot_sigma=hotspot_sigma,
-                hotspot_switch_frac=hotspot_switch_frac,
-                hotspot_switch_time=hotspot_switch_time,
-                hotspot_move_duration=hotspot_move_duration,
-                hotspot_t1_frac=hotspot_t1_frac,
-                hotspot_t2_frac=hotspot_t2_frac,
-                hotspot_jitter_radius=hotspot_jitter_radius,
-                hotspot_jitter_f1=hotspot_jitter_f1,
-                hotspot_jitter_f2=hotspot_jitter_f2,
-                hotspot_amp0=hotspot_amp0,
-                hotspot_amp1=hotspot_amp1,
-                hotspot_amp_noise=hotspot_amp_noise,
-                hotspot_noise_knots=hotspot_noise_knots,
-                data_seed=data_seed,
-                hotspot_interaction_weight=hotspot_interaction_weight,
+                data_type, raw_seq, t_query, s_orig,
+                t_end=t_end, spatial_bounds=(spatial_min, spatial_max), base_rate=base_rate,
+                covariate_dim=field_cov_dim, sthp_alpha=sthp_alpha, sthp_beta=sthp_beta,
+                sthp_mu=sthp_mu, hotspot_weight=hotspot_weight, hotspot_sigma=hotspot_sigma,
+                hotspot_switch_frac=hotspot_switch_frac, hotspot_switch_time=hotspot_switch_time,
+                hotspot_move_duration=hotspot_move_duration, hotspot_t1_frac=hotspot_t1_frac,
+                hotspot_t2_frac=hotspot_t2_frac, hotspot_jitter_radius=hotspot_jitter_radius,
+                hotspot_jitter_f1=hotspot_jitter_f1, hotspot_jitter_f2=hotspot_jitter_f2,
+                hotspot_amp0=hotspot_amp0, hotspot_amp1=hotspot_amp1,
+                hotspot_amp_noise=hotspot_amp_noise, hotspot_noise_knots=hotspot_noise_knots,
+                data_seed=data_seed, hotspot_interaction_weight=hotspot_interaction_weight,
                 hotspot_tod_weight=hotspot_tod_weight,
             )
             return lam_true_local, lam_model_local
 
-        # Single 3D plot
         if args.plot_intensity_3d:
             lam_true, lam_model = compute_intensities_for_time(t_orig)
             fig = plt.figure(figsize=(14, 6))
             ax1 = fig.add_subplot(1, 2, 1, projection="3d")
             ax2 = fig.add_subplot(1, 2, 2, projection="3d")
-
             ax1.plot_surface(xx, yy, lam_true, cmap="viridis", linewidth=0, antialiased=True)
             ax1.set_title(f"True Intensity at t={t_orig:.3f}")
-            ax1.set_xlabel("x")
-            ax1.set_ylabel("y")
-            ax1.set_zlabel("lambda")
-
+            ax1.set_xlabel("x"); ax1.set_ylabel("y"); ax1.set_zlabel("lambda")
             ax2.plot_surface(xx, yy, lam_model, cmap="plasma", linewidth=0, antialiased=True)
             ax2.set_title(f"Estimated Intensity at t={t_orig:.3f}")
-            ax2.set_xlabel("x")
-            ax2.set_ylabel("y")
-            ax2.set_zlabel("lambda")
-
+            ax2.set_xlabel("x"); ax2.set_ylabel("y"); ax2.set_zlabel("lambda")
             plt.tight_layout()
             plt.savefig(args.plot_out, dpi=150)
             plt.close(fig)
             print(f"Saved 3D intensity comparison to {args.plot_out}")
 
-        # Animated GIF over representative times
         if args.plot_intensity_gif:
             try:
                 from PIL import Image
@@ -938,14 +1071,11 @@ def main():
                 print("Skipping GIF: selected sequence has no events.")
                 return
 
-            # Animate from the first observed event to t_end, and use
-            # frame-specific history up to each frame time.
             start_t = min(max(float(raw_times[0]) + 1e-4, 1e-4), float(t_end))
             end_t = max(start_t + 1e-3, float(t_end))
             n_times = max(2, args.plot_n_times)
             times = np.linspace(start_t, end_t, n_times)
 
-            frames = []
             frame_data = []
             for ti in times:
                 n_hist = int(np.searchsorted(raw_times, float(ti), side="right"))
@@ -957,29 +1087,19 @@ def main():
             for _, lam_true_i, lam_model_i in frame_data:
                 global_zmax = max(global_zmax, float(np.max(lam_true_i)), float(np.max(lam_model_i)))
 
+            frames = []
             for ti, lam_true_i, lam_model_i in frame_data:
                 fig = plt.figure(figsize=(14, 6))
                 ax1 = fig.add_subplot(1, 2, 1, projection="3d")
                 ax2 = fig.add_subplot(1, 2, 2, projection="3d")
-
-                ax1.plot_surface(
-                    xx, yy, lam_true_i, cmap="viridis", linewidth=0, antialiased=True, vmin=0.0, vmax=global_zmax
-                )
+                ax1.plot_surface(xx, yy, lam_true_i, cmap="viridis", linewidth=0, antialiased=True, vmin=0.0, vmax=global_zmax)
                 ax1.set_title(f"True Intensity at t={ti:.3f}")
-                ax1.set_xlabel("x")
-                ax1.set_ylabel("y")
-                ax1.set_zlabel("lambda")
+                ax1.set_xlabel("x"); ax1.set_ylabel("y"); ax1.set_zlabel("lambda")
                 ax1.set_zlim(0.0, global_zmax)
-
-                ax2.plot_surface(
-                    xx, yy, lam_model_i, cmap="plasma", linewidth=0, antialiased=True, vmin=0.0, vmax=global_zmax
-                )
+                ax2.plot_surface(xx, yy, lam_model_i, cmap="plasma", linewidth=0, antialiased=True, vmin=0.0, vmax=global_zmax)
                 ax2.set_title(f"Estimated Intensity at t={ti:.3f}")
-                ax2.set_xlabel("x")
-                ax2.set_ylabel("y")
-                ax2.set_zlabel("lambda")
+                ax2.set_xlabel("x"); ax2.set_ylabel("y"); ax2.set_zlabel("lambda")
                 ax2.set_zlim(0.0, global_zmax)
-
                 plt.tight_layout()
                 fig.canvas.draw()
                 w, h = fig.canvas.get_width_height()
@@ -990,15 +1110,10 @@ def main():
             out_path = args.plot_out
             if not out_path.lower().endswith(".gif"):
                 out_path = os.path.splitext(out_path)[0] + ".gif"
-
             duration_ms = int(1000 / max(1, args.plot_gif_fps))
             frames[0].save(
-                out_path,
-                save_all=True,
-                append_images=frames[1:],
-                duration=duration_ms,
-                loop=0,
-                disposal=2,
+                out_path, save_all=True, append_images=frames[1:],
+                duration=duration_ms, loop=0, disposal=2,
             )
             print(f"Saved intensity animation to {out_path} ({len(frames)} frames)")
 

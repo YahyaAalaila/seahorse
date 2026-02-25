@@ -27,17 +27,27 @@ except ImportError:
 
 
 class ODEFunc(nn.Module):
-    """The right-hand side f(z, t) of the ODE dz/dt = f(z, t)."""
+    """The right-hand side f(z, t) of the ODE dz/dt = f(z, t).
+
+    Output is bounded via tanh, preventing exploding ODE trajectories.
+    Matches the original NeuralSTPP design (SimpleHiddenStateODEFunc applies
+    torch.tanh to the network output). The last linear layer is zero-initialized
+    so that dz/dt ≈ 0 at init, following the original's zero_init=True flag.
+    """
 
     def __init__(self, hidden_dim: int, field_cov_dim: int = 0):
         super().__init__()
         input_dim = hidden_dim + 1  # +1 for time
         if field_cov_dim > 0:
             input_dim += field_cov_dim
+        # Zero-init the last linear so dz/dt ≈ 0 at init (matches original).
+        last_linear = nn.Linear(hidden_dim * 2, hidden_dim)
+        nn.init.zeros_(last_linear.weight)
+        nn.init.zeros_(last_linear.bias)
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim * 2),
             nn.Tanh(),
-            nn.Linear(hidden_dim * 2, hidden_dim),
+            last_linear,
         )
         self.field_cov_dim = field_cov_dim
         self._x_field_fn = None  # Set externally before each ODE solve
@@ -48,14 +58,15 @@ class ODEFunc(nn.Module):
             t: scalar tensor — current time
             z: (B, h)
         Returns:
-            dz/dt: (B, h)
+            dz/dt: (B, h) — bounded in (-1, 1) via tanh
         """
         t_expand = t.expand(z.shape[0], 1)  # (B, 1)
         inp = [z, t_expand]
         if self.field_cov_dim > 0 and self._x_field_fn is not None:
             x_f = self._x_field_fn(t)  # (B, r)
             inp.append(x_f)
-        return self.net(torch.cat(inp, dim=-1))
+        # tanh bounds velocity to (-1, 1) preventing ODE blow-up
+        return torch.tanh(self.net(torch.cat(inp, dim=-1)))
 
 
 class AugmentedODEFunc(nn.Module):
@@ -85,7 +96,8 @@ class AugmentedODEFunc(nn.Module):
         dz = self.ode_func(t, z)  # (B, h)
 
         B = z.shape[0]
-        elapsed = t.expand(B, 1)  # (B, 1)
+        # t is a 0-dim scalar from torchdiffeq; reshape to (B, 1) safely.
+        elapsed = t.reshape(1, 1).expand(B, 1)  # (B, 1)
         lam = self.intensity_fn(z, elapsed)  # (B,)
 
         return torch.cat([dz, lam.unsqueeze(-1)], dim=-1)  # (B, h+1)

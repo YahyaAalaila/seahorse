@@ -1,7 +1,9 @@
 """
-Training loop for unified STPP models.
+Legacy training loop (no Lightning dependency).
+For new usage, prefer the Lightning-based training via train.py.
 """
 
+import copy
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -97,8 +99,22 @@ class Trainer:
         val_loader: Optional[DataLoader] = None,
         n_epochs: int = 100,
         log_every: int = 1,
+        early_stopping_patience: int = 0,
+        early_stopping_min_delta: float = 0.0,
+        restore_best: bool = True,
     ) -> Dict[str, list]:
-        history = {"train_nll": [], "val_nll": [], "epoch_time_sec": []}
+        history = {
+            "train_nll": [],
+            "val_nll": [],
+            "epoch_time_sec": [],
+            "best_val_nll": None,
+            "best_epoch": None,
+        }
+
+        best_val = float("inf")
+        best_epoch = None
+        best_state = None
+        bad_epochs = 0
 
         for epoch in range(1, n_epochs + 1):
             t0 = time.time()
@@ -110,8 +126,19 @@ class Trainer:
             val_metrics = None
             if val_loader is not None:
                 val_metrics = self.evaluate(val_loader)
-                history["val_nll"].append(val_metrics["nll"])
-                self.scheduler.step(val_metrics["nll"])
+                val_nll = float(val_metrics["nll"])
+                history["val_nll"].append(val_nll)
+                self.scheduler.step(val_nll)
+
+                improved = val_nll < (best_val - float(early_stopping_min_delta))
+                if improved:
+                    best_val = val_nll
+                    best_epoch = epoch
+                    bad_epochs = 0
+                    if restore_best:
+                        best_state = copy.deepcopy(self.model.state_dict())
+                else:
+                    bad_epochs += 1
 
             if epoch % log_every == 0 or epoch == 1:
                 msg = f"[Epoch {epoch:3d}] train NLL: {train_metrics['nll']:.4f}"
@@ -119,5 +146,22 @@ class Trainer:
                     msg += f"  val NLL: {val_metrics['nll']:.4f}"
                 msg += f"  ({elapsed:.1f}s)"
                 print(msg)
+
+            if (
+                val_loader is not None
+                and early_stopping_patience is not None
+                and int(early_stopping_patience) > 0
+                and bad_epochs >= int(early_stopping_patience)
+            ):
+                print(
+                    f"Early stopping at epoch {epoch} (best val NLL {best_val:.4f} at epoch {best_epoch})."
+                )
+                break
+
+        if best_epoch is not None:
+            history["best_val_nll"] = float(best_val)
+            history["best_epoch"] = int(best_epoch)
+        if restore_best and best_state is not None:
+            self.model.load_state_dict(best_state)
 
         return history
