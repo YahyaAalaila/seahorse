@@ -1,32 +1,30 @@
-# DeepSTPP configuration
-# Encoder: Attention, Dynamics: Identity, Updater: Attention
-# Decoder: Factorized — log-normal mixture (temporal) + Gaussian mixture (spatial)
+# DeepSTPP in the unified framework — faithful to Lin et al. 2021
+# TransformerEncoder (sinusoidal time PE) + LogNormalMixtureTemporal +
+# DataCenteredGaussianSpatial (event-location Gaussians + background anchors).
 
 model:
   preset: deep_stpp
   hidden_dim: 64
   spatial_dim: 2
-  event_cov_dim: 0
-  field_cov_dim: 0
-  overrides:
-    encoder:
-      num_heads: 4
-      num_layers: 2
-    decoder:
-      temporal:
-        n_components: 16
-      spatial:
-        n_components: 16
+  encoder:
+    num_heads: 4
+    num_layers: 2
+    dropout: 0.1
+  updater:
+    num_heads: 4
+  decoder:
+    spatial:
+      seq_len: 10           # must equal paper_lookback when using paper_autostpp_sthp
+      num_points: 50        # background spatial anchors (50 in paper)
+      sigma_min: 0.3        # minimum Gaussian sigma in model space
 
 training:
-  lr: 0.001
+  lr: 1.0e-3
   weight_decay: 1.0e-5
   grad_clip: 5.0
   n_epochs: 100
-  batch_size: 32
+  batch_size: 64
 
 data:
-  type: hawkes
-  n_train: 200
-  n_val: 50
-  T: 10.0
+  type: sthp
+  protocol: paper_autostpp_sthp

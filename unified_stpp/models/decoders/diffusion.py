@@ -198,10 +198,25 @@ class DiffusionDecoder(Decoder):
         x_field: Optional[Tensor] = None,
     ) -> Tensor:
         """
-        NLL via denoising score matching loss.
-        
-        For diffusion models, we train with the DSM loss rather than
-        the exact NLL. This is standard practice (DSTPP does the same).
+        Training surrogate via denoising score matching (DSM) loss.
+
+        .. warning::
+            **This is NOT the true negative log-likelihood.**
+
+            The returned value is the weighted DSM objective
+            ``E[σ²||s_θ(x+σε) − (−ε/σ)||²]``, which is used as a
+            training surrogate for the intractable exact NLL.  It is NOT
+            comparable to the per-event NLL returned by FactorizedDecoder
+            or AutoIntDecoder, and MUST NOT be reported alongside those
+            values in likelihood tables.
+
+            True per-event NLL for a diffusion model requires integrating
+            the probability-flow ODE (see Song et al., 2021, "Score-Based
+            Generative Modeling through SDEs").  That path is not yet
+            implemented here.
+
+        TODO: implement probability-flow ODE evaluation to obtain a true,
+        comparable per-event NLL for DiffusionDecoder / DSTPP.
         """
         tau = (t - t_prev).clamp(min=1e-6)  # (B, 1)
         x = torch.cat([tau, s], dim=-1)  # (B, 1+d)

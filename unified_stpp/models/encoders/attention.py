@@ -17,9 +17,9 @@ class AttentionEncoder(Encoder):
         self,
         input_dim: int,
         hidden_dim: int,
-        num_heads: int = 4,
-        num_layers: int = 2,
-        dropout: float = 0.1,
+        num_heads: int = 2,
+        num_layers: int = 3,
+        dropout: float = 0,
         event_cov_dim: int = 0,
         **kwargs,
     ):

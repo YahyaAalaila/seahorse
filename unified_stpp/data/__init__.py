@@ -1,4 +1,5 @@
-from .dataset import STPPDataset, collate_fn
+from .dataset import STPPDataset, collate_fn, PaperSlidingWindowDataset
+from .contract import validate_batch, fingerprint_batch
 from .synthetic import (
     generate_hawkes_stpp,
     generate_inhomogeneous_stpp,

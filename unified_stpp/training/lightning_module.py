@@ -6,13 +6,23 @@ import pytorch_lightning as pl
 
 
 class STPPLightningModule(pl.LightningModule):
-    def __init__(self, model, lr=1e-3, weight_decay=1e-5, grad_clip=5.0):
+    def __init__(
+        self,
+        model,
+        lr=1e-3,
+        weight_decay=1e-5,
+        grad_clip=5.0,
+        adam_beta1=0.9,
+        adam_beta2=0.999,
+    ):
         super().__init__()
         self.model = model  # UnifiedSTPP instance
         self.save_hyperparameters(ignore=["model"])
         self.lr = lr
         self.weight_decay = weight_decay
         self.grad_clip = grad_clip
+        self.adam_beta1 = adam_beta1
+        self.adam_beta2 = adam_beta2
 
     def forward(self, batch):
         return self.model(
@@ -24,25 +34,51 @@ class STPPLightningModule(pl.LightningModule):
             x_field_at_events=batch.get("field_covariates"),
         )
 
+    @staticmethod
+    def _batch_size_from_batch(batch) -> int:
+        if isinstance(batch, dict) and "lengths" in batch and batch["lengths"] is not None:
+            return int(batch["lengths"].shape[0])
+        if isinstance(batch, dict) and "times" in batch and batch["times"] is not None:
+            return int(batch["times"].shape[0])
+        return 1
+
     def training_step(self, batch, batch_idx):
         output = self.forward(batch)
         loss = output["nll"]
-        self.log("train/nll", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/n_events", output["total_events"], on_step=False, on_epoch=True)
+        batch_size = self._batch_size_from_batch(batch)
+        self.log("train/nll", loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        self.log(
+            "train/n_events",
+            output["total_events"],
+            on_step=False,
+            on_epoch=True,
+            batch_size=batch_size,
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
         output = self.forward(batch)
-        self.log("val/nll", output["nll"], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/n_events", output["total_events"], on_step=False, on_epoch=True)
+        batch_size = self._batch_size_from_batch(batch)
+        self.log("val/nll", output["nll"], on_step=False, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        self.log(
+            "val/n_events",
+            output["total_events"],
+            on_step=False,
+            on_epoch=True,
+            batch_size=batch_size,
+        )
 
     def test_step(self, batch, batch_idx):
         output = self.forward(batch)
-        self.log("test/nll", output["nll"], on_step=False, on_epoch=True)
+        batch_size = self._batch_size_from_batch(batch)
+        self.log("test/nll", output["nll"], on_step=False, on_epoch=True, batch_size=batch_size)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            self.model.parameters(),
+            lr=self.lr,
+            weight_decay=self.weight_decay,
+            betas=(self.adam_beta1, self.adam_beta2),
         )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode="min", factor=0.5, patience=10

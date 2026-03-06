@@ -406,6 +406,147 @@ class GaussianMixtureSpatial(nn.Module):
 
 
 # ============================================================================
+# DataCenteredGaussianSpatial (DeepSTPP faithful — Lin et al. 2021)
+# ============================================================================
+
+class DataCenteredGaussianSpatial(nn.Module):
+    """
+    Spatial Gaussian mixture whose centers are pinned to past event locations
+    (+ learnable background anchors), matching Lin et al. 2021 DeepSTPP.
+
+    The decoder predicts ONLY mixture logits and per-component diagonal
+    log-sigma from z.  Event-location centers are received via the x_field
+    argument as a flattened (seq_len * spatial_dim,) vector.
+
+    Args:
+        spatial_dim:   d, dimension of spatial coordinates.
+        hidden_dim:    dimension of latent z.
+        seq_len:       number of most-recent history events used as centers.
+        num_points:    number of learnable background anchor centers.
+        sigma_min:     minimum allowed Gaussian sigma (model-space units);
+                       prevents excessively sharp intensity peaks.
+        field_cov_dim: ignored (kept for API compatibility).
+    """
+
+    def __init__(
+        self,
+        spatial_dim: int,
+        hidden_dim: int,
+        seq_len: int = 20,
+        num_points: int = 20,
+        sigma_min: float = 0.3,
+        field_cov_dim: int = 0,
+        **kwargs,
+    ):
+        super().__init__()
+        self.spatial_dim = spatial_dim
+        self.seq_len = seq_len
+        self.num_points = num_points
+        self.sigma_min = sigma_min
+        M = seq_len + num_points
+
+        if num_points > 0:
+            self.background = nn.Parameter(
+                torch.randn(num_points, spatial_dim) * 0.01
+            )
+        else:
+            self.register_parameter("background", None)
+
+        # Predict logits (M) + log-sigma per dim (M*d) from z
+        self.param_net = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.SiLU(),
+            nn.Linear(hidden_dim, M + M * spatial_dim),
+        )
+
+    @property
+    def requires_history(self) -> bool:
+        return True
+
+    @property
+    def history_window_size(self) -> int:
+        return self.seq_len
+
+    def _get_centers(self, x_field: Optional[Tensor], B: int, device) -> Tensor:
+        """Build (B, M, d) centers from history locs + background anchors."""
+        if x_field is not None:
+            hist = x_field.reshape(B, self.seq_len, self.spatial_dim)
+        else:
+            hist = torch.zeros(B, self.seq_len, self.spatial_dim, device=device)
+
+        if self.background is not None:
+            bg = self.background.unsqueeze(0).expand(B, -1, -1)  # (B, P, d)
+            return torch.cat([hist, bg], dim=1)                   # (B, M, d)
+        return hist
+
+    def log_prob(
+        self,
+        z: Tensor,
+        t: Tensor,
+        s: Tensor,
+        t_prev: Tensor,
+        x_field: Optional[Tensor] = None,
+    ) -> Tensor:
+        B = z.shape[0]
+        M = self.seq_len + self.num_points
+        d = self.spatial_dim
+
+        centers = self._get_centers(x_field, B, z.device)   # (B, M, d)
+
+        params   = self.param_net(z)                                   # (B, M + M*d)
+        logits   = params[:, :M]                                       # (B, M)
+        log_sig  = params[:, M:].reshape(B, M, d)                     # (B, M, d)
+        sigma    = F.softplus(log_sig) + self.sigma_min                # (B, M, d)
+        inv_var  = 1.0 / sigma.pow(2).clamp(min=1e-6)                  # (B, M, d)
+
+        diff    = s.unsqueeze(1) - centers                             # (B, M, d)
+        log_det = 0.5 * inv_var.prod(dim=-1).clamp(min=1e-12).log()   # (B, M)
+        quad    = (diff * inv_var * diff).sum(dim=-1)                  # (B, M)
+        log_g   = log_det - math.log(2.0 * math.pi) * (d / 2.0) - 0.5 * quad  # (B, M)
+        log_pi  = F.log_softmax(logits, dim=-1)                        # (B, M)
+
+        return torch.logsumexp(log_pi + log_g, dim=-1)                 # (B,)
+
+    def nll(
+        self,
+        z: Tensor,
+        t: Tensor,
+        s: Tensor,
+        t_prev: Tensor,
+        x_field: Optional[Tensor] = None,
+    ) -> Tensor:
+        return -self.log_prob(z, t, s, t_prev, x_field=x_field)
+
+    def sample(
+        self,
+        z: Tensor,
+        t: Tensor,
+        t_prev: Tensor,
+        x_field: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Ancestral sample: draw component k ~ Cat(w), then s ~ N(μ_k, σ_k² I)."""
+        B = z.shape[0]
+        d = self.spatial_dim
+        M = self.seq_len + self.num_points
+        device = z.device
+
+        centers = self._get_centers(x_field, B, device)               # (B, M, d)
+
+        params   = self.param_net(z)
+        logits   = params[:, :M]
+        log_sig  = params[:, M:].reshape(B, M, d)
+        sigma    = F.softplus(log_sig) + self.sigma_min                # (B, M, d)
+
+        pi = F.softmax(logits, dim=-1)                                 # (B, M)
+        k  = torch.multinomial(pi, num_samples=1).squeeze(-1)          # (B,)
+        batch_idx = torch.arange(B, device=device)
+        mu_k    = centers[batch_idx, k]                                # (B, d)
+        sigma_k = sigma[batch_idx, k]                                  # (B, d)
+        eps     = torch.randn(B, d, device=device)
+        return mu_k + sigma_k * eps                                    # (B, d)
+
+
+# ============================================================================
 # Utilities
 # ============================================================================
 

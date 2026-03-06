@@ -14,9 +14,11 @@ from .models.decoders import (
     LogNormalMixtureTemporal,
     CNFSpatial,
     GaussianMixtureSpatial,
+    DataCenteredGaussianSpatial,
     DiffusionDecoder,
     MLPMarkDecoder,
     AttentionMarkDecoder,
+    AutoIntDecoder,
 )
 from .models.covariates import LiftingMap, MarkEmbedding
 from .models.unified_model import UnifiedSTPP
@@ -46,6 +48,7 @@ TEMPORAL_DECODER_REGISTRY = {
 SPATIAL_DECODER_REGISTRY = {
     "cnf": CNFSpatial,
     "gaussian_mixture": GaussianMixtureSpatial,
+    "data_centered_gaussian": DataCenteredGaussianSpatial,
 }
 
 MARK_DECODER_REGISTRY = {
@@ -79,7 +82,27 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "spatial": {"type": "cnf", "solver": "dopri5"},
         },
     },
+    # DeepSTPP in the unified framework (Lin et al. 2021):
+    #   TransformerEncoder (sinusoidal time PE) +
+    #   LogNormalMixtureTemporal +
+    #   DataCenteredGaussianSpatial (event-location Gaussians + background anchors).
     "deep_stpp": {
+        "encoder": {"type": "transformer", "num_heads": 2, "num_layers": 3, "dropout": 0.1},
+        "dynamics": {"type": "identity"},
+        "updater": {"type": "attention", "num_heads": 2},
+        "decoder": {
+            "type": "factorized",
+            "temporal": {"type": "lognormal_mixture", "n_components": 16},
+            "spatial": {
+                "type": "data_centered_gaussian",
+                "seq_len": 20,
+                "num_points": 20,
+                "sigma_min": 0.3,
+            },
+        },
+    },
+    # Free-GMM variant: attention encoder + LogNormal mixture + unconstrained GMM spatial.
+    "deep_stpp_free": {
         "encoder": {"type": "attention", "num_heads": 4, "num_layers": 2},
         "dynamics": {"type": "identity"},
         "updater": {"type": "attention", "num_heads": 4},
@@ -100,13 +123,31 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "sigma_max": 5.0,
         },
     },
+    "auto_stpp": {
+        "encoder": {"type": "gru", "num_layers": 1},
+        "dynamics": {"type": "identity"},
+        "updater": {"type": "gru_jump"},
+        "decoder": {
+            "type": "autoint",
+            "n_components": 8,
+            "n_layers": 2,
+            "internal_dim": 64,
+            # Bounding box in z-scored coordinates (STPPDataModule normalize=True).
+            # After z-scoring, data has mean≈0, std≈1; ±3.5σ covers >99.9% of
+            # the distribution without inflating the compensator integral.
+            "x_lo": -3.5,
+            "x_hi": 3.5,
+            "y_lo": -3.5,
+            "y_hi": 3.5,
+        },
+    },
 }
 
 
 def build_model(
     config: Dict[str, Any],
     spatial_dim: int = 2,
-    hidden_dim: int = 64,
+    hidden_dim: int = 128,
     event_cov_dim: int = 0,
     field_cov_dim: int = 0,
     preset: Optional[str] = None,
@@ -158,7 +199,9 @@ def build_model(
 
     # Build encoder (uses effective_event_cov_dim to see mark embeddings)
     enc_cfg = config["encoder"]
+    
     enc_type = enc_cfg.pop("type")
+    print(f"Building encoder of type '{enc_type}' for preset = {preset}, ")
     encoder = ENCODER_REGISTRY[enc_type](
         input_dim=input_dim,
         hidden_dim=hidden_dim,
@@ -237,6 +280,14 @@ def build_model(
             n_noise_levels=dec_cfg.get("n_noise_levels", 50),
             sigma_min=dec_cfg.get("sigma_min", 0.01),
             sigma_max=dec_cfg.get("sigma_max", 5.0),
+        )
+    elif dec_type == "autoint":
+        autoint_cfg = {k: v for k, v in dec_cfg.items() if k != "type"}
+        decoder = AutoIntDecoder(
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            field_cov_dim=field_cov_dim,
+            **autoint_cfg,
         )
     else:
         raise ValueError(f"Unknown decoder type: {dec_type}")

@@ -18,6 +18,24 @@ from .base import Encoder, Dynamics, Updater, Decoder, MarkDecoder
 from .dynamics.identity import IdentityDynamics
 
 
+def _sliding_history_windows(locations: Tensor, L: int, seq_len: int) -> Tensor:
+    """
+    Build (B, L, seq_len * d) history windows for prediction positions 0..L-1.
+
+    Window n contains the seq_len events immediately preceding prediction
+    position n+1 (events max(0, n+1-seq_len)..n), left-padded with the
+    first observed event when fewer than seq_len events are available.
+    """
+    B, _, d = locations.shape
+    # Pad seq_len-1 copies of the first event on the left
+    first = locations[:, :1, :].expand(-1, seq_len - 1, -1)          # (B, seq_len-1, d)
+    padded = torch.cat([first, locations[:, :L + 1, :]], dim=1)       # (B, seq_len-1+L+1, d)
+    windows = torch.stack(
+        [padded[:, n : n + seq_len, :] for n in range(L)], dim=1
+    )                                                                   # (B, L, seq_len, d)
+    return windows.reshape(B, L, seq_len * d)
+
+
 class UnifiedSTPP(nn.Module):
     """
     The unified Neural STPP framework.
@@ -156,10 +174,21 @@ class UnifiedSTPP(nn.Module):
         n_indices = torch.arange(L, device=device)                         # (L,)
         mask = (n_indices.unsqueeze(0) < (lengths.unsqueeze(1) - 1)).float()  # (B, L)
 
-        # Field covariates at position n (not n+1, to avoid future leakage)
-        x_field_dec = None
-        if x_field_at_events is not None:
-            x_field_dec = x_field_at_events[:, :L, :]  # (B, L, r)
+        # Field covariates / history windows for decoder.
+        # When the spatial sub-decoder needs history windows (data-centered
+        # Gaussians), build them from the event locations and pass via the
+        # dedicated x_field_spatial kwarg so the temporal decoder is unaffected.
+        spatial_dec = getattr(self.decoder, "spatial", None)
+        x_field_flat = None
+        x_field_spatial_flat = None
+        if spatial_dec is not None and getattr(spatial_dec, "requires_history", False):
+            seq_len = spatial_dec.history_window_size
+            hist_windows = _sliding_history_windows(locations, L, seq_len)   # (B, L, seq_len*d)
+            x_field_spatial_flat = hist_windows.reshape(B * L, -1)
+            if x_field_at_events is not None:
+                x_field_flat = x_field_at_events[:, :L, :].reshape(B * L, -1)
+        elif x_field_at_events is not None:
+            x_field_flat = x_field_at_events[:, :L, :].reshape(B * L, -1)
 
         # Flatten to (B*L, ...) for a single batched decoder call
         h = z_cond.shape[-1]
@@ -168,14 +197,21 @@ class UnifiedSTPP(nn.Module):
         t_flat      = t_target.reshape(B * L, 1)
         s_flat      = s_target.reshape(B * L, d)
         t_prev_flat = t_prev.reshape(B * L, 1)
-        x_field_flat = (
-            x_field_dec.reshape(B * L, -1) if x_field_dec is not None else None
-        )
 
         # Single batched ground decoder call
-        nll_flat = self.decoder.nll(
-            z_flat, t_flat, s_flat, t_prev_flat, x_field=x_field_flat
-        )  # (B*L,)
+        if x_field_spatial_flat is not None:
+            # FactorizedDecoder accepts x_field_spatial to route history windows
+            # exclusively to the spatial sub-decoder.
+            nll_flat = self.decoder.nll(
+                z_flat, t_flat, s_flat, t_prev_flat,
+                x_field=x_field_flat,
+                x_field_spatial=x_field_spatial_flat,
+            )  # (B*L,)
+        else:
+            nll_flat = self.decoder.nll(
+                z_flat, t_flat, s_flat, t_prev_flat,
+                x_field=x_field_flat,
+            )  # (B*L,)
         nll_all = nll_flat.reshape(B, L)  # (B, L)
 
         # Mark NLL (additive, same batched pattern)

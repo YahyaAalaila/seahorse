@@ -40,12 +40,20 @@ class FactorizedDecoder(Decoder):
         s: Tensor,
         t_prev: Tensor,
         x_field: Optional[Tensor] = None,
+        x_field_spatial: Optional[Tensor] = None,
     ) -> Tensor:
         """
         Returns log f*(t, s) = log f*(t) + log f*(s|t).
+
+        Args:
+            x_field: field covariates passed to both sub-decoders (default).
+            x_field_spatial: if provided, passed to the spatial decoder instead
+                of x_field.  Use this for data-centered decoders that receive
+                history windows rather than field covariates.
         """
         log_ft = self.temporal.log_prob(z, t, t_prev, x_field=x_field)
-        log_fs = self.spatial.log_prob(z, t, s, t_prev, x_field=x_field)
+        spat_field = x_field_spatial if x_field_spatial is not None else x_field
+        log_fs = self.spatial.log_prob(z, t, s, t_prev, x_field=spat_field)
         return log_ft + log_fs
 
     def nll(
@@ -55,14 +63,16 @@ class FactorizedDecoder(Decoder):
         s: Tensor,
         t_prev: Tensor,
         x_field: Optional[Tensor] = None,
+        x_field_spatial: Optional[Tensor] = None,
     ) -> Tensor:
         """
         NLL = -log f*(t) - log f*(s|t) = -log f*(t,s).
-        
+
         For density-based decoders, the compensator is implicit
         (the density integrates to 1 by construction).
         """
-        return -self.log_prob(z, t, s, t_prev, x_field=x_field)
+        return -self.log_prob(z, t, s, t_prev, x_field=x_field,
+                              x_field_spatial=x_field_spatial)
 
     def sample(
         self,

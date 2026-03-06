@@ -306,7 +306,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train unified STPP model")
     parser.add_argument("--config", type=str, default=None, help="Path to YAML config")
     parser.add_argument("--preset", type=str, default=None,
-                        choices=["neural_stpp", "deep_stpp", "dstpp"],
+                        choices=["neural_stpp", "deep_stpp", "dstpp", "auto_stpp"],
                         help="Use a preset configuration")
     parser.add_argument("--hidden_dim", type=int, default=64)
     parser.add_argument("--spatial_dim", type=int, default=2)

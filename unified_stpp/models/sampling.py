@@ -145,16 +145,25 @@ class IntensityEvaluator:
       λ*(t, s) is directly available.
     """
 
-    def __init__(self, model, z: Tensor, t_prev: Tensor):
+    def __init__(
+        self,
+        model,
+        z: Tensor,
+        t_prev: Tensor,
+        history_locs_norm: Optional[Tensor] = None,
+    ):
         """
         Args:
             model: trained UnifiedSTPP
             z: (B, h) — latent state after encoding history
             t_prev: (B, 1) — time of last event
+            history_locs_norm: (N, d) — normalized event locations from history,
+                used by data-centered decoders (DataCenteredGaussianSpatial).
         """
         self.model = model
         self.z = z
         self.t_prev = t_prev
+        self.history_locs_norm = history_locs_norm
 
     @torch.no_grad()
     def intensity(self, t: Tensor, s: Tensor, x_field: Optional[Tensor] = None) -> Tensor:
@@ -220,7 +229,24 @@ class IntensityEvaluator:
             lam_t = ft / St.clamp(min=1e-8)  # (B,)
 
         # Spatial density
-        log_fs = decoder.spatial.log_prob(z, t, s, self.t_prev, x_field)
+        # For data-centered decoders, override x_field with the history window.
+        spatial_dec = decoder.spatial
+        if getattr(spatial_dec, "requires_history", False) and self.history_locs_norm is not None:
+            seq_len = spatial_dec.history_window_size
+            hist = self.history_locs_norm  # (N, d) normalized
+            N = hist.shape[0]
+            if N >= seq_len:
+                window = hist[-seq_len:]               # (seq_len, d)
+            else:
+                pad = hist[:1].expand(seq_len - N, -1) # (seq_len-N, d)
+                window = torch.cat([pad, hist], dim=0) # (seq_len, d)
+            # Expand to (B, seq_len*d)
+            B = z.shape[0]
+            x_field_spatial = window.reshape(1, -1).expand(B, -1)
+        else:
+            x_field_spatial = x_field
+
+        log_fs = spatial_dec.log_prob(z, t, s, self.t_prev, x_field_spatial)
         fs = torch.exp(log_fs)  # (B,)
 
         return lam_t * fs
