@@ -95,6 +95,16 @@ class TrainingConfig(BaseModel):
     adam_beta1: float = 0.9
     adam_beta2: float = 0.999
     device: str = "auto"
+    lr_schedule: str = "constant"
+    """LR schedule: ``"constant"`` (ReduceLROnPlateau) or ``"cosine"`` (cosine annealing)."""
+    lr_warmup_epochs: int = 0
+    """Linear warmup epochs before the main schedule. Only used when ``lr_schedule="cosine"``."""
+    lr_step_size: Optional[int] = None
+    """If set, use StepLR: multiply lr by ``lr_step_gamma`` every ``lr_step_size`` epochs."""
+    lr_step_gamma: float = 0.5
+    """Multiplicative decay factor for StepLR."""
+    vae_beta: float = 0.0
+    """KL weight for VAE regularization (ELBO beta). 0 disables KL (non-VAE mode)."""
 
     @field_validator("n_epochs", mode="before")
     @classmethod
@@ -156,17 +166,23 @@ class STPPConfig(BaseModel):
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "STPPConfig":
+    def from_yaml(cls, path: str | Path, sanitize: bool = True) -> "STPPConfig":
         """Load config from a YAML file.
 
-        Search-space syntax (``{min, max}`` dicts and choice lists) is
-        sanitised to scalar defaults before Pydantic validation, so the same
-        YAML can serve both as a default config *and* as a search-space
-        template for HPO.
+        Parameters
+        ----------
+        sanitize : bool
+            When ``True`` (default), search-space syntax (``{min, max}`` dicts
+            and choice lists) is collapsed to scalar defaults so the YAML can
+            serve as both a config *and* an HPO search-space template.
+            Set to ``False`` when loading a fully-resolved config saved by
+            ``to_yaml()``; skipping sanitisation prevents list-valued fields
+            (e.g. ``paper_split_ratio: [8, 1, 1]``) from being misread as
+            choice sets.
         """
         with open(path) as f:
             raw = yaml.safe_load(f)
-        return cls(**_sanitize_search_space(raw))
+        return cls(**(_sanitize_search_space(raw) if sanitize else raw))
 
     def to_yaml(self, path: str | Path) -> None:
         """Serialise config to a YAML file."""
@@ -206,14 +222,15 @@ class STPPConfig(BaseModel):
 def _sanitize_search_space(d: dict) -> dict:
     """Replace search-space specs with scalar defaults so Pydantic can validate.
 
-    ``{min: x, max: y}``  →  ``x``  (lower bound)
-    ``[a, b, c]``         →  ``a``  (first choice)
+    ``{min: x, max: y}``           →  ``x``        (lower bound)
+    ``{min: x, max: y, default: z}`` →  ``z``      (explicit default)
+    ``[a, b, c]``                  →  ``a``        (first choice)
     """
     out: dict = {}
     for k, v in d.items():
         if isinstance(v, dict):
             if "min" in v and "max" in v:
-                out[k] = v["min"]
+                out[k] = v.get("default", v["min"])
             else:
                 out[k] = _sanitize_search_space(v)
         elif isinstance(v, list) and v and not isinstance(v[0], (dict, list)):

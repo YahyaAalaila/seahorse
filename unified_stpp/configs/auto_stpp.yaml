@@ -1,34 +1,34 @@
 model:
   preset: auto_stpp
-  hidden_dim: 64
+  hidden_dim: 128
   spatial_dim: 2
   n_marks: 0
-  # Architecture overrides — deep-merged with the preset.
-  # The most important tunable for AutoSTPP is the spatial bounding box, which
-  # must be in *normalised* coordinates (i.e. divided by the dataset loc_std).
-  #
-  #   rule of thumb:  bbox = raw_spatial_bounds / loc_std
-  #
-  # For the default Hawkes data (spatial_bounds=[-5,5], loc_std≈2.9) that gives
-  # ≈[-1.73, 1.73].  [-2, 2] is a safe margin.  Setting this too wide (e.g. the
-  # raw [-5, 5]) inflates the compensator ~8× and is the main cause of high NLL.
-  overrides:
-    decoder:
-      x_lo: -2.0
-      x_hi: 2.0
-      y_lo: -2.0
-      y_hi: 2.0
-      n_components: 8
-      n_layers: 2
-      internal_dim: 64
+  # Keep AutoInt decoder but use a DeepSTPP-like backbone:
+  # transformer encoder + attention updater.
+  encoder:
+    type: transformer
+    num_heads: 2
+    num_layers: 3
+    dropout: 0.1
+  updater:
+    type: attention
+    num_heads: 2
+  # Decoder overrides — deep-merged with preset auto_stpp decoder.
+  # Spatial bounding box is auto-computed from training data at runtime;
+  # no need to set x_lo/hi/y_lo/hi here.
+  decoder:
+    n_components: [2, 5, 10]    # paper: N=2 (synthetic) / N=10 (real)  |  HPO choices
+    n_layers: 2
+    internal_dim: [64, 128]     # paper: 64 (synthetic) / 128 (real)  |  HPO choices
 
 training:
-  lr: {min: 1.0e-4, max: 1.0e-2}
+  lr: {min: 1.0e-4, max: 1.0e-2, default: 4.0e-3}
   weight_decay: 1.0e-5
   grad_clip: 5.0
-  n_epochs: 100
-  batch_size: 32
-  early_stopping_patience: 20
+  n_epochs: 50
+  batch_size: 128
+  lr_step_size: [20, 10, 50]   # paper: step_size=20  |  HPO choices
+  lr_step_gamma: [0.5, 0.2]    # paper: gamma=0.5  |  HPO choices
 
 data:
   type: hawkes

@@ -15,6 +15,7 @@ from .models.decoders import (
     CNFSpatial,
     GaussianMixtureSpatial,
     DataCenteredGaussianSpatial,
+    DeepSTPPDecoder,
     DiffusionDecoder,
     MLPMarkDecoder,
     AttentionMarkDecoder,
@@ -62,43 +63,92 @@ MARK_DECODER_REGISTRY = {
 # ============================================================================
 
 PRESETS: Dict[str, Dict[str, Any]] = {
+    # SelfAttentiveCNF variant — main model from Chen et al. 2021 (NeuralSTPP).
+    # Key paper faithfulness choices:
+    #   - AttentionEncoder (not GRU) for self-attention over event history.
+    #   - AttentionUpdater at each event arrival.
+    #   - ConcatSquash velocity field (layer_type="concat", 3 hidden layers).
+    #   - Self-attentive base N(μ_attn, I) for the CNF (base_type="self_attentive").
+    #   - ODE tolerance 1e-4 (paper default --tol 1e-4).
     "neural_stpp": {
+        "encoder": {"type": "attention", "num_heads": 4, "num_layers": 2},
+        "dynamics": {
+            "type": "neural_ode",
+            "solver": "dopri5",
+            "atol": 1e-4,
+            "rtol": 1e-4,
+            # Jointly integrate [z(t), Λ(t)] so the compensator uses the
+            # actually-evolved state z(τ) at each quadrature point τ.
+            "augmented": True,
+            # Standard backprop through ODE steps; avoids the second backward
+            # ODE pass, halving training time on CPU.
+            "use_adjoint": False,
+        },
+        "updater": {"type": "attention", "num_heads": 4},
+        "decoder": {
+            "type": "factorized",
+            "temporal": {"type": "cumulative_hazard", "n_quad_points": 20},
+            "spatial": {
+                "type": "cnf",
+                "solver": "dopri5",
+                "atol": 1e-4,
+                "rtol": 1e-4,
+                "layer_type": "concat",      # ConcatSquash — paper default
+                "n_hidden_layers": 3,         # hdims="64-64-64"
+                "base_type": "self_attentive",  # SelfAttentiveCNF key contribution
+                "history_k": 20,
+            },
+        },
+    },
+    # JumpCNF variant — second model from Chen et al. 2021.
+    # GRU encoder + GRU jump update; plain N(0,I) base with ConcatSquash flow.
+    "neural_stpp_jump": {
         "encoder": {"type": "gru", "num_layers": 1},
         "dynamics": {
             "type": "neural_ode",
             "solver": "dopri5",
-            # Jointly integrate [z(t), Λ(t)] in one ODE solve so the compensator
-            # uses the actually-evolved state z(τ) at each quadrature point τ,
-            # not z frozen at the event time (which causes NLL explosion).
+            "atol": 1e-4,
+            "rtol": 1e-4,
             "augmented": True,
-            # Standard backprop through ODE steps rather than adjoint; avoids the
-            # second backward ODE pass, halving training time on CPU.
             "use_adjoint": False,
         },
         "updater": {"type": "gru_jump"},
         "decoder": {
             "type": "factorized",
             "temporal": {"type": "cumulative_hazard", "n_quad_points": 20},
-            "spatial": {"type": "cnf", "solver": "dopri5"},
+            "spatial": {
+                "type": "cnf",
+                "solver": "dopri5",
+                "atol": 1e-4,
+                "rtol": 1e-4,
+                "layer_type": "concat",
+                "n_hidden_layers": 3,
+                "base_type": "standard",  # JumpCNF uses standard N(0,I) base
+            },
         },
     },
-    # DeepSTPP in the unified framework (Lin et al. 2021):
-    #   TransformerEncoder (sinusoidal time PE) +
-    #   LogNormalMixtureTemporal +
-    #   DataCenteredGaussianSpatial (event-location Gaussians + background anchors).
+    # DeepSTPP faithful to Lin et al. 2021.
+    #
+    # Original pipeline:
+    #   TransformerEncoder (sinusoidal time PE on cumsum(Δt)) → VAE → z
+    #   z → w_dec / b_dec / s_dec → M = seq_len + num_points Hawkes kernels
+    #   λ(s,t) = λ_t(t) · f(s|t)
+    #   λ_t(t) = Σ w_i exp(−b_i (t−tᵢ))             [Hawkes temporal, closed compensator]
+    #   f(s|t) = Σ (vᵢ/Σvⱼ) N(s; sᵢ, diag(σᵢ))    [GMM weights tied to temporal vᵢ]
+    #
+    # The coupled decoder (DeepSTPPDecoder) replaces the previous factorized
+    # LogNormalMixtureTemporal + DataCenteredGaussianSpatial pair, which was
+    # decoupled and used the wrong temporal model.
     "deep_stpp": {
-        "encoder": {"type": "transformer", "num_heads": 2, "num_layers": 3, "dropout": 0.1},
+        "encoder": {"type": "transformer", "num_heads": 2, "num_layers": 3, "dropout": 0.0},
         "dynamics": {"type": "identity"},
         "updater": {"type": "attention", "num_heads": 2},
         "decoder": {
-            "type": "factorized",
-            "temporal": {"type": "lognormal_mixture", "n_components": 16},
-            "spatial": {
-                "type": "data_centered_gaussian",
-                "seq_len": 20,
-                "num_points": 20,
-                "sigma_min": 0.3,
-            },
+            "type": "deep_stpp",   # → DeepSTPPDecoder (coupled Hawkes + GMM)
+            "seq_len": 20,         # paper: seq_len=20
+            "num_points": 20,      # paper: num_points=20
+            "sigma_min": 1e-4,     # paper: s_min=1e-4 (in MinMax [0,1] space)
+            "n_layers": 3,         # paper: decoder_n_layer=3
         },
     },
     # Free-GMM variant: attention encoder + LogNormal mixture + unconstrained GMM spatial.
@@ -124,9 +174,11 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         },
     },
     "auto_stpp": {
-        "encoder": {"type": "gru", "num_layers": 1},
+        # Use the same Transformer/attention backbone family as deep_stpp;
+        # only the decoder differs (AutoInt vs factorized lognormal+spatial).
+        "encoder": {"type": "transformer", "num_heads": 2, "num_layers": 3, "dropout": 0.1},
         "dynamics": {"type": "identity"},
-        "updater": {"type": "gru_jump"},
+        "updater": {"type": "attention", "num_heads": 2},
         "decoder": {
             "type": "autoint",
             "n_components": 8,
@@ -271,7 +323,17 @@ def build_model(
             and hasattr(temporal, '_intensity')
         ):
             dynamics.intensity_fn = temporal._intensity
-            dynamics.aug_func = AugmentedODEFunc(dynamics.func, temporal._intensity)
+            dynamics.aug_func = AugmentedODEFunc(
+                dynamics.func, temporal._intensity, intensity_module=temporal
+            )
+    elif dec_type == "deep_stpp":
+        dec_cfg_clean = {k: v for k, v in dec_cfg.items() if k != "type"}
+        decoder = DeepSTPPDecoder(
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            field_cov_dim=field_cov_dim,
+            **dec_cfg_clean,
+        )
     elif dec_type == "diffusion":
         decoder = DiffusionDecoder(
             hidden_dim=hidden_dim,
@@ -309,6 +371,8 @@ def build_model(
         lifting_map=lifting_map,
         mark_decoder=mark_decoder,
         mark_embedding=mark_embedding,
+        vae=config.get("vae", False),
+        hidden_dim=hidden_dim,
     )
 
     return model

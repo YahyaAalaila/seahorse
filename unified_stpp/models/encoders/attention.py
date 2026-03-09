@@ -37,7 +37,11 @@ class AttentionEncoder(Encoder):
             batch_first=True,
             activation="gelu",
         )
-        self.attn_layers = nn.TransformerEncoder(layer, num_layers=num_layers)
+        # enable_nested_tensor=False: disables the nested-tensor fast-path which
+        # is not implemented on MPS (Apple Silicon GPU). Has no effect on CUDA/CPU.
+        self.attn_layers = nn.TransformerEncoder(
+            layer, num_layers=num_layers, enable_nested_tensor=False
+        )
         self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(

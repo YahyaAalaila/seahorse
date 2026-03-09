@@ -137,20 +137,65 @@ def cmd_tune(args):
     print(f"Best config written to {out_path}")
 
 
+def _parse_overrides(override_list: list[str]) -> dict:
+    """Convert ['training.n_epochs=50', 'model.hidden_dim=128'] to nested dict."""
+    result = {}
+    for item in (override_list or []):
+        if "=" not in item:
+            print(f"WARNING: ignoring malformed override {item!r} (expected key=value)", file=sys.stderr)
+            continue
+        key, _, raw_val = item.partition("=")
+        # Auto-cast: int → float → bool → str
+        try:
+            val = int(raw_val)
+        except ValueError:
+            try:
+                val = float(raw_val)
+            except ValueError:
+                if raw_val.lower() in ("true", "false"):
+                    val = raw_val.lower() == "true"
+                else:
+                    val = raw_val
+        # Expand dotted key into nested dict
+        parts = key.split(".")
+        node = result
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node[parts[-1]] = val
+    return result
+
+
 def cmd_bench(args):
     from unified_stpp.benchmark import Benchmark
 
     splits = _load_splits_dir(args.splits_dir)
     seeds = [int(s) for s in args.seeds]
-    bench = Benchmark(presets=args.presets, splits=splits, seeds=seeds)
+    base_overrides = _parse_overrides(args.override)
+    out = args.out or "bench_out"
+    bench = Benchmark(presets=args.presets, splits=splits, seeds=seeds,
+                      base_overrides=base_overrides,
+                      hpo_configs_dir=args.hpo_configs_dir,
+                      normalize=args.normalize)
 
     if args.tune:
-        bench.tune_all(n_trials=args.n_trials, algorithm=args.algorithm)
+        bench.tune_all(n_trials=args.n_trials, algorithm=args.algorithm, out_dir=out)
 
     table = bench.run(n_workers=args.n_workers)
-    out = args.out or "bench_out"
     table.report(out)
     print(f"Report written to {out}/report.html")
+
+    if args.intensity_video != "none":
+        print(f"\nRendering intensity animations (fmt={args.intensity_video})...")
+        produced = table.plot_intensities(
+            splits=splits,
+            out_dir=out,
+            fmt=args.intensity_video,
+            n_frames=args.intensity_frames,
+            n_grid=args.intensity_grid,
+            fps=args.intensity_fps,
+        )
+        for p in produced:
+            print(f"  {p}")
 
 
 # ---------------------------------------------------------------------------
@@ -194,8 +239,28 @@ def main():
     bench_p.add_argument("--out",        default="bench_out")
     bench_p.add_argument("--n_workers",  type=int, default=1)
     bench_p.add_argument("--tune",       action="store_true", help="Run HPO before evaluation")
-    bench_p.add_argument("--n_trials",   type=int, default=50)
-    bench_p.add_argument("--algorithm",  default="asha", choices=["asha", "bayesian", "grid"])
+    bench_p.add_argument("--n_trials",         type=int, default=50)
+    bench_p.add_argument("--algorithm",        default="asha", choices=["asha", "bayesian", "grid"])
+    bench_p.add_argument("--intensity_video",  default="none",
+                         choices=["none", "gif", "mp4", "png"],
+                         help="Render per-preset intensity animation after benchmarking")
+    bench_p.add_argument("--intensity_frames", type=int, default=24,
+                         help="Number of animation frames (gif/mp4 only)")
+    bench_p.add_argument("--intensity_grid",   type=int, default=40,
+                         help="Spatial grid resolution (points per axis)")
+    bench_p.add_argument("--intensity_fps",    type=int, default=8,
+                         help="Animation frames per second")
+    bench_p.add_argument("--hpo_configs_dir", default=None,
+                         metavar="DIR",
+                         help="Directory with {preset}_best.yaml files from a prior --tune run "
+                              "(presets found here skip re-tuning)")
+    bench_p.add_argument("--override", nargs="*", default=[],
+                         metavar="KEY=VALUE",
+                         help="Override config values for all presets, e.g. training.n_epochs=50")
+    bench_p.add_argument("--normalize", action="store_true", default=True,
+                         help="Z-score normalize time and space for all presets (default: on)")
+    bench_p.add_argument("--no-normalize", dest="normalize", action="store_false",
+                         help="Disable normalization (all presets see raw coordinates)")
 
     args = parser.parse_args()
     {

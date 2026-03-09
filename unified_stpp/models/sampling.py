@@ -151,19 +151,22 @@ class IntensityEvaluator:
         z: Tensor,
         t_prev: Tensor,
         history_locs_norm: Optional[Tensor] = None,
+        history_times_norm: Optional[Tensor] = None,
     ):
         """
         Args:
             model: trained UnifiedSTPP
             z: (B, h) — latent state after encoding history
             t_prev: (B, 1) — time of last event
-            history_locs_norm: (N, d) — normalized event locations from history,
-                used by data-centered decoders (DataCenteredGaussianSpatial).
+            history_locs_norm: (N, d) — normalized event locations (history)
+            history_times_norm: (N,) — normalized event times (history),
+                required for DeepSTPPDecoder which needs both.
         """
         self.model = model
         self.z = z
         self.t_prev = t_prev
         self.history_locs_norm = history_locs_norm
+        self.history_times_norm = history_times_norm
 
     @torch.no_grad()
     def intensity(self, t: Tensor, s: Tensor, x_field: Optional[Tensor] = None) -> Tensor:
@@ -189,13 +192,54 @@ class IntensityEvaluator:
         # Check if decoder is density-based (has temporal + spatial sub-decoders)
         if hasattr(decoder, 'temporal') and hasattr(decoder, 'spatial'):
             return self._factorized_intensity(z_t, t, s, x_field)
+        elif getattr(decoder, 'requires_time_history', False):
+            # DeepSTPPDecoder: build x_field from history times + locations,
+            # then call spatial_intensity() which returns λ_t(t)·f(s|t) directly
+            # (without the compensator that log_prob includes).
+            x_field_dec = self._build_time_history_x_field(decoder, s.shape[0])
+            if hasattr(decoder, 'spatial_intensity'):
+                return decoder.spatial_intensity(z_t, t, s, self.t_prev, x_field=x_field_dec)
+            else:
+                log_val = decoder.log_prob(z_t, t, s, self.t_prev, x_field_dec)
+                return torch.exp(log_val)
         else:
-            # Intensity or joint density decoder
-            # For diffusion: approximate via score
+            # Intensity or joint density decoder (e.g. diffusion)
             log_val = decoder.log_prob(z_t, t, s, self.t_prev, x_field)
-            # This is log f*(t,s) or log λ*(t,s) depending on decoder type
-            # For a rough intensity, exponentiate
             return torch.exp(log_val)
+
+    def _build_time_history_x_field(self, decoder, B: int) -> Optional[Tensor]:
+        """Build x_field = [abs_times, locs] for DeepSTPPDecoder grid evaluation.
+
+        Returns (B, seq_len + seq_len*d) with all rows identical (same history
+        for every grid point).  Returns None if no history is available.
+        """
+        seq_len = decoder.history_window_size
+        d       = decoder.spatial_dim
+        device  = self.z.device
+
+        has_times = self.history_times_norm is not None
+        has_locs  = self.history_locs_norm  is not None
+        if not (has_times and has_locs):
+            return None
+
+        times = self.history_times_norm  # (N,)
+        locs  = self.history_locs_norm   # (N, d)
+        N     = locs.shape[0]
+
+        if N >= seq_len:
+            t_win = times[-seq_len:]
+            s_win = locs[-seq_len:]
+        else:
+            t_pad = times[:1].expand(seq_len - N)
+            t_win = torch.cat([t_pad, times], dim=0)
+            s_pad = locs[:1].expand(seq_len - N, d)
+            s_win = torch.cat([s_pad, locs], dim=0)
+
+        # Pack: [t_0,...,t_{seq-1}, s_0x,s_0y,...] — same layout as nll() expects
+        return torch.cat([
+            t_win.unsqueeze(0).expand(B, -1),     # (B, seq_len)
+            s_win.reshape(1, -1).expand(B, -1),   # (B, seq_len*d)
+        ], dim=-1)
 
     def _factorized_intensity(
         self, z: Tensor, t: Tensor, s: Tensor, x_field: Optional[Tensor]

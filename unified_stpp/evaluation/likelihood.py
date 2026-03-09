@@ -259,7 +259,7 @@ class LikelihoodEvaluator:
 
             # --- manual reconstruction path ---
             events = torch.cat([times.unsqueeze(-1), locations], dim=-1)  # (B, N, 1+d)
-            _, all_states = self.model.encoder(
+            _, all_states = self.model.encode(
                 events, lengths, x_event=batch.get("event_covariates")
             )  # (B, N, h)
 

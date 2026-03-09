@@ -27,6 +27,35 @@ from unified_stpp.models.sampling import IntensityEvaluator
 from .results import RunResult
 
 
+def _autoint_bbox_from_dm(dm: "STPPDataModule", margin: float = 0.5) -> dict:
+    """Compute spatial bounding box from normalized training data.
+
+    Samples up to 20 batches from the training dataloader, collects all valid
+    location values (masked by sequence lengths), and returns the 1st/99th
+    percentile expanded by *margin* in normalized (z-scored) coordinates.
+    """
+    locs = []
+    loader = dm.train_dataloader()
+    for i, batch in enumerate(loader):
+        if i >= 20:
+            break
+        t = batch["locations"]  # (B, T, 2)
+        lens = batch["lengths"]  # (B,)
+        for b in range(t.shape[0]):
+            valid = t[b, : int(lens[b].item())]
+            locs.append(valid.detach().cpu().numpy())
+
+    if not locs:
+        return {"x_lo": -2.0, "x_hi": 2.0, "y_lo": -2.0, "y_hi": 2.0}
+
+    pts = np.concatenate(locs, axis=0)  # (N, 2)
+    x_lo = float(np.percentile(pts[:, 0], 1)) - margin
+    x_hi = float(np.percentile(pts[:, 0], 99)) + margin
+    y_lo = float(np.percentile(pts[:, 1], 1)) - margin
+    y_hi = float(np.percentile(pts[:, 1], 99)) + margin
+    return {"x_lo": x_lo, "x_hi": x_hi, "y_lo": y_lo, "y_hi": y_hi}
+
+
 class STPPRunner:
     """Orchestrates the full fit → evaluate → save/load lifecycle.
 
@@ -162,8 +191,20 @@ class STPPRunner:
         dm.setup()
 
         # -- 2. Model ---------------------------------------------------------
+        build_overrides = dict(cfg.model.build_overrides)
+        if cfg.model.preset == "auto_stpp":
+            bbox = _autoint_bbox_from_dm(dm)
+            decoder_ov = dict(build_overrides.get("decoder", {}))
+            decoder_ov.update(bbox)
+            build_overrides["decoder"] = decoder_ov
+            print(
+                f"  AutoSTPP bbox (auto): "
+                f"x=[{bbox['x_lo']:.2f}, {bbox['x_hi']:.2f}], "
+                f"y=[{bbox['y_lo']:.2f}, {bbox['y_hi']:.2f}]"
+            )
+
         model = build_model(
-            config=cfg.model.build_overrides,
+            config=build_overrides,
             preset=cfg.model.preset,
             hidden_dim=cfg.model.hidden_dim,
             spatial_dim=cfg.model.spatial_dim,
@@ -180,6 +221,11 @@ class STPPRunner:
             grad_clip=tcfg.grad_clip,
             adam_beta1=tcfg.adam_beta1,
             adam_beta2=tcfg.adam_beta2,
+            lr_schedule=tcfg.lr_schedule,
+            lr_warmup_epochs=tcfg.lr_warmup_epochs,
+            lr_step_size=tcfg.lr_step_size,
+            lr_step_gamma=tcfg.lr_step_gamma,
+            vae_beta=tcfg.vae_beta,
         )
 
         # -- 3. Callbacks & Loggers -------------------------------------------
@@ -208,12 +254,29 @@ class STPPRunner:
             pass
 
         # -- 4. Trainer -------------------------------------------------------
+        # torchdiffeq uses float64 internally which MPS doesn't support, and
+        # its adjoint backward stores ODE states that would be on a different
+        # device than the MPS gradients. Force CPU for ODE-based models on MPS.
+        accelerator = tcfg.device
+        if accelerator == "auto" and torch.backends.mps.is_available():
+            from unified_stpp.models.dynamics.neural_ode import NeuralODEDynamics
+            from unified_stpp.models.decoders.spatial import CNFSpatial
+            if any(isinstance(m, (NeuralODEDynamics, CNFSpatial))
+                   for m in model.modules()):
+                import warnings
+                warnings.warn(
+                    "MPS detected but torchdiffeq doesn't support MPS (float64). "
+                    "Falling back to CPU for this model.",
+                    stacklevel=2,
+                )
+                accelerator = "cpu"
+
         # inference_mode=False: fall back to torch.no_grad() for val/test so
         # that decoders using torch.enable_grad() internally (e.g. AutoInt)
         # can still compute autograd-based quantities during evaluation.
         trainer = pl.Trainer(
             max_epochs=tcfg.n_epochs,
-            accelerator=tcfg.device,
+            accelerator=accelerator,
             callbacks=callbacks,
             logger=loggers,
             enable_progress_bar=True,
@@ -249,6 +312,19 @@ class STPPRunner:
         self._lightning_module = lm
         self._data_module = dm
 
+        # Extract normalization stats from the training dataset so downstream
+        # code (sampling-based metrics, intensity plots) can convert model
+        # outputs from normalized to original coordinates without re-reading
+        # the raw sequences.
+        ds = dm._train_dataset
+        norm_stats = {
+            "normalize": cfg.data.normalize,
+            "time_mean": float(getattr(ds, "time_mean", 0.0)),
+            "time_std":  float(getattr(ds, "time_std",  1.0)),
+            "loc_mean":  list(np.asarray(getattr(ds, "loc_mean", [0.0, 0.0])).tolist()),
+            "loc_std":   list(np.asarray(getattr(ds, "loc_std",  [1.0, 1.0])).tolist()),
+        }
+
         return RunResult(
             preset=cfg.model.preset,
             dataset_id=dataset_id,
@@ -259,6 +335,7 @@ class STPPRunner:
             n_params=n_params,
             effective_config=cfg.model_dump(),
             checkpoint_path=ckpt_path,
+            norm_stats=norm_stats,
         )
 
     # ------------------------------------------------------------------
@@ -314,7 +391,7 @@ class STPPRunner:
 
         events = torch.cat([t_tensor, s_tensor], dim=-1)  # (1, N, 1+d)
         with torch.no_grad():
-            z_final, _ = model.encoder(events, lengths)
+            z_final, _ = model.encode(events, lengths)
 
         z = z_final  # (1, h)
         t_prev = torch.tensor([[t_norm[-1]]], dtype=torch.float32, device=device)  # (1, 1)
@@ -418,6 +495,11 @@ class STPPRunner:
             grad_clip=tc.grad_clip,
             adam_beta1=tc.adam_beta1,
             adam_beta2=tc.adam_beta2,
+            lr_schedule=tc.lr_schedule,
+            lr_warmup_epochs=tc.lr_warmup_epochs,
+            lr_step_size=tc.lr_step_size,
+            lr_step_gamma=tc.lr_step_gamma,
+            vae_beta=tc.vae_beta,
         )
         runner._lightning_module = lm
         return runner

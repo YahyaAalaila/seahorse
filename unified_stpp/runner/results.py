@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -13,17 +12,44 @@ from typing import Any, Optional
 class RunResult:
     """Output of one training run.
 
+    Metric definition
+    -----------------
+    ``val_nll`` and ``test_nll`` are the **per-event negative log-likelihood**
+    in *normalized* coordinates::
+
+        NLL = -1/N Σ_i log p(t_i_norm, s_i_norm | H_i)
+
+    where (t_norm, s_norm) are z-scored with the training-set statistics stored
+    in ``norm_stats``.  The values are directly comparable across models IFF all
+    models used the same normalization (enforced by ``Benchmark``).
+
+    To convert to NLL in original-space coordinates, subtract the log-Jacobian::
+
+        NLL_original = NLL_normalized - log(time_std × loc_std_x × loc_std_y)
+
+    This constant shift does not affect model ranking.
+
+    For sampling-based metrics (Wasserstein, RMSE, …), denormalize model
+    outputs using ``norm_stats`` before computing distances in original space::
+
+        t_orig = t_norm * norm_stats["time_std"] + norm_stats["time_mean"]
+        s_orig = s_norm * norm_stats["loc_std"]  + norm_stats["loc_mean"]
+
     Attributes
     ----------
     preset:           Model preset name (e.g. ``"auto_stpp"``).
     dataset_id:       Identifier for the dataset used.
     seed:             Random seed used for this run.
-    val_nll:          Best validation NLL/event achieved during training.
-    test_nll:         Test NLL/event (``nan`` if no test set was provided).
+    val_nll:          Best validation NLL/event (normalized space).
+    test_nll:         Test NLL/event (normalized space; ``nan`` if no test set).
     train_time_sec:   Wall-clock training time in seconds.
     n_params:         Total number of trainable model parameters.
     effective_config: The config dict actually used (post-HPO or from YAML).
     checkpoint_path:  Path to the saved Lightning checkpoint (if any).
+    norm_stats:       Normalization stats from training data:
+                      ``time_mean``, ``time_std``, ``loc_mean`` (list),
+                      ``loc_std`` (list), ``normalize`` (bool).
+                      Use these to convert model outputs to original space.
     extra_metrics:    Dict for any additional metrics the caller wants to store.
     """
 
@@ -36,6 +62,7 @@ class RunResult:
     n_params: int
     effective_config: dict[str, Any]
     checkpoint_path: Optional[Path] = None
+    norm_stats: dict[str, Any] = field(default_factory=dict)
     extra_metrics: dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------

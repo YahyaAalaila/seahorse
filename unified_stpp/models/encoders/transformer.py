@@ -38,7 +38,15 @@ class TransformerEncoder(Encoder):
             batch_first=True,
             activation="gelu",
         )
-        self.layers = nn.TransformerEncoder(layer, num_layers=num_layers)
+        # Disable nested-tensor fast path: MPS currently misses
+        # aten::_nested_tensor_from_mask_left_aligned.
+        try:
+            self.layers = nn.TransformerEncoder(
+                layer, num_layers=num_layers, enable_nested_tensor=False
+            )
+        except TypeError:
+            # Older PyTorch versions may not expose enable_nested_tensor.
+            self.layers = nn.TransformerEncoder(layer, num_layers=num_layers)
         self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(

@@ -14,7 +14,7 @@ Optimizations:
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import Optional, Callable
+from typing import Optional, Callable, TYPE_CHECKING
 
 from ..base import Dynamics
 
@@ -79,10 +79,19 @@ class AugmentedODEFunc(nn.Module):
     The last dimension of the state is the Λ accumulator (starts at 0).
     """
 
-    def __init__(self, ode_func: ODEFunc, intensity_fn: Callable):
+    def __init__(
+        self,
+        ode_func: ODEFunc,
+        intensity_fn: Callable,
+        intensity_module: Optional[nn.Module] = None,
+    ):
         super().__init__()
         self.ode_func = ode_func
         self.intensity_fn = intensity_fn  # (z, elapsed) → (B,)
+        # Register as a submodule so .cpu()/.to() moves its parameters too.
+        # This is critical for the MPS→CPU fallback in _run_odeint.
+        if intensity_module is not None:
+            self.intensity_module = intensity_module
 
     def forward(self, t: Tensor, z_aug: Tensor) -> Tensor:
         """

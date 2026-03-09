@@ -129,7 +129,7 @@ def eval_intensity(
         events = torch.cat(
             [times_t.unsqueeze(-1), locs_t], dim=-1
         )                                                           # (1, N, 1+d)
-        _z_final, all_states = model.encoder(events, lengths)       # (1, N, h)
+        _z_final, all_states = model.encode(events, lengths)        # (1, N, h)
 
         # State after the last history event conditions the next prediction
         z_hist = all_states[:, N - 1, :]                           # (1, h)

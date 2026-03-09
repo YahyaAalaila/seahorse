@@ -1,32 +1,34 @@
-# NeuralSTPP configuration
-# Encoder: GRU, Dynamics: Neural ODE, Updater: GRU Jump
-# Decoder: Factorized — cumulative hazard (temporal) + CNF (spatial)
+# NeuralSTPP — SelfAttentiveCNF variant (Chen et al. 2021, arxiv 2011.04583).
+# Preset defaults: AttentionEncoder, NeuralODE dynamics, ConcatSquash CNF,
+# self-attentive base distribution, tol=1e-4 (paper default).
 
 model:
   preset: neural_stpp
-  hidden_dim: 64
+  hidden_dim: 128          # paper hdims="64-64-64" (width per layer)
   spatial_dim: 2
   event_cov_dim: 0
   field_cov_dim: 0
+  # Architecture overrides — deep-merged with the preset.
   overrides:
     encoder:
-      num_layers: 1
+      num_heads: 4
+      num_layers: 2
     dynamics:
-      solver: dopri5
-      atol: 1.0e-5
-      rtol: 1.0e-5
+      atol: 1.0e-4        # paper --tol 1e-4
+      rtol: 1.0e-4
     decoder:
-      temporal:
-        n_quad_points: 20
       spatial:
-        solver: dopri5
+        history_k: 20     # window of past locations for attentive base
 
 training:
-  lr: 0.001
+  lr: 1.0e-3
   weight_decay: 1.0e-5
   grad_clip: 5.0
   n_epochs: 100
-  batch_size: 32
+  batch_size: 128
+  patience: 30
+  lr_schedule: cosine     # cosine decay as in the paper
+  lr_warmup_epochs: 5
 
 data:
   type: hawkes

@@ -130,6 +130,39 @@ class BenchmarkTable:
     # Rich report
     # ------------------------------------------------------------------
 
+    def plot_intensities(
+        self,
+        splits: dict,
+        out_dir,
+        fmt: str = "gif",
+        n_frames: int = 24,
+        n_grid: int = 40,
+        fps: int = 8,
+        device: str = "cpu",
+    ) -> list:
+        """Render animated intensity plots; one GIF/MP4/PNG per dataset.
+
+        Parameters
+        ----------
+        splits  : ``{dataset_id: (train_seqs, val_seqs, test_seqs)}`` —
+                  same dict that was passed to :class:`Benchmark`.
+        out_dir : directory to write output files into.
+        fmt     : ``"gif"`` | ``"mp4"`` | ``"png"`` (static 4-snapshot grid).
+        n_frames: number of animation frames (gif/mp4 only).
+        n_grid  : spatial grid resolution per axis.
+        fps     : animation speed.
+        device  : torch device for model inference.
+
+        Returns
+        -------
+        List of :class:`pathlib.Path` objects for the produced files.
+        """
+        from unified_stpp.benchmark.intensity_plot import plot_bench_intensities
+        return plot_bench_intensities(
+            self, splits=splits, out_dir=out_dir,
+            fmt=fmt, n_frames=n_frames, n_grid=n_grid, fps=fps, device=device,
+        )
+
     def report(self, out_dir) -> None:
         """Write a self-contained HTML report + CSV + JSON to *out_dir*.
 

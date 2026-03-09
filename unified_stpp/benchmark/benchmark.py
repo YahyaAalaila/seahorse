@@ -53,6 +53,16 @@ class Benchmark:
     base_overrides: Dict merged into every preset config before HPO/training.
     hpo_configs:    Pre-computed best configs from ``tune_all()``; if provided,
                     ``run()`` skips Stage 1 and uses these directly.
+    normalize:      Whether to z-score normalize time and space for all models.
+                    Forced uniformly so that all presets see the same coordinate
+                    system and NLL values are directly comparable.
+
+    ML best-practices contract
+    --------------------------
+    The benchmark is the authority on data.  Splits are fixed before any model
+    is initialised.  Every preset is forced to ``protocol="unified"`` so that
+    no preset can re-split or re-format the data internally.  ``normalize`` is
+    applied identically to all presets via the same training-set statistics.
 
     Usage
     -----
@@ -68,12 +78,26 @@ class Benchmark:
         seeds: list[int] = None,
         base_overrides: dict[str, Any] = None,
         hpo_configs: Optional[dict[str, STPPConfig]] = None,
+        hpo_configs_dir: Optional[str] = None,
+        normalize: bool = True,
     ):
         self.presets = presets
         self.splits = splits
         self.seeds = seeds if seeds is not None else [42]
         self.base_overrides = base_overrides or {}
+        self.normalize = normalize
         self.hpo_configs: dict[str, STPPConfig] = hpo_configs or {}
+
+        # Load pre-saved HPO configs (from a previous tune_all run).
+        # Any preset already in hpo_configs takes precedence.
+        if hpo_configs_dir:
+            from pathlib import Path
+            hpo_dir = Path(hpo_configs_dir)
+            for yaml_path in sorted(hpo_dir.glob("*_best.yaml")):
+                preset_name = yaml_path.stem[: -len("_best")]
+                if preset_name not in self.hpo_configs:
+                    self.hpo_configs[preset_name] = STPPConfig.from_yaml(str(yaml_path), sanitize=False)
+                    print(f"[bench] Loaded HPO config for '{preset_name}' from {yaml_path}")
 
     # ------------------------------------------------------------------
     # Stage 1: HPO
@@ -85,6 +109,7 @@ class Benchmark:
         algorithm: str = "asha",
         tune_dataset: Optional[str] = None,
         n_workers: int = 1,
+        out_dir: Optional[str] = None,
     ) -> dict[str, STPPConfig]:
         """Run HPO for every preset.  Results are stored in ``self.hpo_configs``.
 
@@ -94,22 +119,51 @@ class Benchmark:
         algorithm:     ``"asha"`` | ``"bayesian"`` | ``"grid"``.
         tune_dataset:  Dataset to use for HPO (defaults to the first key in splits).
         n_workers:     Number of parallel Ray workers (passed to ``run_hpo``).
+        out_dir:       If set, saves each best config to ``{out_dir}/hpo/{preset}_best.yaml``
+                       so it can be reloaded in a later run via ``hpo_configs_dir``.
         """
+        from pathlib import Path
         from unified_stpp.benchmark.hpo import run_hpo
 
         ds_key = tune_dataset or next(iter(self.splits))
         train_seqs, val_seqs, _ = self.splits[ds_key]
 
-        for preset in self.presets:
-            cfg = self._base_config(preset)
+        # Presets already loaded (e.g. from hpo_configs_dir) can be skipped.
+        presets_to_tune = [p for p in self.presets if p not in self.hpo_configs]
+        if len(presets_to_tune) < len(self.presets):
+            skipped = [p for p in self.presets if p in self.hpo_configs]
+            print(f"[bench] Skipping HPO for already-tuned presets: {skipped}")
+
+        for preset in presets_to_tune:
+            # Load raw YAML to preserve HPO search-space syntax (lists, {min/max}
+            # dicts).  Using model_dump(mode="json") would convert tuples (e.g.
+            # paper_split_ratio) to lists, which the HPO parser then mistakes for
+            # discrete choice sets — causing Pydantic validation failures in trials.
+            raw_dict = _load_raw_yaml(preset)
+            # Force uniform data protocol: the benchmark owns the splits, so no
+            # preset is allowed to re-split or change the time representation.
+            raw_dict.setdefault("data", {})
+            raw_dict["data"]["protocol"] = "unified"
+            raw_dict["data"]["normalize"] = self.normalize
+            if self.base_overrides:
+                _deep_update(raw_dict, self.base_overrides)
+
             best_cfg = run_hpo(
-                config_dict=cfg.model_dump(mode="json"),
+                config_dict=raw_dict,
                 train_seqs=train_seqs,
                 val_seqs=val_seqs,
                 n_trials=n_trials,
                 algorithm=algorithm,
             )
             self.hpo_configs[preset] = best_cfg
+
+            # Persist immediately so a partial run is recoverable.
+            if out_dir:
+                hpo_dir = Path(out_dir) / "hpo"
+                hpo_dir.mkdir(parents=True, exist_ok=True)
+                save_path = hpo_dir / f"{preset}_best.yaml"
+                best_cfg.to_yaml(str(save_path))
+                print(f"[bench] Saved best HPO config for '{preset}' to {save_path}")
 
         return self.hpo_configs
 
@@ -134,6 +188,10 @@ class Benchmark:
         jobs = []
         for preset in self.presets:
             cfg = self.hpo_configs.get(preset) or self._base_config(preset)
+            # Apply the benchmark data contract to every config, including those
+            # loaded from disk (hpo_configs_dir), which may carry stale protocol
+            # settings from a previous run with different data handling.
+            cfg = self._apply_data_contract(cfg)
             for dataset_id, (train_seqs, val_seqs, test_seqs) in self.splits.items():
                 for seed in self.seeds:
                     jobs.append((preset, dataset_id, seed, cfg, train_seqs, val_seqs, test_seqs))
@@ -149,12 +207,24 @@ class Benchmark:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _apply_data_contract(self, cfg: STPPConfig) -> STPPConfig:
+        """Enforce the benchmark data contract on any STPPConfig.
+
+        Forces ``protocol="unified"`` and ``normalize=self.normalize`` so that
+        every preset — whether built fresh or loaded from a saved HPO file —
+        uses the same coordinate system as the splits supplied to the benchmark.
+        """
+        raw = cfg.model_dump(mode="json")
+        raw.setdefault("data", {})
+        raw["data"]["protocol"] = "unified"
+        raw["data"]["normalize"] = self.normalize
+        return STPPConfig(**raw)
+
     def _base_config(self, preset: str) -> STPPConfig:
         """Build base STPPConfig for *preset*, applying ``base_overrides``."""
         cfg = STPPConfig.from_preset(preset)
         if self.base_overrides:
-            import copy
-            raw = cfg.model_dump()
+            raw = cfg.model_dump(mode="json")
             _deep_update(raw, self.base_overrides)
             cfg = STPPConfig(**raw)
         return cfg
@@ -195,3 +265,20 @@ def _deep_update(base: dict, override: dict) -> None:
             _deep_update(base[k], v)
         else:
             base[k] = v
+
+
+def _load_raw_yaml(preset: str) -> dict:
+    """Return the raw (unsanitized) YAML dict for *preset*.
+
+    Using the raw YAML preserves HPO search-space syntax (lists and {min/max}
+    dicts) so the HPO parser can distinguish between tunable parameters and
+    fixed config values.  Falls back to a minimal dict if no YAML file exists.
+    """
+    import yaml
+    from pathlib import Path
+
+    yaml_path = Path(__file__).parent.parent / "configs" / f"{preset}.yaml"
+    if yaml_path.exists():
+        with open(yaml_path) as f:
+            return yaml.safe_load(f) or {}
+    return {"model": {"preset": preset}}

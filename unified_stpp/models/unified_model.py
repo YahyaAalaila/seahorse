@@ -18,6 +18,43 @@ from .base import Encoder, Dynamics, Updater, Decoder, MarkDecoder
 from .dynamics.identity import IdentityDynamics
 
 
+def _sliding_history_windows_with_times(
+    times: Tensor, locations: Tensor, L: int, seq_len: int
+) -> Tensor:
+    """
+    Build (B, L, seq_len + seq_len * d) windows packed as [times | locations].
+
+    Packed format per window:
+        [t_0, ..., t_{seq_len-1},  s_0_x, s_0_y, ..., s_{seq_len-1}_y]
+
+    Window n contains the seq_len events immediately preceding prediction
+    position n+1, left-padded with the first observed event when fewer than
+    seq_len events are available.  Times are absolute (cumulative), matching
+    the ``times`` tensor format used throughout the framework.
+    """
+    B, _, d = locations.shape
+
+    # Pad seq_len-1 copies of the first event
+    first_t = times[:, :1].expand(-1, seq_len - 1)                    # (B, seq_len-1)
+    padded_t = torch.cat([first_t, times[:, : L + 1]], dim=1)         # (B, seq_len-1+L+1)
+
+    first_s  = locations[:, :1, :].expand(-1, seq_len - 1, -1)        # (B, seq_len-1, d)
+    padded_s = torch.cat([first_s, locations[:, : L + 1, :]], dim=1)  # (B, seq_len-1+L+1, d)
+
+    t_windows = torch.stack(
+        [padded_t[:, n : n + seq_len] for n in range(L)], dim=1
+    )  # (B, L, seq_len)
+
+    s_windows = torch.stack(
+        [padded_s[:, n : n + seq_len, :] for n in range(L)], dim=1
+    )  # (B, L, seq_len, d)
+
+    # Pack as (B, L, seq_len + seq_len*d) = [times | locs]
+    return torch.cat(
+        [t_windows, s_windows.reshape(B, L, seq_len * d)], dim=-1
+    )  # (B, L, seq_len*(1+d))
+
+
 def _sliding_history_windows(locations: Tensor, L: int, seq_len: int) -> Tensor:
     """
     Build (B, L, seq_len * d) history windows for prediction positions 0..L-1.
@@ -66,6 +103,8 @@ class UnifiedSTPP(nn.Module):
         lifting_map: Optional[nn.Module] = None,
         mark_decoder: Optional[MarkDecoder] = None,
         mark_embedding: Optional[nn.Module] = None,
+        vae: bool = False,
+        hidden_dim: int = 128,
     ):
         super().__init__()
         self.encoder = encoder
@@ -75,6 +114,37 @@ class UnifiedSTPP(nn.Module):
         self.lifting_map = lifting_map
         self.mark_decoder = mark_decoder
         self.mark_embedding = mark_embedding
+        self.vae = vae
+        if vae:
+            self.vae_mu_proj = nn.Linear(hidden_dim, hidden_dim)
+            self.vae_logvar_proj = nn.Linear(hidden_dim, hidden_dim)
+
+    def encode(self, events: Tensor, lengths: Tensor, x_event=None):
+        """Encode events to (z_final, all_states), applying VAE bottleneck if enabled.
+
+        Use this instead of ``model.encoder(...)`` so that the VAE projection
+        (mu_proj / logvar_proj) is always applied during inference/visualization.
+        During eval mode, returns ``mu`` deterministically (no sampling noise).
+        """
+        z_final, all_states = self.encoder(events, lengths, x_event=x_event)
+        if self.vae:
+            z_final, _ = self._vae_reparameterize(z_final)
+        return z_final, all_states
+
+    def _vae_reparameterize(self, z: Tensor):
+        """VAE bottleneck: project to (mu, log_var), sample during training.
+
+        Works on any shape (..., H). Returns (z_out, kl_loss).
+        During eval, returns mu (deterministic).
+        """
+        mu = self.vae_mu_proj(z)
+        log_var = self.vae_logvar_proj(z).clamp(min=-10, max=4)
+        if self.training:
+            z_out = mu + torch.randn_like(mu) * torch.exp(0.5 * log_var)
+        else:
+            z_out = mu
+        kl = -0.5 * (1.0 + log_var - mu.pow(2) - log_var.exp()).mean()
+        return z_out, kl
 
     def forward(
         self,
@@ -120,18 +190,28 @@ class UnifiedSTPP(nn.Module):
         z_final, all_states = self.encoder(events, lengths, x_event=x_event)
 
         # ====================================================================
+        # Step 2b: VAE bottleneck (optional)
+        # ====================================================================
+        kl_loss = None
+        if self.vae:
+            all_states, kl_loss = self._vae_reparameterize(all_states)
+
+        # ====================================================================
         # Step 3: Dispatch to batched or sequential forward
         # ====================================================================
         if isinstance(self.dynamics, IdentityDynamics):
-            return self._forward_batched(
+            result = self._forward_batched(
                 times, locations, lengths, all_states, x_field_at_events, device,
                 marks=marks,
             )
         else:
-            return self._forward_sequential(
+            result = self._forward_sequential(
                 times, locations, lengths, all_states, x_field_at_events, device,
                 marks=marks,
             )
+        if kl_loss is not None:
+            result["kl_loss"] = kl_loss
+        return result
 
     def _forward_batched(
         self,
@@ -175,15 +255,35 @@ class UnifiedSTPP(nn.Module):
         mask = (n_indices.unsqueeze(0) < (lengths.unsqueeze(1) - 1)).float()  # (B, L)
 
         # Field covariates / history windows for decoder.
-        # When the spatial sub-decoder needs history windows (data-centered
-        # Gaussians), build them from the event locations and pass via the
-        # dedicated x_field_spatial kwarg so the temporal decoder is unaffected.
+        #
+        # Three routing cases:
+        #   1. DeepSTPPDecoder (requires_time_history=True): needs absolute times
+        #      AND locations for each history window event.  These are packed into
+        #      x_field as (B*L, seq_len + seq_len*d) and passed as the sole x_field.
+        #
+        #   2. FactorizedDecoder with DataCenteredGaussianSpatial (requires_history
+        #      on the spatial sub-decoder, no time history): build location-only
+        #      windows and route via the x_field_spatial kwarg so the temporal
+        #      sub-decoder is unaffected.
+        #
+        #   3. Standard case: pass x_field_at_events directly (no history window).
         spatial_dec = getattr(self.decoder, "spatial", None)
         x_field_flat = None
         x_field_spatial_flat = None
-        if spatial_dec is not None and getattr(spatial_dec, "requires_history", False):
+
+        if getattr(self.decoder, "requires_time_history", False):
+            # Case 1: DeepSTPPDecoder — build (time, location) windows
+            seq_len = self.decoder.history_window_size
+            hist_windows = _sliding_history_windows_with_times(
+                times, locations, L, seq_len
+            )  # (B, L, seq_len + seq_len*d)
+            x_field_spatial_flat = hist_windows.reshape(B * L, -1)
+            if x_field_at_events is not None:
+                x_field_flat = x_field_at_events[:, :L, :].reshape(B * L, -1)
+        elif spatial_dec is not None and getattr(spatial_dec, "requires_history", False):
+            # Case 2: FactorizedDecoder + DataCenteredGaussianSpatial
             seq_len = spatial_dec.history_window_size
-            hist_windows = _sliding_history_windows(locations, L, seq_len)   # (B, L, seq_len*d)
+            hist_windows = _sliding_history_windows(locations, L, seq_len)  # (B, L, seq_len*d)
             x_field_spatial_flat = hist_windows.reshape(B * L, -1)
             if x_field_at_events is not None:
                 x_field_flat = x_field_at_events[:, :L, :].reshape(B * L, -1)
@@ -199,9 +299,14 @@ class UnifiedSTPP(nn.Module):
         t_prev_flat = t_prev.reshape(B * L, 1)
 
         # Single batched ground decoder call
-        if x_field_spatial_flat is not None:
-            # FactorizedDecoder accepts x_field_spatial to route history windows
-            # exclusively to the spatial sub-decoder.
+        if getattr(self.decoder, "requires_time_history", False):
+            # DeepSTPPDecoder: history (times+locs) as the sole x_field argument
+            nll_flat = self.decoder.nll(
+                z_flat, t_flat, s_flat, t_prev_flat,
+                x_field=x_field_spatial_flat,
+            )  # (B*L,)
+        elif x_field_spatial_flat is not None:
+            # FactorizedDecoder: route location windows exclusively to spatial sub-decoder
             nll_flat = self.decoder.nll(
                 z_flat, t_flat, s_flat, t_prev_flat,
                 x_field=x_field_flat,
@@ -383,9 +488,9 @@ class UnifiedSTPP(nn.Module):
             else:
                 x_event_hist = x_event_marks
 
-        # Encode history
+        # Encode history (encode() applies VAE bottleneck if enabled)
         events = torch.cat([history_times.unsqueeze(-1), history_locations], dim=-1)
-        z, all_states = self.encoder(events, history_lengths, x_event=x_event_hist)
+        z, all_states = self.encode(events, history_lengths, x_event=x_event_hist)
 
         sampled_t = []
         sampled_s = []
