@@ -4,7 +4,7 @@
 <p align="center">
   <img
     src="https://raw.githubusercontent.com/YahyaAalaila/STPPGC/feature/lightning_stppv0.0.1/docs/logo2.png"
-    alt="BenchSTPP logo"
+    alt="SeahorSTPP logo"
     width="90"
 />
 </p>
