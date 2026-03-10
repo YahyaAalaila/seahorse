@@ -16,6 +16,8 @@ from torch import Tensor
 from typing import Optional, Dict, Any
 import os
 from .base import Encoder, Dynamics, Updater, Decoder, MarkDecoder
+from .abstractions import StateModel, EventModel
+from .adapters import LegacyPipelineStateAdapter, LegacyPipelineEventAdapter
 from .dynamics.identity import IdentityDynamics
 from .neural_tpp_backbone import NeuralTPPBackbone
 
@@ -109,6 +111,9 @@ class UnifiedSTPP(nn.Module):
         hidden_dim: int = 128,
         backbone: Optional[NeuralTPPBackbone] = None,
         backbone_spatial: Optional[nn.Module] = None,
+        state_model: Optional[StateModel] = None,
+        event_model: Optional[EventModel] = None,
+        use_state_event_path: bool = False,
     ):
         super().__init__()
         self.encoder = encoder
@@ -122,14 +127,43 @@ class UnifiedSTPP(nn.Module):
         # NeuralTPP faithful backbone — bypasses encoder/dynamics/updater/decoder
         self.backbone = backbone
         self.backbone_spatial = backbone_spatial
+        self.state_model = state_model
+        self.event_model = event_model
+        self.use_state_event_path = use_state_event_path
         if vae:
             self.vae_mu_proj = nn.Linear(hidden_dim, hidden_dim)
             self.vae_logvar_proj = nn.Linear(hidden_dim, hidden_dim)
+        if self.state_model is None and self.encoder is not None:
+            self.state_model = LegacyPipelineStateAdapter(
+                encode_fn=self._encode_legacy_history,
+                mark_embed_fn=self._embed_marks if self.mark_embedding is not None else None,
+                vae_reparameterize_fn=self._vae_reparameterize if self.vae else None,
+            )
+        if self.event_model is None and self.decoder is not None and self.dynamics is not None:
+            self.event_model = LegacyPipelineEventAdapter(
+                forward_batched_fn=self._forward_batched,
+                forward_sequential_fn=self._forward_sequential,
+            )
         self._debug_nstpp = os.getenv("UNIFIED_STPP_DEBUG_NSTPP", "0") == "1"
         self._debug_nstpp_max_calls = max(
             1, int(os.getenv("UNIFIED_STPP_DEBUG_NSTPP_MAX_CALLS", "10"))
         )
         self._debug_nstpp_calls = 0
+
+    def _embed_marks(self, marks: Tensor) -> Tensor:
+        if self.mark_embedding is None:
+            raise RuntimeError("mark_embedding is not configured.")
+        return self.mark_embedding(marks)
+
+    def _encode_legacy_history(
+        self,
+        events: Tensor,
+        lengths: Tensor,
+        x_event: Optional[Tensor] = None,
+    ):
+        if self.encoder is None:
+            raise RuntimeError("encoder is not configured.")
+        return self.encoder(events, lengths, x_event=x_event)
 
     def encode(self, events: Tensor, lengths: Tensor, x_event=None):
         """Encode events to (z_final, all_states), applying VAE bottleneck if enabled.
@@ -192,6 +226,24 @@ class UnifiedSTPP(nn.Module):
             return self._forward_neural_tpp(times, locations, lengths, device)
 
         # ====================================================================
+        # Stage-1 path: coarse StateModel/EventModel compatibility adapters
+        # ====================================================================
+        if (
+            self.use_state_event_path
+            and self.state_model is not None
+            and self.event_model is not None
+        ):
+            return self._forward_state_event(
+                times=times,
+                locations=locations,
+                lengths=lengths,
+                marks=marks,
+                x_event=x_event,
+                x_field_at_events=x_field_at_events,
+                device=device,
+            )
+
+        # ====================================================================
         # Step 1: Embed marks as event-level covariates (if mark_embedding set)
         # ====================================================================
         if marks is not None and self.mark_embedding is not None:
@@ -227,6 +279,72 @@ class UnifiedSTPP(nn.Module):
                 times, locations, lengths, all_states, x_field_at_events, device,
                 marks=marks,
             )
+        if kl_loss is not None:
+            result["kl_loss"] = kl_loss
+        return result
+
+    def _forward_state_event(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        marks: Optional[Tensor],
+        x_event: Optional[Tensor],
+        x_field_at_events: Optional[Tensor],
+        device,
+    ) -> Dict[str, Tensor]:
+        """
+        Coarse StateModel/EventModel execution path.
+
+        Stage 1 intentionally delegates to legacy internals via compatibility
+        adapters to preserve behavior.
+        """
+        state_ctx = self.state_model.forward_history(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            marks=marks,
+            x_event=x_event,
+            x_field_at_events=x_field_at_events,
+        )
+
+        if isinstance(self.dynamics, IdentityDynamics):
+            state = self.state_model.sequence_forward(
+                state_ctx,
+                times=times,
+                locations=locations,
+                lengths=lengths,
+                x_field_at_events=x_field_at_events,
+            )
+            result = self.event_model.sequence_nll(
+                times=times,
+                locations=locations,
+                lengths=lengths,
+                state=state,
+                x_field_at_events=x_field_at_events,
+                marks=marks,
+                device=device,
+            )
+        else:
+            state = self.state_model.query(
+                state_ctx,
+                times=times,
+                locations=locations,
+                lengths=lengths,
+                x_field_at_events=x_field_at_events,
+            )
+            result = self.event_model.nll(
+                times=times,
+                locations=locations,
+                lengths=lengths,
+                state=state,
+                x_field_at_events=x_field_at_events,
+                marks=marks,
+                device=device,
+            )
+
+        kl_loss = getattr(state_ctx, "kl_loss", None)
         if kl_loss is not None:
             result["kl_loss"] = kl_loss
         return result
