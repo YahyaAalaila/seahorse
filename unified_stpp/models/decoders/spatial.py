@@ -139,12 +139,15 @@ class CNFVelocityField(nn.Module):
             self.hidden_layers = nn.ModuleList(cs_layers)
             self.output_layer  = nn.Linear(hidden_dim, spatial_dim)
             self.mlp = None
-        else:  # "mlp"
-            # Plain concat+Tanh: [s, τ, z, X] → Linear → Tanh → … → Linear
+        else:  # "mlp" or "softplus"
+            # Plain concat+activation: [s, τ, z, X] → Linear → Act → … → Linear
+            # "softplus" uses nn.Softplus (matches NeuralSTPP base_cnf).
+            # "mlp" uses nn.Tanh (legacy default).
+            act_cls = nn.Softplus if layer_type == "softplus" else nn.Tanh
             in_d = spatial_dim + ctx_dim
             mlp_layers: list = []
             for _ in range(n_hidden_layers):
-                mlp_layers += [nn.Linear(in_d, hidden_dim), nn.Tanh()]
+                mlp_layers += [nn.Linear(in_d, hidden_dim), act_cls()]
                 in_d = hidden_dim
             mlp_layers.append(nn.Linear(hidden_dim, spatial_dim))
             self.mlp = nn.Sequential(*mlp_layers)
@@ -322,16 +325,21 @@ class CNFSpatial(nn.Module):
             return _euler_solve_simple(self.velocity, s_aug, t_span,
                                        n_steps=self.n_steps if self.n_steps > 0 else 50)
 
+        # torchdiffeq adaptive solvers default to dtype=float64 for time-like
+        # tensors (rtol, atol, step sizes).  MPS does not support float64, so
+        # we pin all solver scalars to s_aug's dtype (float32 on MPS).
+        options: dict = {"dtype": s_aug.dtype}
+        if self.solver == "euler" and self.n_steps > 0:
+            dt_total = abs((t_span[-1] - t_span[0]).item())
+            if dt_total > 1e-8:
+                options["step_size"] = dt_total / self.n_steps
+
         ode_kwargs: dict = {
             "method": self.solver,
             "atol": self.atol,
             "rtol": self.rtol,
+            "options": options,
         }
-
-        if self.solver == "euler" and self.n_steps > 0:
-            dt_total = abs((t_span[-1] - t_span[0]).item())
-            if dt_total > 1e-8:
-                ode_kwargs["options"] = {"step_size": dt_total / self.n_steps}
 
         if self.use_adjoint:
             traj = _odeint_adj(self.velocity, s_aug, t_span, **ode_kwargs)
@@ -366,7 +374,7 @@ class CNFSpatial(nn.Module):
         s_aug = torch.cat([s, torch.zeros(B, 1, device=s.device)], dim=-1)
         s_aug = s_aug.requires_grad_(True)
 
-        t_span = torch.tensor([1.0, 0.0], device=s.device)
+        t_span = torch.tensor([1.0, 0.0], device=s.device, dtype=s.dtype)
         s_aug_0 = self._run_odeint(t_span, s_aug)
 
         s_0     = s_aug_0[:, :d]
@@ -407,7 +415,7 @@ class CNFSpatial(nn.Module):
         if self.base_type == "self_attentive":
             s_0 = s_0 + self._compute_mu_attn(z, x_field)
 
-        t_span = torch.tensor([0.0, 1.0], device=device)
+        t_span = torch.tensor([0.0, 1.0], device=device, dtype=s_0.dtype)
         return self._run_odeint(t_span, s_0)
 
 

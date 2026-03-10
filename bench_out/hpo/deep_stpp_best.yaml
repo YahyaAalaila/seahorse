@@ -1,0 +1,52 @@
+data:
+  protocol: paper_autostpp_sthp
+  normalize: false
+  batch_size: 128
+  num_workers: 0
+  seed: 42
+  paper_lookback: null
+  paper_lookahead: 1
+  paper_split_ratio:
+  - 8
+  - 1
+  - 1
+  type: sthp
+model:
+  preset: deep_stpp
+  hidden_dim: 128
+  spatial_dim: 2
+  n_marks: 0
+  event_cov_dim: 0
+  field_cov_dim: 0
+  vae: true
+  encoder:
+    dropout: 0.0
+    num_heads: 4
+    num_layers: 3
+  decoder:
+    seq_len: 20
+    sigma_min: 0.0001
+    n_layers: 3
+    num_points: 20
+  updater:
+    num_heads: 4
+training:
+  lr: 0.0006372166690995243
+  weight_decay: 1.0e-05
+  grad_clip: 1.0
+  n_epochs: 50
+  batch_size: 128
+  patience: null
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  device: auto
+  lr_schedule: constant
+  lr_warmup_epochs: 0
+  lr_step_size: 50
+  lr_step_gamma: 0.2
+  vae_beta: 0.001
+logging:
+  out_dir: runs/
+  experiment_name: null
+  save_checkpoints: true
+  wandb: null

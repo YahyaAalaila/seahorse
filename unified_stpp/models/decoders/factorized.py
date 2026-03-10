@@ -74,6 +74,45 @@ class FactorizedDecoder(Decoder):
         return -self.log_prob(z, t, s, t_prev, x_field=x_field,
                               x_field_spatial=x_field_spatial)
 
+    @property
+    def SEQUENCE_COUPLED(self) -> bool:
+        """True when the spatial sub-decoder requires full-sequence processing."""
+        return getattr(self.spatial, "SEQUENCE_COUPLED", False)
+
+    def sequence_nll(
+        self,
+        z_seq: Tensor,
+        t_seq: Tensor,
+        s_seq: Tensor,
+        t_prev_seq: Tensor,
+        lengths: Tensor,
+        mask: Tensor,
+        x_field_seq: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Per-event NLL for sequences with a sequence-coupled spatial sub-decoder.
+
+        Temporal NLL is computed per-event (independent across positions).
+        Spatial NLL is delegated to ``self.spatial.sequence_nll``.
+        """
+        B, L, h = z_seq.shape
+        z_flat = z_seq.reshape(B * L, h)
+        t_flat = t_seq.reshape(B * L, 1)
+        t_prev_flat = t_prev_seq.reshape(B * L, 1)
+        x_field_flat = (
+            x_field_seq.reshape(B * L, -1) if x_field_seq is not None else None
+        )
+
+        temporal_nll = -self.temporal.log_prob(
+            z_flat, t_flat, t_prev_flat, x_field=x_field_flat
+        ).reshape(B, L)  # (B, L)
+
+        spatial_nll = self.spatial.sequence_nll(
+            z_seq, t_seq, s_seq, t_prev_seq, lengths, mask,
+            x_field_seq=x_field_seq,
+        )  # (B, L)
+
+        return temporal_nll + spatial_nll
+
     def sample(
         self,
         z: Tensor,

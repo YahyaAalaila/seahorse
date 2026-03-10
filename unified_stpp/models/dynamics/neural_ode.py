@@ -25,7 +25,6 @@ try:
 except ImportError:
     HAS_TORCHDIFFEQ = False
 
-
 class ODEFunc(nn.Module):
     """The right-hand side f(z, t) of the ODE dz/dt = f(z, t).
 
@@ -192,16 +191,23 @@ class NeuralODEDynamics(Dynamics):
             fallback_steps = self.n_steps if self.n_steps > 0 else 100
             return euler_solve(func, y0, t_span, n_steps=fallback_steps)
 
-        kwargs: dict = {
-            "method": self.solver,
-            "atol": self.atol,
-            "rtol": self.rtol,
-        }
+        # torchdiffeq's adaptive solvers default to dtype=float64 for all
+        # time-like tensors (rtol, atol, step sizes).  MPS (Apple Silicon)
+        # does not support float64, so we override via options to stay in
+        # y0's dtype (float32 on MPS; preserves float64 on CPU/CUDA if needed).
+        options: dict = {"dtype": y0.dtype}
 
         if self.solver == "euler" and self.n_steps > 0:
             dt_total = abs((t_span[-1] - t_span[0]).item())
             if dt_total > 1e-8:
-                kwargs["options"] = {"step_size": dt_total / self.n_steps}
+                options["step_size"] = dt_total / self.n_steps
+
+        kwargs: dict = {
+            "method": self.solver,
+            "atol": self.atol,
+            "rtol": self.rtol,
+            "options": options,
+        }
 
         if self.use_adjoint:
             return _odeint_adj(func, y0, t_span, **kwargs)

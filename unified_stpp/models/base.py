@@ -133,6 +133,11 @@ class Decoder(ABC, nn.Module):
         log_prob: (B,)         — log f*(t, s | H_t) or log λ*(t, s | H_t)
     """
 
+    SEQUENCE_COUPLED: bool = False
+    """When True, this decoder requires the full event sequence to compute NLL.
+    ``UnifiedSTPP`` will call ``sequence_nll`` instead of per-event ``nll``.
+    """
+
     def __init__(self, hidden_dim: int, spatial_dim: int, **kwargs):
         ABC.__init__(self)
         nn.Module.__init__(self)
@@ -167,6 +172,37 @@ class Decoder(ABC, nn.Module):
         For intensity-based decoders: -log λ*(t, s) + ∫∫ λ* ds dt
         """
         ...
+
+    def sequence_nll(
+        self,
+        z_seq: Tensor,
+        t_seq: Tensor,
+        s_seq: Tensor,
+        t_prev_seq: Tensor,
+        lengths: Tensor,
+        mask: Tensor,
+        **kwargs,
+    ) -> Tensor:
+        """Per-event NLL for an entire sequence (batch).
+
+        Required when ``SEQUENCE_COUPLED = True``; the default raises
+        ``NotImplementedError``.  When implemented, returns ``(B, L)``
+        unmasked NLL values — the caller applies ``mask``.
+
+        Args:
+            z_seq:      (B, L, h) — conditioning state at each prediction step.
+            t_seq:      (B, L, 1) — target event times.
+            s_seq:      (B, L, d) — target event locations.
+            t_prev_seq: (B, L, 1) — previous event times (inter-event interval).
+            lengths:    (B,)      — actual sequence lengths.
+            mask:       (B, L)    — 1.0 for valid positions, 0.0 for padding.
+        Returns:
+            nll: (B, L) — per-event NLL, unmasked.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} has SEQUENCE_COUPLED=True but does not "
+            "implement sequence_nll()."
+        )
 
     def sample(
         self,

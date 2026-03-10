@@ -20,9 +20,12 @@ from .models.decoders import (
     MLPMarkDecoder,
     AttentionMarkDecoder,
     AutoIntDecoder,
+    JumpCNFSpatial,
+    SelfAttentiveCNFSpatial,
 )
 from .models.covariates import LiftingMap, MarkEmbedding
 from .models.unified_model import UnifiedSTPP
+from .models.neural_tpp_backbone import NeuralTPPBackbone
 
 
 ENCODER_REGISTRY = {
@@ -50,6 +53,8 @@ SPATIAL_DECODER_REGISTRY = {
     "cnf": CNFSpatial,
     "gaussian_mixture": GaussianMixtureSpatial,
     "data_centered_gaussian": DataCenteredGaussianSpatial,
+    "jump_cnf": JumpCNFSpatial,
+    "self_attentive_cnf": SelfAttentiveCNFSpatial,
 }
 
 MARK_DECODER_REGISTRY = {
@@ -193,6 +198,53 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "y_hi": 3.5,
         },
     },
+    # Sequence-coupled JumpCNF with faithful NeuralPointProcess backbone.
+    #
+    # Temporal: NeuralTPPBackbone owns the full temporal process:
+    #   - learnable _init_state (no encoder)
+    #   - time-independent ODE dh/dt = tanh(net(h)), zero-init last layer
+    #   - intensity sigmoid(linear(h) − 2) × 50  (IntensityODEFunc faithful)
+    #   - joint [h, Λ] ODE; jump update h+ = GRUCell(s, h) spatial-only
+    # Spatial:  JumpCNFSpatial — backward-chained radial flows, O(T²).
+    "neural_stpp_jump_sc": {
+        "backbone": {
+            "update_type": "gru",
+            "solver": "dopri5",
+            "atol": 1e-4,
+            "rtol": 1e-4,
+            "use_adjoint": False,
+            "energy_regularization": 1e-4,  # --tpp_otreg_strength 1e-4
+        },
+        "decoder": {
+            "spatial": {"type": "jump_cnf", "n_flows": 4},
+        },
+    },
+    # Sequence-coupled SelfAttentiveCNF with faithful NeuralPointProcess backbone.
+    #
+    # Same temporal backbone as neural_stpp_jump_sc.
+    # Spatial: SelfAttentiveCNFSpatial — cross-event attention context then
+    #   L independent ConcatSquash CNFs in one batched ODE solve.
+    "neural_stpp_attn_sc": {
+        "backbone": {
+            "update_type": "gru",
+            "solver": "dopri5",
+            "atol": 1e-4,
+            "rtol": 1e-4,
+            "use_adjoint": False,
+            "energy_regularization": 1e-4,  # --tpp_otreg_strength 1e-4
+        },
+        "decoder": {
+            "spatial": {
+                "type": "self_attentive_cnf",
+                "num_heads": 4,
+                "n_hidden_layers": 2,
+                "solver": "dopri5",
+                "atol": 1e-4,
+                "rtol": 1e-4,
+                "otreg_strength": 1e-4,  # --otreg_strength 1e-4
+            },
+        },
+    },
 }
 
 
@@ -222,6 +274,33 @@ def build_model(
         # Deep merge: config overrides preset
         _deep_update(base_config, config)
         config = base_config
+
+    # ------------------------------------------------------------------ #
+    # Backbone path: NeuralTPP faithful presets (neural_stpp_jump_sc, _attn_sc)
+    # These bypass encoder / dynamics / updater / temporal-decoder entirely.
+    # ------------------------------------------------------------------ #
+    if "backbone" in config:
+        bb_cfg = config["backbone"].copy()
+        backbone = NeuralTPPBackbone(
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            **bb_cfg,
+        )
+
+        spat_cfg = config["decoder"]["spatial"].copy()
+        spat_type = spat_cfg.pop("type")
+        backbone_spatial = SPATIAL_DECODER_REGISTRY[spat_type](
+            spatial_dim=spatial_dim,
+            hidden_dim=hidden_dim,
+            field_cov_dim=field_cov_dim,
+            **spat_cfg,
+        )
+
+        return UnifiedSTPP(
+            backbone=backbone,
+            backbone_spatial=backbone_spatial,
+            hidden_dim=hidden_dim,
+        )
 
     input_dim = 1 + spatial_dim  # time + space
 
