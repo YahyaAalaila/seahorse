@@ -220,13 +220,7 @@ class UnifiedSTPP(nn.Module):
         device = times.device
 
         # ====================================================================
-        # Fast path: NeuralTPP backbone bypasses encoder/dynamics/updater/decoder
-        # ====================================================================
-        if self.backbone is not None:
-            return self._forward_neural_tpp(times, locations, lengths, device)
-
-        # ====================================================================
-        # Stage-1 path: coarse StateModel/EventModel compatibility adapters
+        # Coarse StateModel/EventModel path
         # ====================================================================
         if (
             self.use_state_event_path
@@ -242,6 +236,12 @@ class UnifiedSTPP(nn.Module):
                 x_field_at_events=x_field_at_events,
                 device=device,
             )
+
+        # ====================================================================
+        # Fast path fallback: legacy NeuralTPP backbone execution
+        # ====================================================================
+        if self.backbone is not None:
+            return self._forward_neural_tpp(times, locations, lengths, device)
 
         # ====================================================================
         # Step 1: Embed marks as event-level covariates (if mark_embedding set)
@@ -297,8 +297,8 @@ class UnifiedSTPP(nn.Module):
         """
         Coarse StateModel/EventModel execution path.
 
-        Stage 1 intentionally delegates to legacy internals via compatibility
-        adapters to preserve behavior.
+        This path covers both compatibility adapters (Stage 1) and native
+        StateModel/EventModel implementations (Stage 2+).
         """
         state_ctx = self.state_model.forward_history(
             times=times,
@@ -343,6 +343,41 @@ class UnifiedSTPP(nn.Module):
                 marks=marks,
                 device=device,
             )
+
+        debug_this_call = (
+            self._debug_nstpp and self._debug_nstpp_calls < self._debug_nstpp_max_calls
+        )
+        if debug_this_call:
+            mask = result.get("mask")
+            temporal_nll = result.get("temporal_nll_matrix")
+            spatial_nll = result.get("spatial_nll_matrix")
+            nll_matrix = result.get("nll_matrix")
+            if (
+                isinstance(mask, Tensor)
+                and isinstance(temporal_nll, Tensor)
+                and isinstance(spatial_nll, Tensor)
+                and isinstance(nll_matrix, Tensor)
+                and mask.numel() > 0
+                and (mask > 0).any()
+            ):
+                valid = mask > 0
+                t_vals = temporal_nll.detach()[valid]
+                s_vals = spatial_nll.detach()[valid]
+                j_vals = nll_matrix.detach()[valid]
+                energy_reg = result.get("temporal_energy_reg", 0.0)
+                spatial_reg = result.get("spatial_reg", 0.0)
+                print(
+                    "[NSTPP-DEBUG][loss] "
+                    f"temporal_nll(min/mean/max)="
+                    f"{t_vals.min().item():.6f}/{t_vals.mean().item():.6f}/{t_vals.max().item():.6f} "
+                    f"spatial_nll(min/mean/max)="
+                    f"{s_vals.min().item():.6f}/{s_vals.mean().item():.6f}/{s_vals.max().item():.6f} "
+                    f"joint_nll(min/mean/max)="
+                    f"{j_vals.min().item():.6f}/{j_vals.mean().item():.6f}/{j_vals.max().item():.6f} "
+                    f"energy_reg={float(torch.as_tensor(energy_reg).detach().item()):.6f} "
+                    f"spatial_reg={float(torch.as_tensor(spatial_reg).detach().item()):.6f}"
+                )
+                self._debug_nstpp_calls += 1
 
         kl_loss = getattr(state_ctx, "kl_loss", None)
         if kl_loss is not None:

@@ -26,6 +26,8 @@ from .models.decoders import (
 from .models.covariates import LiftingMap, MarkEmbedding
 from .models.unified_model import UnifiedSTPP
 from .models.neural_tpp_backbone import NeuralTPPBackbone
+from .models.state_models import NeuralTPPBackboneStateModel
+from .models.event_models import NeuralSTPPSequenceEventModel
 
 
 ENCODER_REGISTRY = {
@@ -277,7 +279,9 @@ def build_model(
 
     # ------------------------------------------------------------------ #
     # Backbone path: NeuralTPP faithful presets (neural_stpp_jump_sc, _attn_sc)
-    # These bypass encoder / dynamics / updater / temporal-decoder entirely.
+    # These still bypass encoder / dynamics / updater / temporal-decoder.
+    # In Stage 2 they default to the coarse StateModel/EventModel path, with
+    # ``use_state_event_path=False`` preserving the legacy fallback.
     # ------------------------------------------------------------------ #
     if "backbone" in config:
         bb_cfg = config["backbone"].copy()
@@ -296,9 +300,21 @@ def build_model(
             **spat_cfg,
         )
 
+        state_model = NeuralTPPBackboneStateModel(
+            sequence_nll_and_states_fn=backbone.sequence_nll_and_states,
+        )
+        event_model = NeuralSTPPSequenceEventModel(
+            spatial_sequence_nll_fn=backbone_spatial.sequence_nll,
+            spatial_regularization_fn=lambda: getattr(backbone_spatial, "_energy_reg", 0.0),
+        )
+        use_state_event_path = bool(config.get("use_state_event_path", True))
+
         return UnifiedSTPP(
             backbone=backbone,
             backbone_spatial=backbone_spatial,
+            state_model=state_model,
+            event_model=event_model,
+            use_state_event_path=use_state_event_path,
             hidden_dim=hidden_dim,
         )
 
