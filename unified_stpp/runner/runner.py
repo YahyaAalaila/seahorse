@@ -259,10 +259,7 @@ class STPPRunner:
         # device than the MPS gradients. Force CPU for ODE-based models on MPS.
         accelerator = tcfg.device
         if accelerator == "auto" and torch.backends.mps.is_available():
-            from unified_stpp.models.dynamics.neural_ode import NeuralODEDynamics
-            from unified_stpp.models.decoders.spatial import CNFSpatial
-            if any(isinstance(m, (NeuralODEDynamics, CNFSpatial))
-                   for m in model.modules()):
+            if cfg.model.preset in {"neural_stpp_attn_sc", "neural_stpp_jump_sc"}:
                 import warnings
                 warnings.warn(
                     "MPS detected but torchdiffeq doesn't support MPS (float64). "

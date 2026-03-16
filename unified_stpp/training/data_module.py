@@ -15,7 +15,7 @@ from unified_stpp.data.dataset import PaperSlidingWindowDataset
 # Protocol compatibility guard
 # ---------------------------------------------------------------------------
 
-_PAPER_AUTOSTPP_STHP_VALID_PRESETS = frozenset({"auto_stpp", "deep_stpp", "deep_stpp_lognormal"})
+_PAPER_AUTOSTPP_STHP_VALID_PRESETS = frozenset({"auto_stpp", "deep_stpp"})
 
 
 def assert_protocol_model_compatible(protocol: str, model_preset: str) -> None:

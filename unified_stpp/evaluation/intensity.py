@@ -2,36 +2,28 @@
 Intensity evaluation utilities for spatial visualization of STPP models.
 
 Provides a unified interface for evaluating conditional intensity
-λ*(t, s | H) on spatial grids with proper coordinate de-normalization,
-covering both decoder families used in this framework.
+λ*(t, s | H) on spatial grids with proper coordinate de-normalization.
 
 Mathematical background
 -----------------------
-Both decoder families produce values in *normalized* coordinates
+Supported decoders produce values in *normalized* coordinates
 (after z-score normalization of times and locations):
 
-  FactorizedDecoder  (DeepSTPP / NeuralSTPP):
-      decoder.log_prob → log f*_norm(t', s') = log f*(t') + log f*(s'|t')
+  DeepSTPPDecoder:
+      decoder.log_prob → log f*_norm(t', s')
 
-  AutoIntDecoder  (AutoSTPP):
-      decoder.log_prob → log λ*_norm(t', s') = log(μ + prodnet_intensity)
+  AutoIntDecoder:
+      decoder.log_prob → log λ*_norm(t', s')
 
 After z-score normalization (t' = (t − μ_t)/σ_t, s' = (s − μ_s)/σ_s)
 the density/intensity in original coordinates is:
 
     q_orig(t, s) = q_norm(t', s') / (σ_t · σ_x · σ_y)
 
-The same Jacobian factor applies to both decoder types, so
+The same Jacobian factor applies in both cases, so
 `correct_for_normalization=True` divides exp(log_prob_norm) by
 (t_scale · prod(s_scale)) to approximate the quantity in original
 coordinates.
-
-Note on DiffusionDecoder
-------------------------
-DiffusionDecoder.log_prob() returns a rough approximation (not the
-true log-likelihood).  eval_intensity will still call it, but the
-returned values are NOT calibrated and MUST NOT be compared with
-FactorizedDecoder or AutoIntDecoder outputs in likelihood tables.
 """
 
 import torch
@@ -60,10 +52,9 @@ def eval_intensity(
     over a spatial grid, using ``history_times`` / ``history_locs`` as the
     conditioning history H.
 
-    Works for FactorizedDecoder (DeepSTPP / NeuralSTPP) and AutoIntDecoder
-    (AutoSTPP).  For IdentityDynamics the encoder output is used directly;
-    for ODE-based dynamics the state is evolved to ``t_query`` via the
-    dynamics module.
+    Works for DeepSTPPDecoder and AutoIntDecoder. For IdentityDynamics the
+    encoder output is used directly; for non-identity dynamics, the state is
+    evolved to ``t_query`` via the dynamics module.
 
     Args:
         model: Trained UnifiedSTPP in eval mode (or will be switched to eval).

@@ -1,4 +1,4 @@
-"""Regression checks for neural_stpp_*_sc coarse path outputs."""
+"""Regression checks for auto_stpp coarse path outputs."""
 
 from __future__ import annotations
 
@@ -28,12 +28,12 @@ def _tiny_batch():
     return times, locations, lengths
 
 
-class TestNeuralSTPPStateEventOutputs(unittest.TestCase):
-    def _assert_outputs(self, preset: str, forward_seed: int):
+class TestAutoSTPPStateEventOutputs(unittest.TestCase):
+    def test_auto_stpp_outputs(self):
         torch.manual_seed(7)
         model = build_model(
             config={},
-            preset=preset,
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=16,
         )
@@ -43,36 +43,36 @@ class TestNeuralSTPPStateEventOutputs(unittest.TestCase):
 
         model.eval()
         times, locations, lengths = _tiny_batch()
-
         with torch.no_grad():
-            torch.manual_seed(forward_seed)
             out = model(times=times, locations=locations, lengths=lengths)
 
         self.assertIn("nll", out)
         self.assertIn("nll_per_event", out)
         self.assertIn("total_events", out)
+        self.assertIn("sll", out)
+        self.assertIn("tll", out)
         self.assertIn("nll_matrix", out)
+        self.assertIn("sll_matrix", out)
+        self.assertIn("tll_matrix", out)
         self.assertIn("mask", out)
-        self.assertIn("temporal_nll_matrix", out)
-        self.assertIn("spatial_nll_matrix", out)
-        self.assertIn("temporal_energy_reg", out)
-        self.assertIn("spatial_reg", out)
-        self.assertIn("regularization_total", out)
+        self.assertIn("lambs_sum", out)
+        self.assertIn("lamb_t", out)
+        self.assertIn("lamb_ints", out)
+        self.assertIn("background_rate", out)
         self.assertTrue(torch.isfinite(out["nll"]))
 
-        # mean_nll = base_mean_nll + regularization_total contract
         torch.testing.assert_close(
             out["nll"],
-            out["base_mean_nll"] + out["regularization_total"],
+            -(out["sll"] + out["tll"]),
             rtol=1e-6,
             atol=1e-6,
         )
-
-    def test_neural_stpp_jump_sc_outputs(self):
-        self._assert_outputs("neural_stpp_jump_sc", forward_seed=11)
-
-    def test_neural_stpp_attn_sc_outputs(self):
-        self._assert_outputs("neural_stpp_attn_sc", forward_seed=13)
+        torch.testing.assert_close(
+            out["sll"],
+            torch.zeros_like(out["sll"]),
+            rtol=0.0,
+            atol=0.0,
+        )
 
 
 if __name__ == "__main__":

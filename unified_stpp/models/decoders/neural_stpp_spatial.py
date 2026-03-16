@@ -150,12 +150,12 @@ class JumpCNFSpatial(Decoder):
 
     def log_prob(self, z, t, s, t_prev, x_field=None):
         raise NotImplementedError(
-            "JumpCNFSpatial.SEQUENCE_COUPLED=True; use FactorizedDecoder.sequence_nll."
+            "JumpCNFSpatial.SEQUENCE_COUPLED=True; use sequence_nll()."
         )
 
     def nll(self, z, t, s, t_prev, x_field=None):
         raise NotImplementedError(
-            "JumpCNFSpatial.SEQUENCE_COUPLED=True; use FactorizedDecoder.sequence_nll."
+            "JumpCNFSpatial.SEQUENCE_COUPLED=True; use sequence_nll()."
         )
 
     def sequence_nll(

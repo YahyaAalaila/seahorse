@@ -1,0 +1,4 @@
+epoch,lr-AdamW,step,train/n_events,train/nll,val/n_events,val/nll
+,0.0003,0,,,,
+0,,0,,,208.0,8.972492218017578
+0,,0,783.0,8.967029571533203,,

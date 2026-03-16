@@ -1,13 +1,27 @@
-"""
-Parity tests for Stage-1 StateModel/EventModel compatibility adapters.
-"""
+"""Compatibility checks for active coarse-framework presets."""
 
-import copy
+from __future__ import annotations
+
 import unittest
 
 import torch
 
 from unified_stpp.registry import build_model
+
+
+_ACTIVE_PRESETS = (
+    "neural_stpp_attn_sc",
+    "neural_stpp_jump_sc",
+    "deep_stpp",
+    "auto_stpp",
+)
+
+_REMOVED_PRESETS = (
+    "neural_stpp",
+    "neural_stpp_jump",
+    "deep_stpp_free",
+    "dstpp",
+)
 
 
 def _tiny_batch() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -26,71 +40,49 @@ def _tiny_batch() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     return times, locations, lengths
 
 
-class TestStateEventAdapterParity(unittest.TestCase):
-    def _assert_parity(self, *, preset=None, config=None):
-        cfg_legacy = copy.deepcopy(config or {})
-        cfg_adapter = copy.deepcopy(config or {})
+class TestStateEventCompat(unittest.TestCase):
+    def test_active_presets_use_coarse_path(self):
+        for preset in _ACTIVE_PRESETS:
+            with self.subTest(preset=preset):
+                model = build_model(
+                    config={},
+                    preset=preset,
+                    spatial_dim=2,
+                    hidden_dim=16,
+                )
+                self.assertTrue(model.use_state_event_path)
+                self.assertIsNotNone(model.state_model)
+                self.assertIsNotNone(model.event_model)
 
-        torch.manual_seed(7)
-        legacy_model = build_model(
-            config=cfg_legacy,
-            preset=preset,
-            spatial_dim=2,
-            hidden_dim=16,
-        )
-        torch.manual_seed(7)
-        adapter_model = build_model(
-            config=cfg_adapter,
-            preset=preset,
-            spatial_dim=2,
-            hidden_dim=16,
-        )
-        adapter_model.load_state_dict(legacy_model.state_dict())
-
-        self.assertIsNotNone(adapter_model.state_model)
-        self.assertIsNotNone(adapter_model.event_model)
-        self.assertFalse(legacy_model.use_state_event_path)
-        adapter_model.use_state_event_path = True
-
-        legacy_model.eval()
-        adapter_model.eval()
-
+    def test_active_presets_forward_finite(self):
         times, locations, lengths = _tiny_batch()
-        with torch.no_grad():
-            legacy_out = legacy_model(times=times, locations=locations, lengths=lengths)
-            adapter_out = adapter_model(times=times, locations=locations, lengths=lengths)
+        for preset in _ACTIVE_PRESETS:
+            with self.subTest(preset=preset):
+                torch.manual_seed(7)
+                model = build_model(
+                    config={},
+                    preset=preset,
+                    spatial_dim=2,
+                    hidden_dim=16,
+                )
+                model.eval()
+                with torch.no_grad():
+                    out = model(times=times, locations=locations, lengths=lengths)
+                self.assertIn("nll", out)
+                self.assertIn("nll_per_event", out)
+                self.assertIn("total_events", out)
+                self.assertTrue(torch.isfinite(out["nll"]))
 
-        torch.testing.assert_close(legacy_out["nll"], adapter_out["nll"], rtol=1e-6, atol=1e-6)
-        torch.testing.assert_close(
-            legacy_out["nll_per_event"], adapter_out["nll_per_event"], rtol=1e-6, atol=1e-6
-        )
-        torch.testing.assert_close(
-            legacy_out["total_events"], adapter_out["total_events"], rtol=0.0, atol=0.0
-        )
-
-    def test_identity_path_parity(self):
-        self._assert_parity(preset="deep_stpp")
-
-    def test_non_identity_path_parity(self):
-        config = {
-            "encoder": {"type": "gru", "num_layers": 1},
-            "dynamics": {
-                "type": "neural_ode",
-                "solver": "euler",
-                "n_steps": 8,
-                "atol": 1e-5,
-                "rtol": 1e-5,
-                "augmented": False,
-                "use_adjoint": False,
-            },
-            "updater": {"type": "gru_jump"},
-            "decoder": {
-                "type": "factorized",
-                "temporal": {"type": "lognormal_mixture", "n_components": 4},
-                "spatial": {"type": "gaussian_mixture", "n_components": 4},
-            },
-        }
-        self._assert_parity(config=config)
+    def test_removed_presets_rejected(self):
+        for preset in _REMOVED_PRESETS:
+            with self.subTest(preset=preset):
+                with self.assertRaises(ValueError):
+                    build_model(
+                        config={},
+                        preset=preset,
+                        spatial_dim=2,
+                        hidden_dim=16,
+                    )
 
 
 if __name__ == "__main__":
