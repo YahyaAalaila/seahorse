@@ -52,9 +52,26 @@ class STPPLightningModule(pl.LightningModule):
             return int(batch["times"].shape[0])
         return 1
 
+    def _log_state_regularization_terms(self, stage: str, output: dict, n_ev: int):
+        terms = output.get("state_regularization_terms")
+        if not isinstance(terms, dict):
+            return
+        for name, value in terms.items():
+            if value is None:
+                continue
+            if not isinstance(value, torch.Tensor):
+                value = torch.as_tensor(value, device=self.device, dtype=torch.float32)
+            self.log(
+                f"{stage}/state_reg/{name}",
+                value,
+                on_step=False,
+                on_epoch=True,
+                batch_size=n_ev,
+            )
+
     def training_step(self, batch, batch_idx):
         output = self.forward(batch)
-        loss = output["nll"]
+        loss = output.get("loss", output["nll"])
         # Weight epoch average by event count so epoch NLL =
         #   Σ(nll_batch × n_events_batch) / Σ(n_events_batch)
         # i.e. the true per-event NLL over the full epoch, not a
@@ -69,6 +86,7 @@ class STPPLightningModule(pl.LightningModule):
 
         self.log("train/nll", output["nll"], on_step=False, on_epoch=True, prog_bar=True, batch_size=n_ev)
         self.log("train/n_events", output["total_events"], on_step=False, on_epoch=True, batch_size=n_seq)
+        self._log_state_regularization_terms("train", output, n_ev)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -77,11 +95,13 @@ class STPPLightningModule(pl.LightningModule):
         n_seq = self._batch_size_from_batch(batch)
         self.log("val/nll", output["nll"], on_step=False, on_epoch=True, prog_bar=True, batch_size=n_ev)
         self.log("val/n_events", output["total_events"], on_step=False, on_epoch=True, batch_size=n_seq)
+        self._log_state_regularization_terms("val", output, n_ev)
 
     def test_step(self, batch, batch_idx):
         output = self.forward(batch)
         n_ev = max(1, int(output["total_events"].item()))
         self.log("test/nll", output["nll"], on_step=False, on_epoch=True, batch_size=n_ev)
+        self._log_state_regularization_terms("test", output, n_ev)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(

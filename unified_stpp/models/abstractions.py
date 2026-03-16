@@ -1,46 +1,131 @@
-"""
-Coarse-grained model abstractions for state and event modeling.
-
-Stage 1 intentionally keeps these interfaces broad so future models are not
-forced into Encoder/Dynamics/Updater phases.
-"""
+"""Coarse state/event abstractions with capability declarations."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import torch.nn as nn
 from torch import Tensor
 
 
+TrainingObjective = Literal[
+    "exact_nll",
+    "approx_nll",
+    "elbo",
+    "score_matching",
+    "hybrid",
+]
+
+
+@dataclass(frozen=True)
+class StateCapabilities:
+    """Capability declarations for state models."""
+
+    has_query_state: bool = True
+    has_sequence_states: bool = True
+    has_regularization_terms: bool = False
+    state_kind: Literal["process_backbone", "latent_static", "history_passthrough"] = (
+        "history_passthrough"
+    )
+
+
+@dataclass(frozen=True)
+class EventCapabilities:
+    """Capability declarations for event models."""
+
+    training_objective: TrainingObjective = "exact_nll"
+    has_eval_nll: bool = True
+    has_intensity: bool = False
+    has_density: bool = False
+    has_score: bool = False
+    has_native_sampler: bool = False
+    exposes_eventwise_terms: bool = False
+
+
 @dataclass
 class StateContext:
-    """
-    Opaque state context returned by ``StateModel.forward_history``.
-
-    ``payload`` is intentionally unstructured in Stage 1 to avoid baking old
-    decomposition assumptions into the new abstraction.
-    """
+    """Opaque state container shared between state and event models."""
 
     payload: Dict[str, Any] = field(default_factory=dict)
+    # Compatibility field kept for existing VAE-style workflows.
     kl_loss: Optional[Tensor] = None
 
 
 class StateModel(ABC, nn.Module):
-    """
-    Coarse latent-state interface.
-
-    Implementations decide how history is consumed and what query payload shape
-    is exposed to an event model.
-    """
+    """Coarse latent-state interface."""
 
     def __init__(self):
         ABC.__init__(self)
         nn.Module.__init__(self)
 
+    @property
+    def capabilities(self) -> StateCapabilities:
+        return StateCapabilities()
+
     @abstractmethod
+    def encode_history(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        marks: Optional[Tensor] = None,
+        x_event: Optional[Tensor] = None,
+        x_field_at_events: Optional[Tensor] = None,
+    ) -> StateContext:
+        """Build state context from observed history."""
+        ...
+
+    def query_state(
+        self,
+        state_ctx: StateContext,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        x_field_at_events: Optional[Tensor] = None,
+    ) -> StateContext:
+        """Optional point-query state hook."""
+        del times, locations, lengths, x_field_at_events
+        return state_ctx
+
+    def sequence_states(
+        self,
+        state_ctx: StateContext,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        x_field_at_events: Optional[Tensor] = None,
+    ) -> StateContext:
+        """Optional sequence-query state hook."""
+        return self.query_state(
+            state_ctx,
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            x_field_at_events=x_field_at_events,
+        )
+
+    def regularization_terms(
+        self,
+        state_ctx: StateContext,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        marks: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        """Explicit raw state-side regularization terms."""
+        del state_ctx, times, locations, lengths, marks
+        return {}
+
+    # ------------------------------------------------------------------
+    # Backward-compatible Stage-1 wrappers
+    # ------------------------------------------------------------------
+
     def forward_history(
         self,
         *,
@@ -51,10 +136,15 @@ class StateModel(ABC, nn.Module):
         x_event: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
     ) -> StateContext:
-        """Build a context object from observed history."""
-        ...
+        return self.encode_history(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            marks=marks,
+            x_event=x_event,
+            x_field_at_events=x_field_at_events,
+        )
 
-    @abstractmethod
     def query(
         self,
         state_ctx: StateContext,
@@ -64,8 +154,13 @@ class StateModel(ABC, nn.Module):
         lengths: Tensor,
         x_field_at_events: Optional[Tensor] = None,
     ) -> Dict[str, Any]:
-        """Return state payload for event scoring/sampling."""
-        ...
+        return self.query_state(
+            state_ctx,
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            x_field_at_events=x_field_at_events,
+        ).payload
 
     def sequence_forward(
         self,
@@ -76,56 +171,143 @@ class StateModel(ABC, nn.Module):
         lengths: Tensor,
         x_field_at_events: Optional[Tensor] = None,
     ) -> Dict[str, Any]:
-        """Optional sequence-wise query hook; defaults to ``query``."""
-        return self.query(
+        return self.sequence_states(
             state_ctx,
             times=times,
             locations=locations,
             lengths=lengths,
             x_field_at_events=x_field_at_events,
-        )
+        ).payload
 
 
 class EventModel(ABC, nn.Module):
-    """
-    Event likelihood interface.
-
-    Stage 1 keeps two entry points:
-      - ``nll``: generic per-batch event loss path
-      - ``sequence_nll``: sequence-oriented path (including sequence-coupled
-        decoders)
-    """
+    """Event-law interface with capability-driven optional methods."""
 
     def __init__(self):
         ABC.__init__(self)
         nn.Module.__init__(self)
 
+    @property
+    def capabilities(self) -> EventCapabilities:
+        return EventCapabilities()
+
+    @staticmethod
+    def _coerce_state_context(state: StateContext | Dict[str, Any]) -> StateContext:
+        if isinstance(state, StateContext):
+            return state
+        if isinstance(state, dict):
+            return StateContext(payload=state)
+        raise TypeError("EventModel expected `state` to be StateContext or dict payload.")
+
     @abstractmethod
+    def training_loss(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        state: StateContext,
+        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Dict[str, Tensor]:
+        """Compute model-specific training loss output.
+
+        Required output key: ``loss``.
+        """
+        ...
+
+    def eval_nll(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        state: StateContext,
+        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Dict[str, Tensor]:
+        """Compute evaluation-time NLL when supported."""
+        if not self.capabilities.has_eval_nll:
+            raise NotImplementedError("This EventModel does not expose eval_nll().")
+
+        out = self.training_loss(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state,
+            state_regularization_terms=state_regularization_terms,
+            x_field_at_events=x_field_at_events,
+            marks=marks,
+            device=device,
+        )
+        if "nll" not in out and "loss" in out and self.capabilities.training_objective in {
+            "exact_nll",
+            "approx_nll",
+            "elbo",
+        }:
+            out["nll"] = out["loss"]
+        return out
+
+    def intensity(self, **kwargs) -> Tensor:
+        raise NotImplementedError("EventModel does not expose intensity().")
+
+    def density(self, **kwargs) -> Tensor:
+        raise NotImplementedError("EventModel does not expose density().")
+
+    def score(self, **kwargs) -> Tensor:
+        raise NotImplementedError("EventModel does not expose score().")
+
+    def sample_native(self, **kwargs):
+        raise NotImplementedError("EventModel does not expose sample_native().")
+
+    # ------------------------------------------------------------------
+    # Backward-compatible Stage-1 wrappers
+    # ------------------------------------------------------------------
+
     def nll(
         self,
         *,
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
-        state: Dict[str, Any],
+        state: StateContext | Dict[str, Any],
         x_field_at_events: Optional[Tensor] = None,
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        """Compute NLL through the non-sequence-forward path."""
-        ...
+        state_ctx = self._coerce_state_context(state)
+        return self.eval_nll(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state_ctx,
+            state_regularization_terms=None,
+            x_field_at_events=x_field_at_events,
+            marks=marks,
+            device=device,
+        )
 
-    @abstractmethod
     def sequence_nll(
         self,
         *,
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
-        state: Dict[str, Any],
+        state: StateContext | Dict[str, Any],
         x_field_at_events: Optional[Tensor] = None,
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        """Compute NLL through the sequence-forward path."""
-        ...
+        return self.nll(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state,
+            x_field_at_events=x_field_at_events,
+            marks=marks,
+            device=device,
+        )

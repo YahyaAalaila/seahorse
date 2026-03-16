@@ -17,6 +17,26 @@ from typing import Optional, Tuple, Callable
 import math
 
 
+def get_event_model_capabilities(model):
+    """Return EventModel capabilities when available, else None."""
+    event_model = getattr(model, "event_model", None)
+    if event_model is None:
+        return None
+    return getattr(event_model, "capabilities", None)
+
+
+def supports_native_sampling(model) -> bool:
+    """Whether model exposes native event-model sampling."""
+    caps = get_event_model_capabilities(model)
+    return bool(caps is not None and getattr(caps, "has_native_sampler", False))
+
+
+def supports_intensity_query(model) -> bool:
+    """Whether model exposes an event-model intensity interface."""
+    caps = get_event_model_capabilities(model)
+    return bool(caps is not None and getattr(caps, "has_intensity", False))
+
+
 def thinning_sample(
     intensity_fn: Callable,
     t_start: Tensor,

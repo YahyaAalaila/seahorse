@@ -147,7 +147,7 @@ class UnifiedSTPP(nn.Module):
         x_field_at_events: Optional[Tensor],
         device,
     ) -> Dict[str, Tensor]:
-        state_ctx = self.state_model.forward_history(
+        state_ctx = self.state_model.encode_history(
             times=times,
             locations=locations,
             lengths=lengths,
@@ -156,22 +156,34 @@ class UnifiedSTPP(nn.Module):
             x_field_at_events=x_field_at_events,
         )
 
-        state = self.state_model.sequence_forward(
+        state_for_event = self.state_model.sequence_states(
             state_ctx,
             times=times,
             locations=locations,
             lengths=lengths,
             x_field_at_events=x_field_at_events,
         )
-        result = self.event_model.sequence_nll(
+        state_regularization_terms = self.state_model.regularization_terms(
+            state_ctx,
             times=times,
             locations=locations,
             lengths=lengths,
-            state=state,
+            marks=marks,
+        )
+
+        result = self.event_model.training_loss(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state_for_event,
+            state_regularization_terms=state_regularization_terms,
             x_field_at_events=x_field_at_events,
             marks=marks,
             device=device,
         )
+
+        if "nll" not in result and "loss" in result:
+            result["nll"] = result["loss"]
 
         debug_this_call = (
             self._debug_nstpp and self._debug_nstpp_calls < self._debug_nstpp_max_calls
@@ -211,4 +223,9 @@ class UnifiedSTPP(nn.Module):
         kl_loss = getattr(state_ctx, "kl_loss", None)
         if kl_loss is not None and "kl_loss" not in result:
             result["kl_loss"] = kl_loss
+
+        if state_regularization_terms:
+            result["state_regularization_terms"] = state_regularization_terms
+            for name, term in state_regularization_terms.items():
+                result.setdefault(name, term)
         return result

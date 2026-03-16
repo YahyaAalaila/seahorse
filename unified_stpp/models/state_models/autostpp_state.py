@@ -1,19 +1,13 @@
-"""
-StateModel wrapper for AutoSTPP.
-
-This state model is intentionally thin: it packages raw history tensors and
-encoder-produced conditioning states needed by the current AutoSTPP decoder
-contract.
-"""
+"""StateModel wrapper for AutoSTPP."""
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 from torch import Tensor
 
-from ..abstractions import StateContext, StateModel
+from ..abstractions import StateCapabilities, StateContext, StateModel
 
 
 EncodeFn = Callable[[Tensor, Tensor, Optional[Tensor]], Tuple[Tensor, Tensor]]
@@ -21,14 +15,7 @@ MarkEmbedFn = Callable[[Tensor], Tensor]
 
 
 class AutoSTPPStateModel(StateModel):
-    """
-    Thin state wrapper for AutoSTPP.
-
-    Notes
-    -----
-    ``z_seq`` is the primary latent history payload for AutoSTPP event scoring.
-    ``all_states`` is kept as a compatibility alias.
-    """
+    """Thin state wrapper for AutoSTPP."""
 
     def __init__(
         self,
@@ -40,7 +27,16 @@ class AutoSTPPStateModel(StateModel):
         self._encode_fn = encode_fn
         self._mark_embed_fn = mark_embed_fn
 
-    def forward_history(
+    @property
+    def capabilities(self) -> StateCapabilities:
+        return StateCapabilities(
+            has_query_state=True,
+            has_sequence_states=True,
+            has_regularization_terms=False,
+            state_kind="history_passthrough",
+        )
+
+    def encode_history(
         self,
         *,
         times: Tensor,
@@ -72,7 +68,7 @@ class AutoSTPPStateModel(StateModel):
             }
         )
 
-    def query(
+    def query_state(
         self,
         state_ctx: StateContext,
         *,
@@ -80,6 +76,18 @@ class AutoSTPPStateModel(StateModel):
         locations: Tensor,
         lengths: Tensor,
         x_field_at_events: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
+    ) -> StateContext:
         del times, locations, lengths, x_field_at_events
-        return state_ctx.payload
+        return state_ctx
+
+    def sequence_states(
+        self,
+        state_ctx: StateContext,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        x_field_at_events: Optional[Tensor] = None,
+    ) -> StateContext:
+        del times, locations, lengths, x_field_at_events
+        return state_ctx

@@ -1,6 +1,4 @@
-"""
-EventModel wrapper for AutoSTPP joint-intensity likelihood.
-"""
+"""EventModel wrapper for AutoSTPP joint-intensity likelihood."""
 
 from __future__ import annotations
 
@@ -9,7 +7,7 @@ from typing import Any, Callable, Dict, Optional
 import torch
 from torch import Tensor
 
-from ..abstractions import EventModel
+from ..abstractions import EventCapabilities, EventModel, StateContext
 
 
 NLLFn = Callable[[Tensor, Tensor, Tensor, Tensor, Optional[Tensor]], Tensor]
@@ -19,15 +17,7 @@ MuFn = Callable[[], Tensor]
 
 
 class AutoSTPPEventModel(EventModel):
-    """
-    AutoSTPP event model over current AutoInt decoder semantics.
-
-    The model is treated as a unified joint-intensity model. For explicit
-    diagnostics, we expose:
-      - lambs_sum: joint intensity λ*(t, s | H)
-      - lamb_t: equal to joint intensity under current repo semantics
-      - lamb_ints: compensator term
-    """
+    """AutoSTPP event model over current AutoInt decoder semantics."""
 
     def __init__(
         self,
@@ -43,9 +33,21 @@ class AutoSTPPEventModel(EventModel):
         self._compensator_fn = compensator_fn
         self._mu_fn = mu_fn
 
+    @property
+    def capabilities(self) -> EventCapabilities:
+        return EventCapabilities(
+            training_objective="exact_nll",
+            has_eval_nll=True,
+            has_intensity=True,
+            has_density=False,
+            has_score=False,
+            has_native_sampler=False,
+            exposes_eventwise_terms=True,
+        )
+
     @staticmethod
-    def _get_state_term(state: Dict[str, Any], key: str) -> Tensor:
-        val = state.get(key)
+    def _get_state_term(state_ctx: StateContext, key: str) -> Tensor:
+        val = state_ctx.payload.get(key)
         if val is None:
             raise ValueError(f"AutoSTPPEventModel requires state['{key}'].")
         if not isinstance(val, Tensor):
@@ -58,61 +60,60 @@ class AutoSTPPEventModel(EventModel):
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
-        state: Dict[str, Any],
+        state_ctx: StateContext,
         device,
     ) -> Dict[str, Tensor]:
-        B = times.shape[0]
+        bsz = times.shape[0]
         max_len = int(lengths.max().item())
         if max_len < 2:
-            zeros_per_seq = torch.zeros(B, device=device)
+            zeros_per_seq = torch.zeros(bsz, device=device)
             zero_scalar = torch.tensor(0.0, device=device)
             empty_l = 0
             return {
+                "loss": zero_scalar,
                 "nll": zero_scalar,
                 "nll_per_event": zeros_per_seq,
                 "total_events": zero_scalar,
                 "sll": zero_scalar,
                 "tll": zero_scalar,
-                "nll_matrix": torch.zeros(B, empty_l, device=device),
-                "sll_matrix": torch.zeros(B, empty_l, device=device),
-                "tll_matrix": torch.zeros(B, empty_l, device=device),
-                "mask": torch.zeros(B, empty_l, device=device),
-                "lambs_sum": torch.zeros(B, empty_l, device=device),
-                "lamb_t": torch.zeros(B, empty_l, device=device),
-                "lamb_ints": torch.zeros(B, empty_l, device=device),
+                "nll_matrix": torch.zeros(bsz, empty_l, device=device),
+                "sll_matrix": torch.zeros(bsz, empty_l, device=device),
+                "tll_matrix": torch.zeros(bsz, empty_l, device=device),
+                "mask": torch.zeros(bsz, empty_l, device=device),
+                "lambs_sum": torch.zeros(bsz, empty_l, device=device),
+                "lamb_t": torch.zeros(bsz, empty_l, device=device),
+                "lamb_ints": torch.zeros(bsz, empty_l, device=device),
             }
 
-        L = max_len - 1
-        z_seq = state.get("z_seq")
+        l_steps = max_len - 1
+        z_seq = state_ctx.payload.get("z_seq")
         if isinstance(z_seq, Tensor):
-            all_states = z_seq[:, :L, :]
+            all_states = z_seq[:, :l_steps, :]
         else:
-            all_states = self._get_state_term(state, "all_states")[:, :L, :]
-        t_target = times[:, 1 : 1 + L].unsqueeze(-1)
-        s_target = locations[:, 1 : 1 + L, :]
-        t_prev = times[:, :L].unsqueeze(-1)
+            all_states = self._get_state_term(state_ctx, "all_states")[:, :l_steps, :]
+        t_target = times[:, 1 : 1 + l_steps].unsqueeze(-1)
+        s_target = locations[:, 1 : 1 + l_steps, :]
+        t_prev = times[:, :l_steps].unsqueeze(-1)
 
-        n_idx = torch.arange(L, device=device)
+        n_idx = torch.arange(l_steps, device=device)
         mask = (n_idx.unsqueeze(0) < (lengths.unsqueeze(1) - 1)).float()
 
         h = all_states.shape[-1]
         d = s_target.shape[-1]
-        z_flat = all_states.reshape(B * L, h)
-        t_flat = t_target.reshape(B * L, 1)
-        s_flat = s_target.reshape(B * L, d)
-        t_prev_flat = t_prev.reshape(B * L, 1)
+        z_flat = all_states.reshape(bsz * l_steps, h)
+        t_flat = t_target.reshape(bsz * l_steps, 1)
+        s_flat = s_target.reshape(bsz * l_steps, d)
+        t_prev_flat = t_prev.reshape(bsz * l_steps, 1)
         tau_flat = (t_flat - t_prev_flat).clamp(min=1e-6)
 
         nll_flat = self._nll_fn(z_flat, t_flat, s_flat, t_prev_flat, None)
-        nll_matrix = nll_flat.reshape(B, L)
+        nll_matrix = nll_flat.reshape(bsz, l_steps)
 
         log_lamb_flat = self._log_prob_fn(z_flat, t_flat, s_flat, t_prev_flat, None)
-        lambs_sum = torch.exp(log_lamb_flat).reshape(B, L)
-        lamb_ints = self._compensator_fn(z_flat, tau_flat).reshape(B, L)
+        lambs_sum = torch.exp(log_lamb_flat).reshape(bsz, l_steps)
+        lamb_ints = self._compensator_fn(z_flat, tau_flat).reshape(bsz, l_steps)
 
         # AutoSTPP is represented as a unified joint-intensity model in this repo.
-        # We expose a degenerate decomposition for compatibility:
-        #   tll := joint ll, sll := 0.
         tll_matrix = -nll_matrix
         sll_matrix = torch.zeros_like(tll_matrix)
 
@@ -126,6 +127,7 @@ class AutoSTPPEventModel(EventModel):
         sll = torch.zeros_like(tll)
 
         return {
+            "loss": mean_nll,
             "nll": mean_nll,
             "nll_per_event": total_nll / n_events.clamp(min=1),
             "total_events": n_events.sum(),
@@ -142,45 +144,72 @@ class AutoSTPPEventModel(EventModel):
             "background_rate": self._mu_fn().to(device=device, dtype=mean_nll.dtype),
         }
 
-    def nll(
+    def training_loss(
         self,
         *,
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
-        state: Dict[str, Any],
+        state: StateContext,
+        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
         x_field_at_events: Optional[Tensor] = None,
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        del x_field_at_events, marks
+        del state_regularization_terms, x_field_at_events, marks
         if device is None:
             device = times.device
         return self._compute(
             times=times,
             locations=locations,
             lengths=lengths,
-            state=state,
+            state_ctx=state,
             device=device,
         )
 
-    def sequence_nll(
+    def eval_nll(
         self,
         *,
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
-        state: Dict[str, Any],
+        state: StateContext,
+        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
         x_field_at_events: Optional[Tensor] = None,
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        return self.nll(
+        return self.training_loss(
             times=times,
             locations=locations,
             lengths=lengths,
             state=state,
+            state_regularization_terms=state_regularization_terms,
             x_field_at_events=x_field_at_events,
             marks=marks,
             device=device,
         )
+
+    def intensity(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+        state: StateContext,
+        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Tensor:
+        out = self.eval_nll(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state,
+            state_regularization_terms=state_regularization_terms,
+            x_field_at_events=x_field_at_events,
+            marks=marks,
+            device=device,
+        )
+        return out["lambs_sum"]
