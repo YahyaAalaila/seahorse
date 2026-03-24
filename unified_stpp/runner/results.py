@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -64,6 +65,7 @@ class RunResult:
     checkpoint_path: Optional[Path] = None
     norm_stats: dict[str, Any] = field(default_factory=dict)
     extra_metrics: dict[str, Any] = field(default_factory=dict)
+    run_dir: Optional[Path] = None
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -73,13 +75,31 @@ class RunResult:
         d = asdict(self)
         if d["checkpoint_path"] is not None:
             d["checkpoint_path"] = str(d["checkpoint_path"])
+        if d["run_dir"] is not None:
+            d["run_dir"] = str(d["run_dir"])
         return d
+
+    def to_json(self, path) -> None:
+        """Serialise to a JSON file, converting NaN → null."""
+        def _nan_to_null(v):
+            if isinstance(v, float) and math.isnan(v):
+                return None
+            return v
+
+        raw = self.to_dict()
+        cleaned = {k: _nan_to_null(v) for k, v in raw.items()}
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(cleaned, f, indent=2, default=str)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "RunResult":
         d = dict(d)
         if d.get("checkpoint_path"):
             d["checkpoint_path"] = Path(d["checkpoint_path"])
+        if d.get("run_dir"):
+            d["run_dir"] = Path(d["run_dir"])
         return cls(**d)
 
     # ------------------------------------------------------------------
@@ -90,8 +110,9 @@ class RunResult:
         test_str = (
             f"{self.test_nll:.4f}" if not math.isnan(self.test_nll) else "n/a"
         )
+        dir_str = f", run_dir={str(self.run_dir)!r}" if self.run_dir is not None else ""
         return (
             f"RunResult(preset={self.preset!r}, dataset={self.dataset_id!r}, "
             f"seed={self.seed}, val_nll={self.val_nll:.4f}, test_nll={test_str}, "
-            f"params={self.n_params:,})"
+            f"params={self.n_params:,}{dir_str})"
         )

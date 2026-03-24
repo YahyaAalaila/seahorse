@@ -12,8 +12,6 @@ import torch.nn as nn
 from torch import Tensor
 
 from .abstractions import EventModel, StateModel
-from .base import Decoder, Dynamics, Encoder, MarkDecoder, Updater
-from .neural_tpp_backbone import NeuralTPPBackbone
 
 
 class UnifiedSTPP(nn.Module):
@@ -21,86 +19,21 @@ class UnifiedSTPP(nn.Module):
 
     def __init__(
         self,
-        encoder: Optional[Encoder] = None,
-        dynamics: Optional[Dynamics] = None,
-        updater: Optional[Updater] = None,
-        decoder: Optional[Decoder] = None,
-        lifting_map: Optional[nn.Module] = None,
-        mark_decoder: Optional[MarkDecoder] = None,
-        mark_embedding: Optional[nn.Module] = None,
-        vae: bool = False,
+        state_model: StateModel,
+        event_model: EventModel,
+        *,
         hidden_dim: int = 128,
-        backbone: Optional[NeuralTPPBackbone] = None,
-        backbone_spatial: Optional[nn.Module] = None,
-        state_model: Optional[StateModel] = None,
-        event_model: Optional[EventModel] = None,
-        use_state_event_path: bool = True,
     ):
         super().__init__()
-        self.encoder = encoder
-        self.dynamics = dynamics
-        self.updater = updater
-        self.decoder = decoder
-        self.lifting_map = lifting_map
-        self.mark_decoder = mark_decoder
-        self.mark_embedding = mark_embedding
-
-        # Faithful Neural STPP backbone components (used by *_sc presets).
-        self.backbone = backbone
-        self.backbone_spatial = backbone_spatial
-
         self.state_model = state_model
         self.event_model = event_model
-        self.use_state_event_path = bool(use_state_event_path)
-
-        self.vae = bool(vae)
-        if self.vae:
-            self.vae_mu_proj = nn.Linear(hidden_dim, hidden_dim)
-            self.vae_logvar_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.hidden_dim = hidden_dim
 
         self._debug_nstpp = os.getenv("UNIFIED_STPP_DEBUG_NSTPP", "0") == "1"
         self._debug_nstpp_max_calls = max(
             1, int(os.getenv("UNIFIED_STPP_DEBUG_NSTPP_MAX_CALLS", "10"))
         )
         self._debug_nstpp_calls = 0
-
-    def _embed_marks(self, marks: Tensor) -> Tensor:
-        if self.mark_embedding is None:
-            raise RuntimeError("mark_embedding is not configured.")
-        return self.mark_embedding(marks)
-
-    def _encode_legacy_history(
-        self,
-        events: Tensor,
-        lengths: Tensor,
-        x_event: Optional[Tensor] = None,
-    ):
-        if self.encoder is None:
-            raise RuntimeError("encoder is not configured.")
-        return self.encoder(events, lengths, x_event=x_event)
-
-    def encode(self, events: Tensor, lengths: Tensor, x_event=None):
-        """Encode history and apply VAE projection when enabled."""
-        z_final, all_states = self._encode_legacy_history(events, lengths, x_event=x_event)
-        if self.vae:
-            z_final, _ = self._vae_reparameterize(z_final)
-        return z_final, all_states
-
-    def _vae_project(self, z: Tensor):
-        """Project latent tensor to VAE posterior stats (mu, log_var)."""
-        mu = self.vae_mu_proj(z)
-        log_var = self.vae_logvar_proj(z).clamp(min=-10, max=4)
-        return mu, log_var
-
-    def _vae_reparameterize(self, z: Tensor):
-        """VAE bottleneck (sample during training, deterministic in eval)."""
-        mu, log_var = self._vae_project(z)
-        if self.training:
-            z_out = mu + torch.randn_like(mu) * torch.exp(0.5 * log_var)
-        else:
-            z_out = mu
-        kl = -0.5 * (1.0 + log_var - mu.pow(2) - log_var.exp()).mean()
-        return z_out, kl
 
     def forward(
         self,
@@ -114,18 +47,6 @@ class UnifiedSTPP(nn.Module):
     ) -> Dict[str, Tensor]:
         """Compute NLL for a batch of sequences."""
         del x_field_fn
-
-        if self.state_model is None or self.event_model is None:
-            raise RuntimeError(
-                "UnifiedSTPP now requires both state_model and event_model. "
-                "Build the model via unified_stpp.registry.build_model."
-            )
-        if not self.use_state_event_path:
-            raise RuntimeError(
-                "Legacy non-state-event dispatch has been removed. "
-                "Set use_state_event_path=True."
-            )
-
         return self._forward_state_event(
             times=times,
             locations=locations,
@@ -146,7 +67,7 @@ class UnifiedSTPP(nn.Module):
         x_event: Optional[Tensor],
         x_field_at_events: Optional[Tensor],
         device,
-    ) -> Dict[str, Tensor]:
+    ) -> Dict[str, Any]:
         state_ctx = self.state_model.encode_history(
             times=times,
             locations=locations,

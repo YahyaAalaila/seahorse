@@ -1,38 +1,20 @@
 """
 PyTorch Lightning wrapper for UnifiedSTPP models.
 """
+import math
+
 import torch
 import pytorch_lightning as pl
 
+from unified_stpp.config.schema import TrainingConfig
+
 
 class STPPLightningModule(pl.LightningModule):
-    def __init__(
-        self,
-        model,
-        lr=1e-3,
-        weight_decay=1e-5,
-        grad_clip=5.0,
-        adam_beta1=0.9,
-        adam_beta2=0.999,
-        lr_schedule="constant",
-        lr_warmup_epochs=0,
-        lr_step_size=None,
-        lr_step_gamma=0.5,
-        vae_beta=0.0,
-    ):
+    def __init__(self, model, tc: TrainingConfig):
         super().__init__()
         self.model = model  # UnifiedSTPP instance
-        self.save_hyperparameters(ignore=["model"])
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.grad_clip = grad_clip
-        self.adam_beta1 = adam_beta1
-        self.adam_beta2 = adam_beta2
-        self.lr_schedule = lr_schedule
-        self.lr_warmup_epochs = lr_warmup_epochs
-        self.lr_step_size = lr_step_size
-        self.lr_step_gamma = lr_step_gamma
-        self.vae_beta = vae_beta
+        self.tc = tc
+        self.save_hyperparameters({"tc": tc.model_dump()}, ignore=["model"])
 
     def forward(self, batch):
         return self.model(
@@ -79,9 +61,9 @@ class STPPLightningModule(pl.LightningModule):
         n_ev  = max(1, int(output["total_events"].item()))
         n_seq = self._batch_size_from_batch(batch)
 
-        if self.vae_beta > 0 and "kl_loss" in output:
+        if self.tc.vae_beta > 0 and "kl_loss" in output:
             kl = output["kl_loss"]
-            loss = loss + self.vae_beta * kl
+            loss = loss + self.tc.vae_beta * kl
             self.log("train/kl", kl, on_step=False, on_epoch=True, batch_size=n_ev)
 
         self.log("train/nll", output["nll"], on_step=False, on_epoch=True, prog_bar=True, batch_size=n_ev)
@@ -104,17 +86,17 @@ class STPPLightningModule(pl.LightningModule):
         self._log_state_regularization_terms("test", output, n_ev)
 
     def configure_optimizers(self):
+        tc = self.tc
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.lr,
-            weight_decay=self.weight_decay,
-            betas=(self.adam_beta1, self.adam_beta2),
+            lr=tc.lr,
+            weight_decay=tc.weight_decay,
+            betas=(tc.adam_beta1, tc.adam_beta2),
         )
 
-        if self.lr_schedule == "cosine":
-            import math
+        if tc.lr_schedule == "cosine":
             n_epochs = self.trainer.max_epochs
-            warmup = self.lr_warmup_epochs
+            warmup = tc.lr_warmup_epochs
 
             def _schedule(epoch: int) -> float:
                 if epoch < warmup:
@@ -123,36 +105,53 @@ class STPPLightningModule(pl.LightningModule):
                 return 0.5 * (1.0 + math.cos(math.pi * min(progress, 1.0)))
 
             scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=_schedule)
-
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"},
             }
 
-        if self.lr_step_size is not None:
+        if tc.lr_schedule == "step" or tc.lr_step_size is not None:
+            if tc.lr_step_size is None:
+                raise ValueError(
+                    "lr_schedule='step' requires lr_step_size to be set in TrainingConfig."
+                )
             scheduler = torch.optim.lr_scheduler.StepLR(
-                optimizer, step_size=self.lr_step_size, gamma=self.lr_step_gamma
+                optimizer, step_size=tc.lr_step_size, gamma=tc.lr_step_gamma
             )
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"},
             }
 
-        # Default: ReduceLROnPlateau (monitor val/nll)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=10
+        if tc.lr_schedule == "constant":
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=lambda _: 1.0
+            )
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"},
+            }
+
+        if tc.lr_schedule == "reduce_on_plateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="min", factor=0.5, patience=10
+            )
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "monitor": "val/nll",
+                    "interval": "epoch",
+                },
+            }
+
+        raise ValueError(
+            f"Unknown lr_schedule={tc.lr_schedule!r}. "
+            "Valid options: 'constant', 'cosine', 'step', 'reduce_on_plateau'."
         )
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val/nll",
-                "interval": "epoch",
-            },
-        }
 
     def on_before_optimizer_step(self, optimizer):
-        if self.grad_clip > 0:
+        if self.tc.grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(), self.grad_clip
+                self.model.parameters(), self.tc.grad_clip
             )

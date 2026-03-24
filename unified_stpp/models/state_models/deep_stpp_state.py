@@ -1,34 +1,47 @@
-"""StateModel wrapper for DeepSTPP history encoding / posterior sampling."""
+"""StateModel for DeepSTPP — owns TransformerEncoder and optional VAE layers."""
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Tuple
+from typing import Dict, Optional
 
 import torch
+import torch.nn as nn
 from torch import Tensor
 
 from ..abstractions import StateCapabilities, StateContext, StateModel
 
 
-EncodeFn = Callable[[Tensor, Tensor, Optional[Tensor]], Tuple[Tensor, Tensor]]
-VAEStatsFn = Callable[[Tensor], Tuple[Tensor, Tensor]]
-VAEReparamFn = Callable[[Tensor], Tuple[Tensor, Tensor]]
-
-
 class DeepSTPPStateModel(StateModel):
-    """Coarse DeepSTPP state model."""
+    """DeepSTPP state model.  Owns encoder and optional VAE bottleneck."""
 
     def __init__(
         self,
         *,
-        encode_fn: EncodeFn,
-        vae_stats_fn: Optional[VAEStatsFn] = None,
-        vae_reparameterize_fn: Optional[VAEReparamFn] = None,
+        hidden_dim: int,
+        spatial_dim: int,
+        event_cov_dim: int = 0,
+        enc_num_heads: int = 2,
+        enc_num_layers: int = 3,
+        enc_dropout: float = 0.0,
+        vae: bool = False,
+        **enc_extra,
     ):
         super().__init__()
-        self._encode_fn = encode_fn
-        self._vae_stats_fn = vae_stats_fn
-        self._vae_reparameterize_fn = vae_reparameterize_fn
+        from ..history_encoders import TransformerEncoder
+        self.encoder = TransformerEncoder(
+            input_dim=1 + spatial_dim,
+            hidden_dim=hidden_dim,
+            event_cov_dim=event_cov_dim,
+            num_heads=enc_num_heads,
+            num_layers=enc_num_layers,
+            dropout=enc_dropout,
+            **enc_extra,
+        )
+        self.hidden_dim = hidden_dim
+        self.vae = bool(vae)
+        if self.vae:
+            self.vae_mu_proj = nn.Linear(hidden_dim, hidden_dim)
+            self.vae_logvar_proj = nn.Linear(hidden_dim, hidden_dim)
 
     @property
     def capabilities(self) -> StateCapabilities:
@@ -51,16 +64,19 @@ class DeepSTPPStateModel(StateModel):
     ) -> StateContext:
         del marks, x_field_at_events
         events = torch.cat([times.unsqueeze(-1), locations], dim=-1)
-        z_final, all_states = self._encode_fn(events, lengths, x_event)
+        z_final, all_states = self.encoder(events, lengths, x_event=x_event)
 
         z = all_states
-        qm = None
-        qv = None
-        kl_loss = None
-        if self._vae_stats_fn is not None:
-            qm, qv = self._vae_stats_fn(all_states)
-        if self._vae_reparameterize_fn is not None:
-            z, kl_loss = self._vae_reparameterize_fn(all_states)
+        qm = qv = kl_loss = None
+        if self.vae:
+            mu = self.vae_mu_proj(all_states)
+            log_var = self.vae_logvar_proj(all_states).clamp(min=-10, max=4)
+            qm, qv = mu, log_var
+            if self.training:
+                z = mu + torch.randn_like(mu) * torch.exp(0.5 * log_var)
+            else:
+                z = mu
+            kl_loss = -0.5 * (1.0 + log_var - mu.pow(2) - log_var.exp()).mean()
 
         return StateContext(
             payload={
@@ -70,6 +86,9 @@ class DeepSTPPStateModel(StateModel):
                 "kl_loss": kl_loss,
                 "z_final": z_final,
                 "all_states": all_states,
+                "times": times,
+                "locations": locations,
+                "lengths": lengths,
             },
             kl_loss=kl_loss,
         )

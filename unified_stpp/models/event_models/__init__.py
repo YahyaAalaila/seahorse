@@ -1,5 +1,15 @@
-from .neural_stpp_sequence_event import NeuralSTPPSequenceEventModel
+from .neural_stpp_event import NeuralSTPPEventModel
 from .deep_stpp_event import DeepSTPPEventModel
-from .autostpp_event import AutoSTPPEventModel
+from .auto_stpp_event import AutoSTPPEventModel
+from .smash_event import SMASHEventModel
+from .diffusion_event import DiffusionEventModel
+from .factorized_event import FactorizedEventModel
 
-__all__ = ["NeuralSTPPSequenceEventModel", "DeepSTPPEventModel", "AutoSTPPEventModel"]
+__all__ = [
+    "NeuralSTPPEventModel",
+    "DeepSTPPEventModel",
+    "AutoSTPPEventModel",
+    "SMASHEventModel",
+    "DiffusionEventModel",
+    "FactorizedEventModel",
+]

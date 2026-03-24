@@ -1,8 +1,8 @@
-"""EventModel wrapper for AutoSTPP joint-intensity likelihood."""
+"""EventModel for AutoSTPP — owns MonotoneIntegralDecoder."""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+from typing import Dict, Optional
 
 import torch
 from torch import Tensor
@@ -10,28 +10,40 @@ from torch import Tensor
 from ..abstractions import EventCapabilities, EventModel, StateContext
 
 
-NLLFn = Callable[[Tensor, Tensor, Tensor, Tensor, Optional[Tensor]], Tensor]
-LogProbFn = Callable[[Tensor, Tensor, Tensor, Tensor, Optional[Tensor]], Tensor]
-CompensatorFn = Callable[[Tensor, Tensor], Tensor]
-MuFn = Callable[[], Tensor]
-
-
 class AutoSTPPEventModel(EventModel):
-    """AutoSTPP event model over current AutoInt decoder semantics."""
+    """AutoSTPP event model.  Owns MonotoneIntegralDecoder."""
 
     def __init__(
         self,
         *,
-        nll_fn: NLLFn,
-        log_prob_fn: LogProbFn,
-        compensator_fn: CompensatorFn,
-        mu_fn: MuFn,
+        hidden_dim: int,
+        spatial_dim: int,
+        field_cov_dim: int = 0,
+        n_components: int = 8,
+        n_layers: int = 2,
+        internal_dim: int = 64,
+        x_lo: float = -3.5,
+        x_hi: float = 3.5,
+        y_lo: float = -3.5,
+        y_hi: float = 3.5,
+        **dec_extra,
     ):
         super().__init__()
-        self._nll_fn = nll_fn
-        self._log_prob_fn = log_prob_fn
-        self._compensator_fn = compensator_fn
-        self._mu_fn = mu_fn
+        from ..temporal_models.monotone_integral import MonotoneIntegralDecoder
+
+        self.integral_decoder = MonotoneIntegralDecoder(
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            field_cov_dim=field_cov_dim,
+            n_components=n_components,
+            n_layers=n_layers,
+            internal_dim=internal_dim,
+            x_lo=x_lo,
+            x_hi=x_hi,
+            y_lo=y_lo,
+            y_hi=y_hi,
+            **dec_extra,
+        )
 
     @property
     def capabilities(self) -> EventCapabilities:
@@ -53,6 +65,17 @@ class AutoSTPPEventModel(EventModel):
         if not isinstance(val, Tensor):
             raise TypeError(f"AutoSTPPEventModel expects tensor for state['{key}'].")
         return val
+
+    @staticmethod
+    def _broadcast_or_match(tensor: Tensor, batch_size: int, name: str) -> Tensor:
+        if tensor.shape[0] == batch_size:
+            return tensor
+        if tensor.shape[0] == 1:
+            return tensor.expand(batch_size, *tensor.shape[1:])
+        raise ValueError(
+            f"AutoSTPPEventModel state['{name}'] has batch={tensor.shape[0]} "
+            f"but query batch={batch_size}."
+        )
 
     def _compute(
         self,
@@ -106,14 +129,13 @@ class AutoSTPPEventModel(EventModel):
         t_prev_flat = t_prev.reshape(bsz * l_steps, 1)
         tau_flat = (t_flat - t_prev_flat).clamp(min=1e-6)
 
-        nll_flat = self._nll_fn(z_flat, t_flat, s_flat, t_prev_flat, None)
+        nll_flat = self.integral_decoder.nll(z_flat, t_flat, s_flat, t_prev_flat, None)
         nll_matrix = nll_flat.reshape(bsz, l_steps)
 
-        log_lamb_flat = self._log_prob_fn(z_flat, t_flat, s_flat, t_prev_flat, None)
+        log_lamb_flat = self.integral_decoder.log_prob(z_flat, t_flat, s_flat, t_prev_flat, None)
         lambs_sum = torch.exp(log_lamb_flat).reshape(bsz, l_steps)
-        lamb_ints = self._compensator_fn(z_flat, tau_flat).reshape(bsz, l_steps)
+        lamb_ints = self.integral_decoder.compensator(z_flat, tau_flat).reshape(bsz, l_steps)
 
-        # AutoSTPP is represented as a unified joint-intensity model in this repo.
         tll_matrix = -nll_matrix
         sll_matrix = torch.zeros_like(tll_matrix)
 
@@ -138,10 +160,9 @@ class AutoSTPPEventModel(EventModel):
             "tll_matrix": tll_matrix,
             "mask": mask,
             "lambs_sum": lambs_sum,
-            # Under current repo semantics this equals the joint intensity.
             "lamb_t": lambs_sum,
             "lamb_ints": lamb_ints,
-            "background_rate": self._mu_fn().to(device=device, dtype=mean_nll.dtype),
+            "background_rate": self.integral_decoder.mu().to(device=device, dtype=mean_nll.dtype),
         }
 
     def training_loss(
@@ -193,23 +214,71 @@ class AutoSTPPEventModel(EventModel):
     def intensity(
         self,
         *,
-        times: Tensor,
-        locations: Tensor,
-        lengths: Tensor,
         state: StateContext,
-        state_regularization_terms: Optional[Dict[str, Tensor]] = None,
+        query_times: Tensor,
+        query_locations: Tensor,
+        query_lengths: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Tensor:
-        out = self.eval_nll(
-            times=times,
-            locations=locations,
-            lengths=lengths,
-            state=state,
-            state_regularization_terms=state_regularization_terms,
-            x_field_at_events=x_field_at_events,
-            marks=marks,
-            device=device,
+        del query_lengths, x_field_at_events, marks
+        if query_times.ndim == 1:
+            query_times = query_times.unsqueeze(-1)
+        if query_locations.ndim == 3 and query_locations.shape[1] == 1:
+            query_locations = query_locations.squeeze(1)
+        if query_locations.ndim != 2:
+            raise ValueError(
+                "AutoSTPPEventModel.intensity expects query_locations with shape (B, d)."
+            )
+        if device is None:
+            device = query_times.device
+
+        batch_size = query_times.shape[0]
+        history_times = self._broadcast_or_match(
+            self._get_state_term(state, "times"), batch_size, "times"
+        ).to(device=device, dtype=query_times.dtype)
+        history_lengths = self._broadcast_or_match(
+            self._get_state_term(state, "lengths").long(), batch_size, "lengths"
+        ).to(device=device)
+
+        z_final = state.payload.get("z_final")
+        if isinstance(z_final, Tensor):
+            z_hist = self._broadcast_or_match(z_final, batch_size, "z_final").to(device=device)
+        else:
+            z_seq = self._broadcast_or_match(
+                self._get_state_term(state, "z_seq"), batch_size, "z_seq"
+            ).to(device=device)
+            idx = (history_lengths - 1).clamp(min=0)
+            b_idx = torch.arange(batch_size, device=device)
+            z_hist = z_seq[b_idx, idx, :]
+
+        prev_idx = (history_lengths - 1).clamp(min=0)
+        b_idx = torch.arange(batch_size, device=device)
+        t_prev = history_times[b_idx, prev_idx].unsqueeze(-1)
+
+        log_lamb = self.integral_decoder.log_prob(
+            z_hist,
+            query_times.to(device=device, dtype=t_prev.dtype),
+            query_locations.to(device=device),
+            t_prev,
+            None,
         )
-        return out["lambs_sum"]
+        return torch.exp(log_lamb)
+
+    def query_surface(
+        self,
+        *,
+        state: StateContext,
+        grid_times: "torch.Tensor",
+        grid_locs: "torch.Tensor",
+        **kwargs,
+    ) -> "torch.Tensor":
+        """Surface query contract: routes to intensity() for AutoSTPP."""
+        t = grid_times.unsqueeze(-1) if grid_times.ndim == 1 else grid_times
+        return self.intensity(
+            state=state,
+            query_times=t,
+            query_locations=grid_locs,
+            device=grid_times.device,
+        )

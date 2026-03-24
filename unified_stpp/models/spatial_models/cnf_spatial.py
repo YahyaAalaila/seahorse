@@ -16,7 +16,7 @@ SelfAttentiveCNFSpatial (SEQUENCE_COUPLED=True):
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 import os
 
 import torch
@@ -31,7 +31,6 @@ except ImportError:
     HAS_TORCHDIFFEQ = False
 
 from ..base import Decoder
-from .spatial import CNFVelocityField, _euler_solve_simple
 
 __all__ = [
     "HypernetworkRadialFlow",
@@ -41,6 +40,138 @@ __all__ = [
     "SelfAttentiveODEFunc",
     "SelfAttentiveCNFSpatial",
 ]
+
+
+# ============================================================================
+# Divergence helpers
+# ============================================================================
+
+def divergence_bf(f: Tensor, y: Tensor, training: bool) -> Tensor:
+    """
+    Exact divergence via brute-force Jacobian diagonal. O(d) backward passes.
+    """
+    sum_diag = 0.0
+    for i in range(f.shape[1]):
+        retain = training or (i < f.shape[1] - 1)
+        grad_i = torch.autograd.grad(
+            f[:, i].sum(), y, create_graph=training, retain_graph=retain
+        )[0]
+        sum_diag = sum_diag + grad_i[:, i]
+    return sum_diag
+
+
+def _hutchinson_trace(v: Tensor, x: Tensor, e: Tensor) -> Tensor:
+    """Hutchinson trace estimator: E[eps^T J eps] = tr(J)."""
+    vjp = torch.autograd.grad(v, x, e, create_graph=True, retain_graph=True)[0]
+    return (vjp * e).sum(dim=-1)
+
+
+# ============================================================================
+# CNF velocity field pieces
+# ============================================================================
+
+class ConcatSquash(nn.Module):
+    """ConcatSquash hidden layer from FFJORD / Neural STPP."""
+
+    def __init__(self, in_dim: int, out_dim: int, ctx_dim: int):
+        super().__init__()
+        self.lin_z = nn.Linear(in_dim, out_dim)
+        self.lin_t = nn.Linear(ctx_dim, out_dim, bias=False)
+        self.lin_tb = nn.Linear(ctx_dim, out_dim)
+
+    def forward(self, z: Tensor, ctx: Tensor) -> Tensor:
+        return self.lin_z(z) * torch.sigmoid(self.lin_t(ctx)) + torch.tanh(
+            self.lin_tb(ctx)
+        )
+
+
+class CNFVelocityField(nn.Module):
+    """Velocity field v(s, tau; z, X) for spatial CNF-style decoders."""
+
+    def __init__(
+        self,
+        spatial_dim: int,
+        hidden_dim: int,
+        field_cov_dim: int = 0,
+        layer_type: str = "concat",
+        n_hidden_layers: int = 3,
+    ):
+        super().__init__()
+        self.spatial_dim = spatial_dim
+        self.layer_type = layer_type
+        ctx_dim = hidden_dim + 1 + field_cov_dim  # z + tau [+ X_field]
+
+        if layer_type == "concat":
+            cs_layers = []
+            in_dim = spatial_dim
+            for _ in range(n_hidden_layers):
+                cs_layers.append(ConcatSquash(in_dim, hidden_dim, ctx_dim))
+                in_dim = hidden_dim
+            self.hidden_layers = nn.ModuleList(cs_layers)
+            self.output_layer = nn.Linear(hidden_dim, spatial_dim)
+            self.mlp = None
+        else:
+            act_cls = nn.Softplus if layer_type == "softplus" else nn.Tanh
+            in_d = spatial_dim + ctx_dim
+            mlp_layers: list = []
+            for _ in range(n_hidden_layers):
+                mlp_layers += [nn.Linear(in_d, hidden_dim), act_cls()]
+                in_d = hidden_dim
+            mlp_layers.append(nn.Linear(hidden_dim, spatial_dim))
+            self.mlp = nn.Sequential(*mlp_layers)
+            self.hidden_layers = None
+            self.output_layer = None
+
+        self._z_cond: Optional[Tensor] = None
+        self._x_cond: Optional[Tensor] = None
+        self._e: Optional[Tensor] = None
+
+    def _compute_velocity(self, s: Tensor, ctx: Tensor) -> Tensor:
+        if self.layer_type == "concat":
+            h = s
+            for layer in self.hidden_layers:
+                h = layer(h, ctx)
+            return self.output_layer(h)
+        return self.mlp(torch.cat([s, ctx], dim=-1))
+
+    def forward(self, tau: Tensor, s: Tensor) -> Tensor:
+        d = self.spatial_dim
+        s_actual = s[:, :d] if s.shape[-1] > d else s
+
+        bsz = s_actual.shape[0]
+        tau_expand = tau.expand(bsz, 1)
+        ctx_parts = [self._z_cond, tau_expand]
+        if self._x_cond is not None:
+            ctx_parts.append(self._x_cond)
+        ctx = torch.cat(ctx_parts, dim=-1)
+
+        v = self._compute_velocity(s_actual, ctx)
+
+        if s.shape[-1] > d:
+            with torch.enable_grad():
+                s_leaf = s_actual.detach().requires_grad_(True)
+                v_div = self._compute_velocity(s_leaf, ctx.detach())
+
+                if self.spatial_dim <= 3:
+                    trace = divergence_bf(v_div, s_leaf, self.training)
+                else:
+                    if self._e is None:
+                        self._e = torch.randn_like(s_leaf)
+                    trace = _hutchinson_trace(v_div, s_leaf, self._e)
+
+            return torch.cat([v, -trace.unsqueeze(-1)], dim=-1)
+        return v
+
+
+def _euler_solve_simple(func, y0, t_span, n_steps: int = 50):
+    """Simple Euler solver fallback."""
+    dt = (t_span[-1] - t_span[0]) / n_steps
+    y = y0
+    t = t_span[0]
+    for _ in range(n_steps):
+        y = y + dt * func(t, y)
+        t = t + dt
+    return y
 
 
 # ============================================================================
@@ -200,6 +331,57 @@ class JumpCNFSpatial(Decoder):
             log_probs[:, i] = log_p0 + log_det
 
         return -log_probs  # (B, L) NLL
+
+    def conditional_logprob_fn(
+        self,
+        t_query: float,
+        event_times: Tensor,   # (T,) normalized history times
+        event_locs: Tensor,    # (T, d) normalized history locations
+        z_aug: Tensor,         # (T+1, h) — z for history events + h(t_query) as last row
+    ) -> Callable[[Tensor], Tensor]:
+        """Return fn(s: (N, d)) → (N,) log p(s | t_query, history).
+
+        Appends (t_query, s_query) as event T+1 in a batch of N grid points
+        and extracts the last position's log-density from sequence_nll.
+        Mirrors original NeuralSTPP spatial_conditional_logprob_fn.
+        """
+        T = event_times.shape[0]
+        d = self.spatial_dim
+        device, dtype = z_aug.device, z_aug.dtype
+
+        def logprob_fn(s: Tensor) -> Tensor:  # s: (N, d) → (N,) log-prob
+            N = s.shape[0]
+            if T > 0:
+                t_hist_b = event_times.unsqueeze(-1).unsqueeze(0).expand(N, T, 1)
+                s_hist_b = event_locs.unsqueeze(0).expand(N, T, d)
+                t_prev_b = torch.cat([
+                    torch.zeros(N, 1, 1, device=device, dtype=dtype),
+                    t_hist_b[:, :-1, :],
+                ], dim=1)
+                t_prev_last = t_hist_b[:, -1:, :]
+            else:
+                t_hist_b = torch.zeros(N, 0, 1, device=device, dtype=dtype)
+                s_hist_b = torch.zeros(N, 0, d, device=device, dtype=dtype)
+                t_prev_b = torch.zeros(N, 0, 1, device=device, dtype=dtype)
+                t_prev_last = torch.zeros(N, 1, 1, device=device, dtype=dtype)
+
+            t_q_b = torch.full((N, 1, 1), t_query, device=device, dtype=dtype)
+            s_q_b = s.unsqueeze(1)
+
+            t_aug_b  = torch.cat([t_hist_b, t_q_b], dim=1)   # (N, T+1, 1)
+            s_aug_b  = torch.cat([s_hist_b, s_q_b], dim=1)   # (N, T+1, d)
+            tp_aug_b = torch.cat([t_prev_b, t_prev_last], dim=1)  # (N, T+1, 1)
+            z_aug_b  = z_aug.unsqueeze(0).expand(N, T + 1, -1)    # (N, T+1, h)
+            lengths_b = torch.full((N,), T + 1, dtype=torch.long, device=device)
+            mask_b    = torch.ones(N, T + 1, device=device, dtype=dtype)
+
+            nll = self.sequence_nll(
+                z_seq=z_aug_b, t_seq=t_aug_b, s_seq=s_aug_b,
+                t_prev_seq=tp_aug_b, lengths=lengths_b, mask=mask_b,
+            )  # (N, T+1)
+            return -nll[:, -1]  # (N,) log-prob of query location
+
+        return logprob_fn
 
 
 # ============================================================================
@@ -422,7 +604,7 @@ class SelfAttentiveODEFunc(nn.Module):
         v        = v_actual * t_event.unsqueeze(-1)         # (B, L, d)  scale to dummy
 
         # ---- divergence via Hutchinson (separate detached path) ------------
-        # Mirrors CNFVelocityField in spatial.py: detach z → fresh leaf → grad.
+        # Mirrors CNFVelocityField: detach z → fresh leaf → grad.
         # Hutchinson is applied to v_dummy (= v_actual * t_event), which is
         # correct: Tr(∂v_dummy/∂z) = t_event · Tr(∂v_actual/∂z) per event.
         with torch.enable_grad():
@@ -464,7 +646,7 @@ class SelfAttentiveCNFSpatial(Decoder):
 
     2. **Base FC CNF**: simple ConcatSquash/MLP flow, no attention.
        Conditioned on backbone hidden states per event.
-       (Uses the existing :class:`~.spatial.CNFVelocityField`.)
+       (Uses the existing :class:`CNFVelocityField`.)
 
     Learned base distribution: ``N(μ(h), σ(h)²)`` per event, predicted from the
     backbone hidden states.  ActNorm pre-normalises spatial locations.
@@ -685,7 +867,7 @@ class SelfAttentiveCNFSpatial(Decoder):
         # ------------------------------------------------------------------ #
         # 5. Total log-prob and NLL
         # ------------------------------------------------------------------ #
-        # CNF convention (same as CNFSpatial.log_prob in spatial.py):
+        # CNF convention:
         #   log p(data) = log p(base) - log_det_flow
         # where log_det_flow is accumulated by integrating d(log_det)/dt = -div(v).
         # Therefore both attentive and base CNF log-det accumulators are SUBTRACTED.
@@ -734,3 +916,50 @@ class SelfAttentiveCNFSpatial(Decoder):
             )
             self._debug_nstpp_calls += 1
         return torch.where(valid, nll, torch.zeros_like(nll))
+
+    def conditional_logprob_fn(
+        self,
+        t_query: float,
+        event_times: Tensor,   # (T,) normalized history times
+        event_locs: Tensor,    # (T, d) normalized history locations
+        z_aug: Tensor,         # (T+1, h) — z for history events + h(t_query) as last row
+    ) -> Callable[[Tensor], Tensor]:
+        """Return fn(s: (N, d)) → (N,) log p(s | t_query, history).
+
+        Appends (t_query, s_query) as event T+1 in a batch of N grid points
+        and extracts the last position's log-density from sequence_nll.
+        The self-attention runs over the full T+1 sequence with a causal mask,
+        so the query event correctly attends to all T history events.
+        Mirrors original NeuralSTPP spatial_conditional_logprob_fn.
+        """
+        T = event_times.shape[0]
+        d = self.spatial_dim
+        device, dtype = z_aug.device, z_aug.dtype
+
+        def logprob_fn(s: Tensor) -> Tensor:  # s: (N, d) → (N,) log-prob
+            N = s.shape[0]
+            if T > 0:
+                t_hist_b = event_times.unsqueeze(-1).unsqueeze(0).expand(N, T, 1)
+                s_hist_b = event_locs.unsqueeze(0).expand(N, T, d)
+            else:
+                t_hist_b = torch.zeros(N, 0, 1, device=device, dtype=dtype)
+                s_hist_b = torch.zeros(N, 0, d, device=device, dtype=dtype)
+
+            t_q_b = torch.full((N, 1, 1), t_query, device=device, dtype=dtype)
+            s_q_b = s.unsqueeze(1)
+
+            t_aug_b  = torch.cat([t_hist_b, t_q_b], dim=1)   # (N, T+1, 1)
+            s_aug_b  = torch.cat([s_hist_b, s_q_b], dim=1)   # (N, T+1, d)
+            z_aug_b  = z_aug.unsqueeze(0).expand(N, T + 1, -1)    # (N, T+1, h)
+            lengths_b = torch.full((N,), T + 1, dtype=torch.long, device=device)
+            mask_b    = torch.ones(N, T + 1, device=device, dtype=dtype)
+
+            # SelfAttentiveCNFSpatial.sequence_nll does not use t_prev_seq
+            nll = self.sequence_nll(
+                z_seq=z_aug_b, t_seq=t_aug_b, s_seq=s_aug_b,
+                t_prev_seq=t_aug_b,  # unused by attn CNF but required by signature
+                lengths=lengths_b, mask=mask_b,
+            )  # (N, T+1)
+            return -nll[:, -1]  # (N,) log-prob of query location
+
+        return logprob_fn

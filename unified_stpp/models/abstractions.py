@@ -252,17 +252,87 @@ class EventModel(ABC, nn.Module):
             out["nll"] = out["loss"]
         return out
 
-    def intensity(self, **kwargs) -> Tensor:
+    def intensity(
+        self,
+        *,
+        state: StateContext,
+        query_times: Tensor,
+        query_locations: Tensor,
+        query_lengths: Optional[Tensor] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Tensor:
+        del state, query_times, query_locations, query_lengths, x_field_at_events, marks, device
         raise NotImplementedError("EventModel does not expose intensity().")
 
-    def density(self, **kwargs) -> Tensor:
+    def density(
+        self,
+        *,
+        state: StateContext,
+        query_times: Tensor,
+        query_locations: Tensor,
+        query_lengths: Optional[Tensor] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Tensor:
+        del state, query_times, query_locations, query_lengths, x_field_at_events, marks, device
         raise NotImplementedError("EventModel does not expose density().")
 
-    def score(self, **kwargs) -> Tensor:
+    def score(
+        self,
+        *,
+        state: StateContext,
+        query_times: Tensor,
+        query_locations: Tensor,
+        query_lengths: Optional[Tensor] = None,
+        x_field_at_events: Optional[Tensor] = None,
+        marks: Optional[Tensor] = None,
+        device=None,
+    ) -> Tensor:
+        del state, query_times, query_locations, query_lengths, x_field_at_events, marks, device
         raise NotImplementedError("EventModel does not expose score().")
 
     def sample_native(self, **kwargs):
         raise NotImplementedError("EventModel does not expose sample_native().")
+
+    @property
+    def surface_query_type(self) -> Literal["intensity", "density", "proxy_kde"]:
+        """Semantic type of values returned by ``query_surface()``.
+
+        Derived automatically from capability flags; override only if needed.
+        """
+        if self.capabilities.has_intensity:
+            return "intensity"
+        if self.capabilities.has_density:
+            return "density"
+        return "proxy_kde"
+
+    def query_surface(
+        self,
+        *,
+        state: StateContext,
+        grid_times: Tensor,
+        grid_locs: Tensor,
+        **kwargs,
+    ) -> Tensor:
+        """Return ``(G,)`` non-negative surface values in **normalized** space.
+
+        Contract
+        --------
+        - ``grid_times``: ``(G,)`` — all equal to the query t, in normalized space.
+        - ``grid_locs``:  ``(G, d)`` — flattened spatial meshgrid, in normalized space.
+        - ``state``: ``StateContext`` produced by ``state_model.encode_history()``.
+        - Returns: ``(G,)`` non-negative values (intensity, density, or KDE proxy).
+        - Normalization/denormalization is the **caller's** responsibility.
+        - Models must **not** re-encode history or access raw sequence data here.
+        """
+        del state, grid_times, grid_locs, kwargs
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement query_surface(). "
+            "Override this method to support surface visualization."
+        )
 
     # ------------------------------------------------------------------
     # Backward-compatible Stage-1 wrappers

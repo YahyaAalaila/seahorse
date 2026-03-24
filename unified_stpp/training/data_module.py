@@ -15,28 +15,28 @@ from unified_stpp.data.dataset import PaperSlidingWindowDataset
 # Protocol compatibility guard
 # ---------------------------------------------------------------------------
 
-_PAPER_AUTOSTPP_STHP_VALID_PRESETS = frozenset({"auto_stpp", "deep_stpp"})
+_SLIDING_WINDOW_VALID_PRESETS = frozenset({"auto_stpp", "deep_stpp"})
 
 
 def assert_protocol_model_compatible(protocol: str, model_preset: str) -> None:
     """
     Raise if the requested protocol has not been validated for model_preset.
 
-    ``"paper_autostpp_sthp"`` matches the AutoSTPP repo pipeline (MinMax +
+    ``"sliding_window"`` matches the AutoSTPP repo pipeline (MinMax +
     sliding windows) and has only been verified for auto_stpp / deep_stpp on
     synthetic STHP data.  Any other model would silently receive a very
     different coordinate system without this guardrail.
     """
     if (
-        protocol == "paper_autostpp_sthp"
-        and model_preset not in _PAPER_AUTOSTPP_STHP_VALID_PRESETS
+        protocol == "sliding_window"
+        and model_preset not in _SLIDING_WINDOW_VALID_PRESETS
     ):
         raise ValueError(
             f"protocol={protocol!r} has not been validated for model preset "
             f"{model_preset!r}.  Validated presets: "
-            f"{sorted(_PAPER_AUTOSTPP_STHP_VALID_PRESETS)}.  "
-            "Switch to protocol='unified' or add the preset to "
-            "_PAPER_AUTOSTPP_STHP_VALID_PRESETS after explicit parity verification."
+            f"{sorted(_SLIDING_WINDOW_VALID_PRESETS)}.  "
+            "Switch to protocol='standard' or add the preset to "
+            "_SLIDING_WINDOW_VALID_PRESETS after explicit parity verification."
         )
 
 
@@ -54,12 +54,15 @@ class STPPDataModule(pl.LightningDataModule):
         num_workers: int = 0,
         normalize: bool = True,
         seed: int = 42,
-        # Paper-faithful protocol options
-        protocol: str = "unified",
+        # Data protocol options
+        protocol: str = "standard",
         raw_seq: Optional[Dict] = None,
         paper_lookback: int = 10,
         paper_lookahead: int = 1,
         paper_split_ratio: Tuple[int, int, int] = (8, 1, 1),
+        # Protocol guard: when set, setup() validates that protocol is compatible
+        # with this preset before building datasets.
+        model_preset: str = "",
     ):
         super().__init__()
         self.train_seqs = train_seqs
@@ -74,6 +77,7 @@ class STPPDataModule(pl.LightningDataModule):
         self.paper_lookback = paper_lookback
         self.paper_lookahead = paper_lookahead
         self.paper_split_ratio = paper_split_ratio
+        self.model_preset = model_preset
         # Populated by setup()
         self._train_dataset = None
         self._val_dataset = None
@@ -90,12 +94,15 @@ class STPPDataModule(pl.LightningDataModule):
         if self._train_dataset is not None:
             return
 
-        if self.protocol == "paper_autostpp_sthp":
-            self._setup_paper()
-        else:
-            self._setup_unified()
+        if self.model_preset:
+            assert_protocol_model_compatible(self.protocol, self.model_preset)
 
-    def _setup_unified(self):
+        if self.protocol == "sliding_window":
+            self._setup_sliding_window()
+        else:
+            self._setup_standard()
+
+    def _setup_standard(self):
         self._train_dataset = STPPDataset(
             self.train_seqs,
             normalize_time=self.normalize,
@@ -133,7 +140,7 @@ class STPPDataModule(pl.LightningDataModule):
         self._train_generator = torch.Generator()
         self._train_generator.manual_seed(self.seed)
 
-    def _setup_paper(self):
+    def _setup_sliding_window(self):
         """
         Build datasets matching the AutoSTPP paper pipeline for STHP:
 
@@ -148,7 +155,7 @@ class STPPDataModule(pl.LightningDataModule):
 
         if self.raw_seq is None:
             raise ValueError(
-                "STPPDataModule: protocol='paper_autostpp_sthp' requires raw_seq."
+                "STPPDataModule: protocol='sliding_window' requires raw_seq."
             )
 
         seq = self.raw_seq
@@ -202,21 +209,75 @@ class STPPDataModule(pl.LightningDataModule):
         self._train_generator = torch.Generator()
         self._train_generator.manual_seed(self.seed)
 
+    @classmethod
+    def from_splits(
+        cls,
+        data_config,
+        train_seqs: list,
+        val_seqs: list,
+        test_seqs: list | None = None,
+        model_preset: str = "",
+    ) -> "STPPDataModule":
+        """Construct a DataModule from pre-split sequences and a DataConfig.
+
+        Dispatches on ``data_config.protocol``:
+        - ``"standard"``: passes the three splits directly to the data module.
+        - ``"sliding_window"``: concatenates all splits into a single
+          ``raw_seq`` and lets the data module build sliding windows + internal
+          train/val/test split.
+        """
+        import numpy as np
+
+        cfg = data_config
+        if cfg.protocol == "sliding_window":
+            all_seqs = list(train_seqs) + list(val_seqs) + (list(test_seqs) if test_seqs else [])
+            raw_seq = {
+                "times": np.concatenate([np.asarray(s["times"]) for s in all_seqs]),
+                "locations": np.concatenate([np.asarray(s["locations"]) for s in all_seqs]),
+            }
+            return cls(
+                train_seqs=[],
+                val_seqs=[],
+                test_seqs=None,
+                batch_size=cfg.batch_size,
+                num_workers=cfg.num_workers,
+                normalize=cfg.normalize,
+                seed=cfg.seed,
+                protocol="sliding_window",
+                raw_seq=raw_seq,
+                paper_lookback=cfg.paper_lookback or 10,
+                paper_lookahead=cfg.paper_lookahead,
+                paper_split_ratio=cfg.paper_split_ratio,
+                model_preset=model_preset,
+            )
+        else:
+            return cls(
+                train_seqs=train_seqs,
+                val_seqs=val_seqs,
+                test_seqs=test_seqs,
+                batch_size=cfg.batch_size,
+                num_workers=cfg.num_workers,
+                normalize=cfg.normalize,
+                seed=cfg.seed,
+                protocol="standard",
+                model_preset=model_preset,
+            )
+
     def train_dataloader(self):
         return DataLoader(
             self._train_dataset, batch_size=self.batch_size,
             shuffle=True, collate_fn=collate_fn,
             num_workers=self.num_workers,
             generator=self._train_generator,
-            persistent_workers=True if self.num_workers > 0 else False,  # Keep workers alive across epochs for efficiency
+            persistent_workers=True if self.num_workers > 0 else False,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self._val_dataset, batch_size=self.batch_size,
             shuffle=False, collate_fn=collate_fn,
-            num_workers=self.num_workers,  # No shuffling, no normalization (already done in dataset)
-                persistent_workers=True if self.num_workers > 0 else False,  # Keep workers alive across epochs for efficiency
+            num_workers=self.num_workers,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
 
     def test_dataloader(self):
@@ -225,6 +286,26 @@ class STPPDataModule(pl.LightningDataModule):
         return DataLoader(
             self._test_dataset, batch_size=self.batch_size,
             shuffle=False, collate_fn=collate_fn,
-            num_workers=self.num_workers, 
-            persistent_workers=True if self.num_workers > 0 else False,  # Keep workers alive across epochs for efficiency  
+            num_workers=self.num_workers,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
+
+    def get_original_sequence(self, split: str = "val", idx: int = 0) -> dict:
+        """Return sequence times and locations in original (un-normalized) space.
+
+        Args:
+            split : "train" | "val" | "test"
+            idx   : sequence index within the split
+
+        Returns:
+            {"times": np.ndarray (L,), "locations": np.ndarray (L, d)}
+        """
+        dataset = {"train": self._train_dataset, "val": self._val_dataset,
+                   "test": self._test_dataset}[split]
+        if dataset is None:
+            raise ValueError(f"Split {split!r} is not available (dataset is None).")
+        seq = dataset.sequences[idx]
+        return {
+            "times": np.asarray(seq["times"], dtype=np.float64),
+            "locations": np.asarray(seq["locations"], dtype=np.float64),
+        }
