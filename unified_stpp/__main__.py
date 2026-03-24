@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -94,7 +95,12 @@ def cmd_fit(args):
         test_seqs,
         dataset_id=Path(args.train).stem,
     )
-    print(result)
+
+    print(f"\n  val_nll:  {result.val_nll:.4f}")
+    if not math.isnan(result.test_nll):
+        print(f"  test_nll: {result.test_nll:.4f}")
+    if result.run_dir is not None:
+        print(f"  saved to: {result.run_dir}\n")
 
     if args.save:
         saved = runner.save(args.save)
@@ -165,13 +171,130 @@ def _parse_overrides(override_list: list[str]) -> dict:
     return result
 
 
-def cmd_bench(args):
-    from unified_stpp.benchmark import Benchmark
+def cmd_evaluate(args):
+    """Post-fit analysis on a saved run (primary evaluation path)."""
+    from unified_stpp.runner import STPPRunner
+    from unified_stpp.evaluation.surface import SurfaceEvalSpec
+    from unified_stpp.viz.workflow import SurfaceVizConfig
 
-    splits = _load_splits_dir(args.splits_dir)
+    runner = STPPRunner.load(args.run)
+    val_seqs = _load_jsonl(args.val)
+
+    surface_viz = None
+    if args.surface_viz:
+        # When --surface_animate is set and the user did not explicitly pass
+        # --surface_history_mode, default to rolling (each frame conditions on
+        # events before its query time, giving genuinely distinct surfaces).
+        # For static panels the conservative 'fixed' default applies.
+        history_mode = args.surface_history_mode
+        if history_mode is None:
+            history_mode = "rolling" if args.surface_animate else "fixed"
+        eval_spec = SurfaceEvalSpec(
+            split=args.surface_history_split,
+            history_mode=history_mode,
+            history_length=args.surface_history_length,
+            t_query_mode=args.surface_t_query_mode,
+            n_time_steps=args.surface_n_time_steps,
+            horizon=args.surface_horizon,
+            n_grid=args.surface_n_grid,
+        )
+        reference_provider = None
+        if args.surface_reference_mode == "sthp_gt":
+            if not args.surface_sthp_meta:
+                raise ValueError(
+                    "--surface_sthp_meta PATH is required with "
+                    "--surface_reference_mode sthp_gt"
+                )
+            from unified_stpp.viz.reference import STHPGroundTruthProvider
+            reference_provider = STHPGroundTruthProvider.from_meta_file(
+                args.surface_sthp_meta
+            )
+        surface_viz = SurfaceVizConfig(
+            eval_spec=eval_spec,
+            enabled=True,
+            render_mode=args.surface_render_mode,
+            animate=args.surface_animate,
+            save_panel=True,
+            save_individual=True,
+            reference_mode=args.surface_reference_mode,
+            reference_provider=reference_provider,
+            reference_first=args.surface_reference_first,
+            animate_share_colorscale=not args.surface_no_share_colorscale,
+        )
+
+    run_dir = Path(args.out) if args.out else None
+    artifacts = runner.evaluate(val_seqs=val_seqs, surface_viz=surface_viz, run_dir=run_dir)
+
+    if artifacts:
+        for name, path in artifacts.items():
+            print(f"  {name}: {path}")
+    else:
+        print("No evaluation workflows were enabled.  Pass --surface_viz to generate surface plots.")
+
+
+def cmd_bench(args):
+    from pathlib import Path
+
+    from unified_stpp.benchmark import Benchmark
+    from unified_stpp.runner.artifacts import make_bench_run_id, write_bench_meta
+    from unified_stpp.utils import deep_update
+
+    if args.datasets:
+        # Load each named dataset directly by path — avoids the root-train.jsonl
+        # shortcut in _load_splits_dir when splits_dir also contains flat splits.
+        p = Path(args.splits_dir)
+        splits = {}
+        missing = []
+        for d in args.datasets:
+            ds_dir = p / d
+            if not ds_dir.is_dir() or not (ds_dir / "train.jsonl").exists():
+                missing.append(d)
+            else:
+                splits[d] = (
+                    _load_jsonl(ds_dir / "train.jsonl"),
+                    _load_jsonl(ds_dir / "val.jsonl"),
+                    _load_jsonl(ds_dir / "test.jsonl") if (ds_dir / "test.jsonl").exists() else None,
+                )
+        if missing:
+            raise ValueError(
+                f"Dataset directories not found under {args.splits_dir!r}: {missing}"
+            )
+    else:
+        splits = _load_splits_dir(args.splits_dir)
+
     seeds = [int(s) for s in args.seeds]
     base_overrides = _parse_overrides(args.override)
-    out = args.out or "bench_out"
+    out = args.out or make_bench_run_id()
+    out_path = Path(out)
+
+    # Route all per-run dirs inside the bench output dir so everything is
+    # co-located and moveable as a unit.  User's --override logging.out_dir=...
+    # takes precedence: deep_update puts base_overrides values on top of bench_local.
+    bench_local = {"logging": {"out_dir": str(out_path)}}
+    deep_update(bench_local, base_overrides)
+    base_overrides = bench_local
+
+    write_bench_meta(
+        out_dir=out_path,
+        bench_id=out_path.name,
+        argv=sys.argv[1:],
+        splits_dir=args.splits_dir,
+        datasets=sorted(splits.keys()),
+        presets=args.presets,
+        seeds=seeds,
+        normalize=args.normalize,
+        n_workers=args.n_workers,
+        overrides=args.override or [],
+        hpo_configs_dir=args.hpo_configs_dir,
+    )
+
+    # Write a one-click rerun script alongside bench_meta.json
+    rerun_path = out_path / "rerun.sh"
+    out_path.mkdir(parents=True, exist_ok=True)
+    with open(rerun_path, "w") as f:
+        f.write("#!/bin/bash\n" + " ".join(sys.argv) + "\n")
+    rerun_path.chmod(0o755)
+
     bench = Benchmark(presets=args.presets, splits=splits, seeds=seeds,
                       base_overrides=base_overrides,
                       hpo_configs_dir=args.hpo_configs_dir,
@@ -231,12 +354,108 @@ def main():
     tune_p.add_argument("--algorithm", default="asha", choices=["asha", "bayesian", "grid"])
     tune_p.add_argument("--out",       default=None, help="Output path for best config YAML")
 
+    # -- evaluate -------------------------------------------------------------
+    eval_p = sub.add_parser(
+        "evaluate",
+        help="Post-fit analysis on a saved run (primary evaluation path)",
+    )
+    eval_p.add_argument("--run", required=True,
+                        help="Path to a saved run directory (produced by fit)")
+    eval_p.add_argument("--val", required=True,
+                        help="Path to val .jsonl — sequences used as evaluation history")
+    eval_p.add_argument("--out", default=None,
+                        help="Output directory for artifacts (default: the run directory)")
+    eval_p.add_argument("--surface_viz", action="store_true",
+                        help="Enable surface visualization workflow")
+    eval_p.add_argument("--surface_n_grid", type=int, default=50,
+                        metavar="N", help="Grid resolution per axis (default: 50)")
+    eval_p.add_argument("--surface_n_time_steps", type=int, default=3,
+                        metavar="N", help="Number of time steps to query (default: 3)")
+    eval_p.add_argument("--surface_render_mode", default="2d", choices=["2d", "3d"],
+                        help="Render mode: '2d' heatmap (default) or '3d' surface")
+    eval_p.add_argument("--surface_animate", action="store_true",
+                        help="Also save a GIF animation of the surface sequence")
+    eval_p.add_argument("--surface_history_length", type=int, default=10,
+                        metavar="N", help="Number of history events to condition on (default: 10)")
+    eval_p.add_argument("--surface_history_split", default="val",
+                        choices=["train", "val", "test"],
+                        help="Which data split to draw history from (default: val)")
+    eval_p.add_argument(
+        "--surface_history_mode",
+        choices=["fixed", "rolling"], default=None,
+        help=(
+            "History strategy per animation frame. "
+            "'rolling' (recommended for animation) uses all events strictly before "
+            "each t_query, giving genuinely different surfaces per frame. "
+            "Default when --surface_animate is set: 'rolling'. "
+            "Default otherwise: 'fixed'."
+        ),
+    )
+    eval_p.add_argument(
+        "--surface_t_query_mode",
+        choices=["after_history", "uniform"], default="after_history",
+        help=(
+            "How to place query times across the sequence. "
+            "'uniform' spans the entire sequence time range and typically gives "
+            "more visibly distinct frames. "
+            "'after_history' with small --surface_horizon can yield subtle changes."
+        ),
+    )
+    eval_p.add_argument(
+        "--surface_horizon",
+        type=float, default=1.0,
+        help="Time horizon past the last history event for 'after_history' mode (default: 1.0).",
+    )
+    eval_p.add_argument(
+        "--surface_reference_mode",
+        choices=["none", "empirical_kde", "sthp_gt"], default="none",
+        help=(
+            "Reference surface to show alongside the model. "
+            "'empirical_kde': marginal spatial KDE from the sequence events (time-independent proxy). "
+            "'sthp_gt': exact conditional intensity λ*(t,s|H) from an STHP model — "
+            "requires --surface_sthp_meta pointing to the dataset_meta.json produced by "
+            "gen_sthp_splits.py. "
+            "'none' (default): no reference."
+        ),
+    )
+    eval_p.add_argument(
+        "--surface_sthp_meta",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to dataset_meta.json for STHP ground-truth reference. "
+            "Required when --surface_reference_mode sthp_gt is set."
+        ),
+    )
+    eval_p.add_argument(
+        "--surface_reference_first",
+        action="store_true", default=False,
+        help=(
+            "Put the reference surface on the LEFT and the model on the RIGHT in "
+            "all outputs (animation frames, multi-panel figures, individual files). "
+            "Default: model left, reference right."
+        ),
+    )
+    eval_p.add_argument(
+        "--surface_no_share_colorscale",
+        action="store_true", default=False,
+        help=(
+            "Disable the fixed global colorscale in GIF animations. "
+            "By default every frame uses the same vmin/vmax per surface type so "
+            "colors are comparable across time steps. "
+            "Pass this flag to let each frame auto-scale independently."
+        ),
+    )
+
     # -- bench ----------------------------------------------------------------
     bench_p = sub.add_parser("bench", help="Multi-preset × multi-dataset benchmark")
     bench_p.add_argument("--presets",    nargs="+", required=True)
     bench_p.add_argument("--splits_dir", required=True, help="Directory with train/val/test.jsonl splits")
+    bench_p.add_argument("--datasets",   nargs="+", default=None, metavar="DATASET",
+                         help="Restrict to these dataset names from splits_dir (default: all found)")
     bench_p.add_argument("--seeds",      nargs="+", default=["42"])
-    bench_p.add_argument("--out",        default="bench_out")
+    bench_p.add_argument("--out",        default=None, metavar="DIR",
+                         help="Output directory (default: bench_YYYYMMDD_HHMMSS_<sha8>)")
     bench_p.add_argument("--n_workers",  type=int, default=1)
     bench_p.add_argument("--tune",       action="store_true", help="Run HPO before evaluation")
     bench_p.add_argument("--n_trials",         type=int, default=50)
@@ -264,9 +483,10 @@ def main():
 
     args = parser.parse_args()
     {
-        "fit":   cmd_fit,
-        "tune":  cmd_tune,
-        "bench": cmd_bench,
+        "fit":      cmd_fit,
+        "tune":     cmd_tune,
+        "evaluate": cmd_evaluate,
+        "bench":    cmd_bench,
     }[args.command](args)
 
 

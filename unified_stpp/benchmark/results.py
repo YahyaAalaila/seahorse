@@ -8,7 +8,7 @@ import base64
 import io
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,8 @@ class BenchmarkTable:
     """Container for all RunResults from a Benchmark run."""
 
     runs: list[RunResult]
+    surfaces_by_dataset: dict = field(default_factory=dict)
+    """Nested dict: ``{dataset_id: {preset: list[SurfaceResult]}}``."""
 
     # ------------------------------------------------------------------
     # Tabular views
@@ -163,6 +165,63 @@ class BenchmarkTable:
             fmt=fmt, n_frames=n_frames, n_grid=n_grid, fps=fps, device=device,
         )
 
+    def save_surface_comparison(
+        self,
+        out_dir,
+        render_mode: str = "3d",
+        animate: bool = False,
+        fps: int = 4,
+    ) -> dict:
+        """Save benchmark-level cross-model comparison panels (one per dataset).
+
+        Requires ``surfaces_by_dataset`` to be populated (i.e. ``Benchmark.run()``
+        was called with ``surface_viz`` enabled).
+
+        Only datasets with ≥ 2 models produce a comparison figure.
+
+        Parameters
+        ----------
+        out_dir     : directory to write comparison figures into.
+        render_mode : ``"3d"`` (default) or ``"2d"``.
+        animate     : also produce a .gif animation per dataset.
+        fps         : animation frames per second (when ``animate=True``).
+
+        Returns
+        -------
+        dict mapping artifact name → Path.
+        """
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from unified_stpp.viz.multi_plot import plot_model_comparison
+
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        artifacts: dict = {}
+
+        for dataset_id, preset_surfaces in self.surfaces_by_dataset.items():
+            if len(preset_surfaces) < 2:
+                continue
+
+            fig = plot_model_comparison(preset_surfaces, render_mode=render_mode)
+            png_path = out / f"comparison_{dataset_id}.png"
+            fig.savefig(png_path, bbox_inches="tight")
+            plt.close(fig)
+            artifacts[f"comparison_{dataset_id}"] = png_path
+
+            if animate:
+                from unified_stpp.viz.animation import animate_surface_sequence
+                gif_path = out / f"comparison_{dataset_id}.gif"
+                actual_path = animate_surface_sequence(
+                    preset_surfaces,
+                    output_path=gif_path,
+                    render_mode=render_mode,
+                    fps=fps,
+                )
+                artifacts[f"comparison_anim_{dataset_id}"] = actual_path
+
+        return artifacts
+
     def report(self, out_dir) -> None:
         """Write a self-contained HTML report + CSV + JSON to *out_dir*.
 
@@ -170,6 +229,7 @@ class BenchmarkTable:
         - ``results.json``
         - ``table_test_nll.csv``
         - ``report.html`` (figures embedded as base64)
+        - ``comparison_{dataset_id}.png`` (when surface_viz was used)
         """
         import pandas as pd
 
@@ -191,6 +251,15 @@ class BenchmarkTable:
         fig_nll_b64 = self._make_nll_bar_chart()
         fig_time_b64 = self._make_time_bar_chart()
 
+        # Surface comparison (if surfaces were collected)
+        surface_b64s: dict = {}
+        if self.surfaces_by_dataset:
+            surface_artifacts = self.save_surface_comparison(out, render_mode="3d")
+            for key, path in surface_artifacts.items():
+                if Path(path).suffix == ".png":
+                    with open(path, "rb") as f:
+                        surface_b64s[key] = base64.b64encode(f.read()).decode()
+
         # HTML
         html = _render_html(
             runs=self.runs,
@@ -198,6 +267,7 @@ class BenchmarkTable:
             latex=self.to_latex(),
             fig_nll_b64=fig_nll_b64,
             fig_time_b64=fig_time_b64,
+            surface_b64s=surface_b64s,
         )
         (out / "report.html").write_text(html, encoding="utf-8")
 
@@ -280,6 +350,7 @@ def _render_html(
     latex: str,
     fig_nll_b64: str,
     fig_time_b64: str,
+    surface_b64s: dict | None = None,
 ) -> str:
     """Produce a self-contained HTML string."""
     rows_html = "\n".join(
@@ -291,6 +362,15 @@ def _render_html(
     )
     nll_img = f'<img src="data:image/png;base64,{fig_nll_b64}" alt="NLL chart" style="max-width:100%">' if fig_nll_b64 else ""
     time_img = f'<img src="data:image/png;base64,{fig_time_b64}" alt="Time chart" style="max-width:100%">' if fig_time_b64 else ""
+
+    surface_section = ""
+    if surface_b64s:
+        imgs = "\n".join(
+            f'<p><b>{key}</b></p>'
+            f'<img src="data:image/png;base64,{b64}" alt="{key}" style="max-width:100%">'
+            for key, b64 in surface_b64s.items()
+        )
+        surface_section = f"<h2>Surface Comparison</h2>\n{imgs}"
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -325,6 +405,8 @@ def _render_html(
 <h2>Figures</h2>
 {nll_img}
 {time_img}
+
+{surface_section}
 
 <h2>LaTeX Table</h2>
 <pre>{latex}</pre>

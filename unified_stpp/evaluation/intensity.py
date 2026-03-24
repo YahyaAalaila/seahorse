@@ -1,37 +1,14 @@
-"""
-Intensity evaluation utilities for spatial visualization of STPP models.
+"""Intensity evaluation utilities built on StateModel/EventModel capabilities."""
 
-Provides a unified interface for evaluating conditional intensity
-λ*(t, s | H) on spatial grids with proper coordinate de-normalization.
+from __future__ import annotations
 
-Mathematical background
------------------------
-Supported decoders produce values in *normalized* coordinates
-(after z-score normalization of times and locations):
-
-  DeepSTPPDecoder:
-      decoder.log_prob → log f*_norm(t', s')
-
-  AutoIntDecoder:
-      decoder.log_prob → log λ*_norm(t', s')
-
-After z-score normalization (t' = (t − μ_t)/σ_t, s' = (s − μ_s)/σ_s)
-the density/intensity in original coordinates is:
-
-    q_orig(t, s) = q_norm(t', s') / (σ_t · σ_x · σ_y)
-
-The same Jacobian factor applies in both cases, so
-`correct_for_normalization=True` divides exp(log_prob_norm) by
-(t_scale · prod(s_scale)) to approximate the quantity in original
-coordinates.
-"""
-
-import torch
-import numpy as np
 from typing import Optional
 
+import numpy as np
+import torch
+
+from unified_stpp.models.sampling import IntensityEvaluator, supports_intensity_query
 from unified_stpp.models.unified_model import UnifiedSTPP
-from unified_stpp.models.dynamics.identity import IdentityDynamics
 
 
 def eval_intensity(
@@ -47,36 +24,13 @@ def eval_intensity(
     device: Optional[torch.device] = None,
     correct_for_normalization: bool = True,
 ) -> np.ndarray:
-    """
-    Evaluate the conditional intensity λ*(t, s | H) at a fixed time ``t_query``
-    over a spatial grid, using ``history_times`` / ``history_locs`` as the
-    conditioning history H.
+    """Evaluate conditional intensity lambda*(t_query, s_grid | history)."""
+    if not supports_intensity_query(model):
+        name = type(getattr(model, "event_model", None)).__name__
+        raise NotImplementedError(
+            f"EventModel '{name}' does not expose intensity queries."
+        )
 
-    Works for DeepSTPPDecoder and AutoIntDecoder. For IdentityDynamics the
-    encoder output is used directly; for non-identity dynamics, the state is
-    evolved to ``t_query`` via the dynamics module.
-
-    Args:
-        model: Trained UnifiedSTPP in eval mode (or will be switched to eval).
-        t_query: Query time in *original* (un-normalized) coordinates.
-            Must be ≥ history_times[-1].
-        s_grid: (M, d) array of spatial query points in original coordinates.
-        history_times: (N,) array of past event times in original coordinates,
-            sorted ascending.
-        history_locs: (N, d) array of past event locations in original coords.
-        t_bias: Time normalization mean  (= dataset.time_mean from train split).
-        t_scale: Time normalization std  (= dataset.time_std from train split).
-        s_bias: (d,) spatial normalization means  (= dataset.loc_mean).
-        s_scale: (d,) spatial normalization stds  (= dataset.loc_std).
-        device: Torch device; defaults to the device of the model's first param.
-        correct_for_normalization: If True (default), divide the raw decoder
-            output by (t_scale · ∏ s_scale) so the values approximate the
-            intensity in original coordinates.  Set to False to get the raw
-            value in normalized space.
-
-    Returns:
-        intensity: (M,) float32 array of λ*(t_query, s_grid[i] | H) for each i.
-    """
     if device is None:
         try:
             device = next(model.parameters()).device
@@ -85,76 +39,43 @@ def eval_intensity(
 
     model.eval()
 
-    N = len(history_times)
     s_grid = np.asarray(s_grid, dtype=np.float32)
     M, d = s_grid.shape
+    history_times = np.asarray(history_times, dtype=np.float32).reshape(-1)
+    history_locs = np.asarray(history_locs, dtype=np.float32).reshape(-1, d)
+    if history_times.size < 1:
+        raise ValueError("eval_intensity requires at least one history event.")
 
     t_bias_f = float(t_bias)
     t_scale_f = float(t_scale)
-    s_bias_arr = np.asarray(s_bias, dtype=np.float32)    # (d,)
-    s_scale_arr = np.asarray(s_scale, dtype=np.float32)  # (d,)
+    s_bias_arr = np.asarray(s_bias, dtype=np.float32)
+    s_scale_arr = np.asarray(s_scale, dtype=np.float32)
 
-    # ------------------------------------------------------------------
-    # Normalize history and query to the space the model was trained in
-    # ------------------------------------------------------------------
-    times_norm = (history_times.astype(np.float32) - t_bias_f) / t_scale_f
-    locs_norm  = (history_locs.astype(np.float32)  - s_bias_arr) / s_scale_arr
+    times_norm = (history_times - t_bias_f) / t_scale_f
+    locs_norm = (history_locs - s_bias_arr) / s_scale_arr
 
     t_query_norm = (float(t_query) - t_bias_f) / t_scale_f
-    s_grid_norm  = (s_grid - s_bias_arr) / s_scale_arr           # (M, d)
+    s_grid_norm = (s_grid - s_bias_arr) / s_scale_arr
 
-    t_prev_norm = float(times_norm[-1]) if N > 0 else 0.0
+    with torch.enable_grad():
+        history_times_t = torch.tensor(times_norm, dtype=torch.float32, device=device).unsqueeze(0)
+        history_locs_t = torch.tensor(locs_norm, dtype=torch.float32, device=device).unsqueeze(0)
+        history_lengths_t = torch.tensor([history_times.size], dtype=torch.long, device=device)
 
-    # ------------------------------------------------------------------
-    # Encode history → conditioning state z
-    # ------------------------------------------------------------------
-    with torch.enable_grad():  # ProdNet.intensity needs autograd internally
-        times_t = torch.tensor(
-            times_norm, dtype=torch.float32, device=device
-        ).unsqueeze(0)                                              # (1, N)
-        locs_t = torch.tensor(
-            locs_norm, dtype=torch.float32, device=device
-        ).unsqueeze(0)                                              # (1, N, d)
-        lengths = torch.tensor([N], dtype=torch.int64, device=device)  # (1,)
-
-        events = torch.cat(
-            [times_t.unsqueeze(-1), locs_t], dim=-1
-        )                                                           # (1, N, 1+d)
-        _z_final, all_states = model.encode(events, lengths)        # (1, N, h)
-
-        # State after the last history event conditions the next prediction
-        z_hist = all_states[:, N - 1, :]                           # (1, h)
-
-        # For ODE-based dynamics, evolve state from last event time to t_query
-        if not isinstance(model.dynamics, IdentityDynamics):
-            dt_val = max(t_query_norm - t_prev_norm, 1e-6)
-            dt = torch.tensor(
-                [[dt_val]], dtype=torch.float32, device=device
-            )                                                       # (1, 1)
-            z_hist = model.dynamics(z_hist, dt, None).squeeze(1)   # (1, h)
-
-        # ------------------------------------------------------------------
-        # Evaluate decoder.log_prob for all M grid points in one batched call
-        # ------------------------------------------------------------------
-        z_batch = z_hist.expand(M, -1)                             # (M, h)
-        t_q_batch = torch.full(
-            (M, 1), t_query_norm, dtype=torch.float32, device=device
-        )
-        s_q_batch = torch.tensor(
-            s_grid_norm, dtype=torch.float32, device=device
-        )                                                           # (M, d)
-        t_p_batch = torch.full(
-            (M, 1), t_prev_norm, dtype=torch.float32, device=device
+        evaluator = IntensityEvaluator(
+            model,
+            history_times=history_times_t,
+            history_locations=history_locs_t,
+            history_lengths=history_lengths_t,
         )
 
-        log_vals = model.decoder.log_prob(
-            z_batch, t_q_batch, s_q_batch, t_p_batch
-        )                                                           # (M,)
+        t_q_batch = torch.full((M, 1), float(t_query_norm), dtype=torch.float32, device=device)
+        s_q_batch = torch.tensor(s_grid_norm, dtype=torch.float32, device=device)
+        lamb = evaluator.intensity(t_q_batch, s_q_batch)
 
-    intensity = torch.exp(log_vals).detach().cpu().numpy().astype(np.float32)
+    intensity = lamb.detach().cpu().numpy().astype(np.float32)
 
     if correct_for_normalization:
-        # Undo z-score Jacobian: q_orig = q_norm / (σ_t · σ_x · σ_y · …)
         scale_factor = float(t_scale_f * np.prod(s_scale_arr))
         intensity = intensity / scale_factor
 
@@ -175,35 +96,7 @@ def calc_lamb(
     device: Optional[torch.device] = None,
     correct_for_normalization: bool = True,
 ) -> np.ndarray:
-    """
-    Evaluate λ*(t, x, y | H) over a 3-D spatiotemporal grid.
-
-    Each time in ``t_range`` is evaluated over the full
-    (x_range × y_range) spatial grid, producing a ``(T, X, Y)`` array
-    suitable for plt.imshow / plt.contourf visualizations.
-
-    The conditioning history H (history_times / history_locs) is fixed
-    across all time slices: the hidden state is that of the model after
-    seeing the complete history, not updated as t advances through
-    ``t_range``.
-
-    Args:
-        model: Trained UnifiedSTPP.
-        history_times: (N,) past event times in original coordinates.
-        history_locs: (N, d) past event locations in original coordinates.
-        t_bias: Time normalization mean.
-        t_scale: Time normalization std.
-        s_bias: (d,) spatial normalization means.
-        s_scale: (d,) spatial normalization stds.
-        x_range: (X,) x-axis grid values in original coordinates.
-        y_range: (Y,) y-axis grid values in original coordinates.
-        t_range: (T,) query times in original coordinates.
-        device: Torch device.
-        correct_for_normalization: Passed through to eval_intensity.
-
-    Returns:
-        lamb: (T, X, Y) float32 array — intensity at each (t, x, y).
-    """
+    """Evaluate lambda*(t, x, y | H) over a (T, X, Y) grid."""
     x_range = np.asarray(x_range, dtype=np.float32)
     y_range = np.asarray(y_range, dtype=np.float32)
     t_range = np.asarray(t_range, dtype=np.float32)
@@ -212,9 +105,8 @@ def calc_lamb(
     Y = len(y_range)
     T = len(t_range)
 
-    # Build the full 2-D spatial grid  shape (X*Y, 2)
-    xx, yy = np.meshgrid(x_range, y_range, indexing="ij")   # each (X, Y)
-    s_grid = np.stack([xx.ravel(), yy.ravel()], axis=-1)     # (X*Y, 2)
+    xx, yy = np.meshgrid(x_range, y_range, indexing="ij")
+    s_grid = np.stack([xx.ravel(), yy.ravel()], axis=-1)
 
     lamb = np.zeros((T, X, Y), dtype=np.float32)
 
@@ -231,7 +123,7 @@ def calc_lamb(
             s_scale=s_scale,
             device=device,
             correct_for_normalization=correct_for_normalization,
-        )                                                      # (X*Y,)
+        )
         lamb[i] = vals.reshape(X, Y)
 
     return lamb

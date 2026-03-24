@@ -162,7 +162,7 @@ def _model_lam(
     dev = torch.device(device)
     h_t = torch.tensor(h_times, device=dev).unsqueeze(0)     # (1, N)
     h_s = torch.tensor(h_locs,  device=dev).unsqueeze(0)     # (1, N, 2)
-    h_len = torch.tensor([n_hist], device=dev)
+    h_len = torch.tensor([n_hist], dtype=torch.long, device=dev)
 
     s_min_n = torch.tensor(
         (np.array([float(xx.min()), float(yy.min())]) - loc_mean) / loc_std,
@@ -176,13 +176,11 @@ def _model_lam(
     n_g   = int(xx.shape[0])
     jac   = max(float(time_std * np.prod(loc_std)), 1e-12)
 
-    events = torch.cat([h_t.unsqueeze(-1), h_s], dim=-1)
-    z, _   = model.encode(events, h_len, x_event=None)
-    t_prev = h_t[0, (h_len[0] - 1).long()].reshape(1, 1)
     ev = IntensityEvaluator(
-        model, z=z, t_prev=t_prev,
-        history_locs_norm=h_s[0],
-        history_times_norm=h_t[0],  # needed by DeepSTPPDecoder
+        model,
+        history_times=h_t,
+        history_locations=h_s,
+        history_lengths=h_len,
     )
 
     _, _, lam_n = ev.intensity_grid(t=t_n, s_min=s_min_n, s_max=s_max_n, n_grid=n_g)

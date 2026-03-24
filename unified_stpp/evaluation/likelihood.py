@@ -37,7 +37,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from unified_stpp.models.dynamics.identity import IdentityDynamics
+from unified_stpp.models.unified_model import UnifiedSTPP
 
 
 # ---------------------------------------------------------------------------
@@ -229,9 +229,8 @@ class LikelihoodEvaluator:
         self.model.to(self.device)
         self.model.eval()
 
-        # Check for IdentityDynamics (parity only defined there)
-        dynamics = getattr(self.model, "dynamics", None)
-        if not isinstance(dynamics, IdentityDynamics):
+        # Parity check is defined for UnifiedSTPP models
+        if not isinstance(self.model, UnifiedSTPP):
             return ParityReport(
                 passed=False,
                 model_nll=float("nan"),

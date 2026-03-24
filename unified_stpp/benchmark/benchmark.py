@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from unified_stpp.config import STPPConfig
 from unified_stpp.runner import STPPRunner, RunResult
+from unified_stpp.utils import deep_update
 from .results import BenchmarkTable
 
 
@@ -26,16 +27,27 @@ def _run_single(
     train_seqs: list[dict],
     val_seqs: list[dict],
     test_seqs: Optional[list[dict]],
-) -> RunResult:
-    """Run one (preset, dataset, seed) trial and return a RunResult."""
+    surface_viz=None,
+) -> tuple:
+    """Run one (preset, dataset, seed) trial and return a (RunResult, surfaces) tuple."""
     import copy
 
     cfg = copy.deepcopy(config)
-    # Override seed
     cfg.data.seed = seed
 
     runner = STPPRunner(cfg)
-    return runner.fit(train_seqs, val_seqs, test_seqs, dataset_id=dataset_id)
+    result = runner.fit(train_seqs, val_seqs, test_seqs, dataset_id=dataset_id)
+
+    surfaces = None
+    if surface_viz is not None and getattr(surface_viz, "enabled", False):
+        from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
+        from unified_stpp.runner.artifacts import _extend_viz_manifest
+        wf = SurfaceVisualizationWorkflow(surface_viz)
+        artifacts = wf.run(runner, result.run_dir)
+        _extend_viz_manifest(result.run_dir, artifacts)
+        surfaces = wf.surfaces_
+
+    return result, surfaces
 
 
 # ---------------------------------------------------------------------------
@@ -64,12 +76,21 @@ class Benchmark:
     no preset can re-split or re-format the data internally.  ``normalize`` is
     applied identically to all presets via the same training-set statistics.
 
+    Attributes set after run()
+    --------------------------
+    runners_ : dict[str, STPPRunner] | None
+        Fitted runners keyed by preset name (first seed per preset).
+        Only available in sequential mode (``n_workers=1``); ``None`` in
+        parallel mode.
+
     Usage
     -----
     >>> bench = Benchmark(["auto_stpp"], {"toy": (tr, va, te)}, seeds=[42, 0])
     >>> table = bench.run()
     >>> table.report("/tmp/out/")
     """
+
+    runners_: Optional[dict] = None
 
     def __init__(
         self,
@@ -87,6 +108,7 @@ class Benchmark:
         self.base_overrides = base_overrides or {}
         self.normalize = normalize
         self.hpo_configs: dict[str, STPPConfig] = hpo_configs or {}
+        self.runners_: Optional[dict] = None
 
         # Load pre-saved HPO configs (from a previous tune_all run).
         # Any preset already in hpo_configs takes precedence.
@@ -146,7 +168,7 @@ class Benchmark:
             raw_dict["data"]["protocol"] = "unified"
             raw_dict["data"]["normalize"] = self.normalize
             if self.base_overrides:
-                _deep_update(raw_dict, self.base_overrides)
+                deep_update(raw_dict, self.base_overrides)
 
             best_cfg = run_hpo(
                 config_dict=raw_dict,
@@ -175,16 +197,24 @@ class Benchmark:
         self,
         n_workers: int = 1,
         backend: str = "joblib",
+        surface_viz=None,
     ) -> BenchmarkTable:
         """Evaluate all (preset × dataset × seed) combinations.
 
         Parameters
         ----------
-        n_workers:  Degree of parallelism (``1`` = sequential, safe for debugging).
-        backend:    ``"joblib"`` (default) or ``"sequential"``.
+        n_workers:   Degree of parallelism (``1`` = sequential, safe for debugging).
+        backend:     ``"joblib"`` (default) or ``"sequential"``.
+        surface_viz: Optional :class:`~unified_stpp.viz.workflow.SurfaceVizConfig`.
+                     When enabled, surface visualizations are generated per model
+                     and benchmark-level comparison panels are added to the returned
+                     :class:`BenchmarkTable`.  ``runners_`` is populated in
+                     sequential mode only.
 
         Returns a :class:`BenchmarkTable` with all ``RunResult`` objects.
         """
+        import copy
+
         jobs = []
         for preset in self.presets:
             cfg = self.hpo_configs.get(preset) or self._base_config(preset)
@@ -197,11 +227,42 @@ class Benchmark:
                     jobs.append((preset, dataset_id, seed, cfg, train_seqs, val_seqs, test_seqs))
 
         if n_workers == 1 or backend == "sequential":
-            results = [_run_single(*j) for j in jobs]
-        else:
-            results = self._run_parallel(jobs, n_workers, backend)
+            # Inline sequential loop to capture fitted runners.
+            self.runners_ = {}
+            pairs = []
+            for job in jobs:
+                preset, dataset_id, seed, cfg, tr, va, te = job
+                cfg_copy = copy.deepcopy(cfg)
+                cfg_copy.data.seed = seed
+                runner = STPPRunner(cfg_copy)
+                result = runner.fit(tr, va, te, dataset_id=dataset_id)
 
-        return BenchmarkTable(runs=results)
+                surfaces = None
+                if surface_viz is not None and getattr(surface_viz, "enabled", False):
+                    from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
+                    from unified_stpp.runner.artifacts import _extend_viz_manifest
+                    wf = SurfaceVisualizationWorkflow(surface_viz)
+                    artifacts = wf.run(runner, result.run_dir)
+                    _extend_viz_manifest(result.run_dir, artifacts)
+                    surfaces = wf.surfaces_
+
+                pairs.append((result, surfaces))
+                if preset not in self.runners_:
+                    self.runners_[preset] = runner
+        else:
+            self.runners_ = None
+            pairs = self._run_parallel(jobs, n_workers, backend, surface_viz=surface_viz)
+
+        # Aggregate surfaces (first seed per (preset, dataset) only)
+        surfaces_by_dataset: dict = {}
+        for (preset, dataset_id, *_), (result, surfaces) in zip(jobs, pairs):
+            if surfaces is not None:
+                surfaces_by_dataset.setdefault(dataset_id, {})
+                if preset not in surfaces_by_dataset[dataset_id]:
+                    surfaces_by_dataset[dataset_id][preset] = surfaces
+
+        run_results = [r for r, _ in pairs]
+        return BenchmarkTable(runs=run_results, surfaces_by_dataset=surfaces_by_dataset)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -225,11 +286,11 @@ class Benchmark:
         cfg = STPPConfig.from_preset(preset)
         if self.base_overrides:
             raw = cfg.model_dump(mode="json")
-            _deep_update(raw, self.base_overrides)
+            deep_update(raw, self.base_overrides)
             cfg = STPPConfig(**raw)
         return cfg
 
-    def _run_parallel(self, jobs, n_workers: int, backend: str) -> list[RunResult]:
+    def _run_parallel(self, jobs, n_workers: int, backend: str, surface_viz=None) -> list:
         if backend == "ray":
             try:
                 import ray
@@ -243,7 +304,7 @@ class Benchmark:
                 ray.init(ignore_reinit_error=True)
 
             remote_fn = ray.remote(_run_single)
-            futures = [remote_fn.remote(*j) for j in jobs]
+            futures = [remote_fn.remote(*j, surface_viz=surface_viz) for j in jobs]
             return ray.get(futures)
 
         else:  # joblib
@@ -252,20 +313,14 @@ class Benchmark:
             except ImportError:
                 raise ImportError("backend='joblib' requires joblib: pip install 'unified-stpp[runner]'")
 
-            return Parallel(n_jobs=n_workers)(delayed(_run_single)(*j) for j in jobs)
+            return Parallel(n_jobs=n_workers)(
+                delayed(_run_single)(*j, surface_viz=surface_viz) for j in jobs
+            )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _deep_update(base: dict, override: dict) -> None:
-    for k, v in override.items():
-        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
-            _deep_update(base[k], v)
-        else:
-            base[k] = v
-
 
 def _load_raw_yaml(preset: str) -> dict:
     """Return the raw (unsanitized) YAML dict for *preset*.
