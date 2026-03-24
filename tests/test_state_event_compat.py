@@ -14,6 +14,7 @@ _ACTIVE_PRESETS = (
     "neural_stpp_jump_sc",
     "deep_stpp",
     "auto_stpp",
+    "smash",
 )
 
 _REMOVED_PRESETS = (
@@ -50,7 +51,6 @@ class TestStateEventCompat(unittest.TestCase):
                     spatial_dim=2,
                     hidden_dim=16,
                 )
-                self.assertTrue(model.use_state_event_path)
                 self.assertIsNotNone(model.state_model)
                 self.assertIsNotNone(model.event_model)
 

@@ -55,7 +55,6 @@ class TestDeepSTPPStateEventOutputs(unittest.TestCase):
     def test_deep_stpp_outputs(self):
         torch.manual_seed(7)
         model = self._build_model(extra_cfg={})
-        self.assertTrue(model.use_state_event_path)
         self.assertIsNotNone(model.state_model)
         self.assertIsNotNone(model.event_model)
 

@@ -36,8 +36,8 @@ training:
   vae_beta: 1.0e-3           # paper: beta=1e-3 (KL weight in ELBO)
 
 data:
-  protocol: unified
+  protocol: standard
   normalize: true
   # NOTE: for paper-faithful reproduction of Lin et al. 2021 on the original
   # STHP dataset, use experiments/exp_repro_autostpp_synth_sthp.py which sets
-  # protocol=paper_autostpp_sthp and normalize=false (MinMax on delta_t).
+  # protocol=sliding_window and normalize=false (MinMax on delta_t).

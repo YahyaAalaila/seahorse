@@ -13,7 +13,7 @@ class SmokeTest(unittest.TestCase):
         )
         lengths = torch.tensor([4], dtype=torch.long)
 
-        for preset in ("neural_stpp_attn_sc", "neural_stpp_jump_sc", "deep_stpp", "auto_stpp"):
+        for preset in ("neural_stpp_attn_sc", "neural_stpp_jump_sc", "deep_stpp", "auto_stpp", "smash"):
             with self.subTest(preset=preset):
                 torch.manual_seed(0)
                 model = build_model(

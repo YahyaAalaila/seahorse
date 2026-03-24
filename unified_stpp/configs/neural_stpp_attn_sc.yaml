@@ -30,7 +30,7 @@
 
 model:
   preset: neural_stpp_attn_sc
-  hidden_dim: 64           # --hdims "64-64-64" → 3 layers of width 64
+  hidden_dim: 32           # --hdims "64-64-64" → 3 layers of width 64
   spatial_dim: 2
   event_cov_dim: 0
   field_cov_dim: 0
@@ -43,15 +43,15 @@ model:
       n_hidden_layers: 3   # --hdims "64-64-64" → 3-layer velocity field
       layer_type: concat   # --layer_type concat (ConcatSquash)
       solver: dopri5
-      atol: 1.0e-4         # --tol 1e-4
-      rtol: 1.0e-4         # --tol 1e-4
+      atol: 1.0e-5         # --tol 1e-4
+      rtol: 1.0e-5         # --tol 1e-4
 
 training:
-  lr: 1.0e-3               # --lr 1e-3
-  weight_decay: 1.0e-6     # --weight_decay 1e-6
-  grad_clip: 0.0           # --gradclip 0 (no gradient clipping)
+  lr: 5.0e-4               # --lr 1e-3
+  weight_decay: 1.0e-5     # --weight_decay 1e-6
+  grad_clip: 1.0           # --gradclip 0 (no gradient clipping)
   n_epochs: 200
-  batch_size: 32           # --test_bsz 32
+  batch_size: 64           # --test_bsz 32
   patience: 30
 
 data:

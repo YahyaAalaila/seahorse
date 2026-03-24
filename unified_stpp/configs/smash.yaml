@@ -1,0 +1,47 @@
+model:
+  preset: smash
+  hidden_dim: 128
+  spatial_dim: 2
+  n_marks: 0
+  encoder:
+    type: smash_transformer
+    d_model: 128
+    d_rnn: 512
+    d_inner: 256
+    n_layers: 4
+    n_head: 4
+    d_k: 16
+    d_v: 16
+    dropout: 0.1
+    CosSin: true
+  decoder:
+    type: smash
+    sigma_time: 0.1
+    sigma_loc: 0.1
+    num_noise: 50
+    samplingsteps: 500
+    n_samples: 300
+    langevin_step: 0.05
+    sampling_method: normal
+    loss_lambda: 1.0
+    loss_lambda2: 1.0
+    smooth: 0.0
+    # Reconstructed internally from unified times tensor.
+    # false => delta-time, true => log(delta-time)
+    log_normalization: false
+    # Apply min-max scaling on reconstructed event_time per batch.
+    minmax_normalize_time: true
+    # If unified marks are 0..K-1, keep this at 1 to match SMASH 1..K contract.
+    mark_shift: 1
+
+training:
+  lr: 1.0e-3
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 50
+  batch_size: 64
+
+# Keep the repository-wide data contract unchanged.
+data:
+  protocol: standard
+  normalize: true

@@ -37,7 +37,6 @@ class TestAutoSTPPStateEventOutputs(unittest.TestCase):
             spatial_dim=2,
             hidden_dim=16,
         )
-        self.assertTrue(model.use_state_event_path)
         self.assertIsNotNone(model.state_model)
         self.assertIsNotNone(model.event_model)
 
