@@ -1,4 +1,4 @@
-"""StateModel for Diffusion STPP conditioning (unmarked only).
+"""StateModel for upstream-faithful Diffusion STPP conditioning (unmarked only).
 
 Follows the same Batch2toModel flattening semantics as SMASHStateModel but:
 - supports only the unmarked case (loc_dim = 2)
@@ -13,9 +13,11 @@ import torch
 from torch import Tensor
 
 from ..abstractions import StateCapabilities, StateContext, StateModel
-from ..history_encoders.transformer_st import TransformerST
+from ..model_registry import register_state
+from ..history_encoders.dstpp_transformer import DSTPPTransformerST
 
 
+@register_state("diffusion_stpp")
 class DiffusionStateModel(StateModel):
     """Diffusion STPP state encoder over unified_stpp batch tensors.
 
@@ -38,14 +40,61 @@ class DiffusionStateModel(StateModel):
     def __init__(
         self,
         *,
-        transformer: TransformerST,
+        transformer: DSTPPTransformerST,
         spatial_dim: int = 2,
         minmax_normalize_time: bool = True,
+        minmax_normalize_loc: bool = True,
+        input_normalized: bool = False,
+        input_time_mean: float = 0.0,
+        input_time_std: float = 1.0,
+        input_loc_mean: tuple[float, ...] = (0.0, 0.0),
+        input_loc_std: tuple[float, ...] = (1.0, 1.0),
+        token_delta_t_min: float = 0.0,
+        token_delta_t_range: float = 1.0,
+        token_loc_min: tuple[float, ...] = (0.0, 0.0),
+        token_loc_range: tuple[float, ...] = (1.0, 1.0),
     ):
         super().__init__()
         self.transformer = transformer
         self.spatial_dim = int(spatial_dim)
         self.minmax_normalize_time = bool(minmax_normalize_time)
+        self.minmax_normalize_loc = bool(minmax_normalize_loc)
+        self.register_buffer(
+            "input_normalized_flag",
+            torch.tensor(1.0 if input_normalized else 0.0, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_time_mean",
+            torch.tensor(float(input_time_mean), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_time_std",
+            torch.tensor(max(float(input_time_std), 1e-8), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_loc_mean",
+            torch.as_tensor(input_loc_mean, dtype=torch.float32).reshape(self.spatial_dim),
+        )
+        self.register_buffer(
+            "input_loc_std",
+            torch.as_tensor(input_loc_std, dtype=torch.float32).reshape(self.spatial_dim).clamp(min=1e-8),
+        )
+        self.register_buffer(
+            "token_delta_t_min",
+            torch.tensor(float(token_delta_t_min), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_delta_t_range",
+            torch.tensor(max(float(token_delta_t_range), 1e-8), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_loc_min",
+            torch.as_tensor(token_loc_min, dtype=torch.float32).reshape(self.spatial_dim),
+        )
+        self.register_buffer(
+            "token_loc_range",
+            torch.as_tensor(token_loc_range, dtype=torch.float32).reshape(self.spatial_dim).clamp(min=1e-8),
+        )
 
     @property
     def capabilities(self) -> StateCapabilities:
@@ -61,22 +110,47 @@ class DiffusionStateModel(StateModel):
         idx = torch.arange(max_len, device=lengths.device).unsqueeze(0)
         return idx < lengths.unsqueeze(1)
 
-    def _build_delta_time(self, times: Tensor, lengths: Tensor) -> Tensor:
-        """Convert absolute times to inter-event delta times with optional minmax normalisation."""
-        max_len = times.shape[1]
+    def _input_is_normalized(self) -> bool:
+        return bool(self.input_normalized_flag.item() > 0.5)
+
+    def _restore_raw_times(self, times: Tensor) -> Tensor:
+        if not self._input_is_normalized():
+            return times
+        mean = self.input_time_mean.to(device=times.device, dtype=times.dtype)
+        std = self.input_time_std.to(device=times.device, dtype=times.dtype).clamp(min=1e-8)
+        return times * std + mean
+
+    def _restore_raw_locations(self, locations: Tensor) -> Tensor:
+        if not self._input_is_normalized():
+            return locations
+        mean = self.input_loc_mean.to(device=locations.device, dtype=locations.dtype)
+        std = self.input_loc_std.to(device=locations.device, dtype=locations.dtype).clamp(min=1e-8)
+        return locations * std + mean
+
+    def _build_token_locations(self, locations_raw: Tensor, valid_mask: Tensor) -> Tensor:
+        if self.minmax_normalize_loc:
+            loc_min = self.token_loc_min.to(device=locations_raw.device, dtype=locations_raw.dtype)
+            loc_range = self.token_loc_range.to(
+                device=locations_raw.device, dtype=locations_raw.dtype
+            ).clamp(min=1e-8)
+            loc = ((locations_raw - loc_min) / loc_range).clamp_(0.0, 1.0)
+        else:
+            loc = locations_raw
+        return torch.where(valid_mask.unsqueeze(-1), loc, torch.zeros_like(loc))
+
+    def _build_delta_time(self, times_raw: Tensor, lengths: Tensor) -> Tensor:
+        """Convert raw absolute times to diffusion token delta-times."""
+        max_len = times_raw.shape[1]
         valid_mask = self._valid_mask(lengths, max_len)
 
-        dt = torch.zeros_like(times)
-        dt[:, :1] = times[:, :1]
+        dt = torch.zeros_like(times_raw)
         if max_len > 1:
-            dt[:, 1:] = times[:, 1:] - times[:, :-1]
+            dt[:, 1:] = times_raw[:, 1:] - times_raw[:, :-1]
 
         if self.minmax_normalize_time:
-            valid_vals = dt[valid_mask]
-            if valid_vals.numel() > 0:
-                vmin = valid_vals.min()
-                vmax = valid_vals.max()
-                dt = (dt - vmin) / (vmax - vmin).clamp(min=1e-8)
+            vmin = self.token_delta_t_min.to(device=dt.device, dtype=dt.dtype)
+            vrange = self.token_delta_t_range.to(device=dt.device, dtype=dt.dtype).clamp(min=1e-8)
+            dt = ((dt - vmin) / vrange).clamp_(0.0, 1.0)
 
         return torch.where(valid_mask, dt, torch.zeros_like(dt))
 
@@ -92,20 +166,17 @@ class DiffusionStateModel(StateModel):
     ) -> StateContext:
         del marks, x_event, x_field_at_events
 
-        event_time_origin = times
-        event_time = self._build_delta_time(times, lengths)
-
-        # Mask padding positions to zero in locations
         max_len = locations.shape[1]
         valid_mask = self._valid_mask(lengths, max_len)
-        event_loc = torch.where(
-            valid_mask.unsqueeze(-1),
-            locations,
-            torch.zeros_like(locations),
-        )
+        times_raw = self._restore_raw_times(times)
+        locations_raw = self._restore_raw_locations(locations)
+        event_time_origin = torch.where(valid_mask, times_raw, torch.zeros_like(times_raw))
+        event_loc_encoder = self._build_token_locations(locations_raw, valid_mask)
+        event_time = self._build_delta_time(times_raw, lengths)
+        event_loc = self._build_token_locations(locations_raw, valid_mask)
 
         enc_out, non_pad_mask = self.transformer(
-            event_loc=event_loc,
+            event_loc=event_loc_encoder,
             event_time=event_time_origin,
             lengths=lengths,
         )
@@ -142,7 +213,6 @@ class DiffusionStateModel(StateModel):
         else:
             cond_last = torch.zeros(times.shape[0], 1, cond_dim, device=times.device, dtype=times.dtype)
 
-        # img = [delta_time, location] — the diffusion target token
         img_flat = torch.cat((dt_flat, loc_flat), dim=-1)  # (N, 1, 1+spatial_dim)
 
         total_events = torch.tensor(

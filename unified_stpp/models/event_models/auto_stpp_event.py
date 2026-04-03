@@ -8,8 +8,10 @@ import torch
 from torch import Tensor
 
 from ..abstractions import EventCapabilities, EventModel, StateContext
+from ..model_registry import register_event
 
 
+@register_event("auto_stpp")
 class AutoSTPPEventModel(EventModel):
     """AutoSTPP event model.  Owns MonotoneIntegralDecoder."""
 
@@ -48,12 +50,12 @@ class AutoSTPPEventModel(EventModel):
     @property
     def capabilities(self) -> EventCapabilities:
         return EventCapabilities(
-            training_objective="exact_nll",
-            has_eval_nll=True,
+            training_objective="nll",
+            metric_key="nll",
+            objective_description="exact NLL",
+            nll_kind="exact",
+            nll_description="exact joint NLL/event (AutoInt monotone integral)",
             has_intensity=True,
-            has_density=False,
-            has_score=False,
-            has_native_sampler=False,
             exposes_eventwise_terms=True,
         )
 

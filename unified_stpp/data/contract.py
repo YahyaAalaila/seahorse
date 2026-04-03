@@ -17,6 +17,7 @@ Optional (present in dict but may be None)
   marks             (B, N)      int64   — discrete mark indices
   event_covariates  (B, N, p)   float32 — per-event covariate features
   field_covariates  (B, N, r)   float32 — field covariates pre-evaluated at events
+  coordinate_space  scalar str  — semantic coordinate space of times/locations
 
 Invariants checked by `validate_batch`
 ---------------------------------------
@@ -157,6 +158,12 @@ def validate_batch(batch: Dict[str, Any]) -> None:
         raise ValueError("validate_batch: 'locations' contains NaN or Inf.")
 
     # --- optional-field dtype checks (only when not None) ---
+    coordinate_space = batch.get("coordinate_space")
+    if coordinate_space is not None and not isinstance(coordinate_space, str):
+        raise TypeError(
+            f"validate_batch: 'coordinate_space' must be a str or None, got {type(coordinate_space).__name__}."
+        )
+
     if batch.get("marks") is not None:
         m = batch["marks"]
         if not isinstance(m, Tensor) or m.dtype != torch.int64:
@@ -226,6 +233,7 @@ def fingerprint_batch(batch: Dict[str, Any]) -> Dict[str, Any]:
     fp["n_events_max"] = int(shapes["times"][1]) if "times" in shapes else None
     fp["spatial_dim"] = int(shapes["locations"][2]) if "locations" in shapes else None
     fp["total_events"] = int(lengths.sum().item()) if lengths is not None else None
+    fp["coordinate_space"] = batch.get("coordinate_space")
 
     fp["shapes"] = shapes
     fp["dtypes"] = dtypes

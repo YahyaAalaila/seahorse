@@ -28,6 +28,10 @@ Time convention — sequence-relative shifting:
     The spatial model (GaussianMixtureSpatialModel) also receives shifted times.
     Its mixing weights use time differences (t_i - t_j), which are shift-invariant, so
     the shift has no semantic effect on the spatial log-probability.
+
+    Under the raw-first data path, any reversible coordinate transform is
+    applied by the state model first; this event model then works entirely in
+    that family-owned native space.
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from unified_stpp.data.transforms import transform_from_spec
 from ..abstractions import EventCapabilities, EventModel, StateContext
 
 
@@ -73,12 +78,15 @@ class FactorizedEventModel(EventModel):
     @property
     def capabilities(self) -> EventCapabilities:
         return EventCapabilities(
-            training_objective="exact_nll",
-            has_eval_nll=True,
+            training_objective="nll",
+            metric_key="nll",
+            objective_description="exact NLL",
+            nll_kind="exact",
+            nll_description="exact joint NLL/event (factorized temporal + spatial)",
+            supports_raw_reporting=True,
+            raw_nll_description="exact joint NLL/event (raw/original data space; factorized transform corrected)",
             has_intensity=True,
             has_density=True,
-            has_score=False,
-            has_native_sampler=False,
             exposes_eventwise_terms=True,
         )
 
@@ -100,6 +108,21 @@ class FactorizedEventModel(EventModel):
         times_shifted  = (times - t_shift).clamp(min=0.0)        # (B, T)
 
         return times_shifted, locations, mask, t_shift
+
+    @staticmethod
+    def _transform_queries(
+        state: StateContext,
+        query_times: Tensor,
+        query_locations: Tensor,
+    ) -> tuple[Tensor, Tensor]:
+        spec = state.payload.get("input_transform")
+        transform = transform_from_spec(spec if isinstance(spec, dict) else None)
+        if transform is None:
+            return query_times, query_locations
+        lengths = query_times.new_full((query_times.shape[0],), 1, dtype=torch.long)
+        q_t = transform.forward_times(query_times, lengths)
+        q_s = transform.forward_locations(query_locations, lengths)
+        return q_t, q_s
 
     def intensity(
         self,
@@ -129,6 +152,11 @@ class FactorizedEventModel(EventModel):
             device = query_times.device
 
         times_shifted, locations, mask, t_shift = self._extract_history(state, device)
+        query_times, query_locations = self._transform_queries(
+            state,
+            query_times.to(device),
+            query_locations.to(device),
+        )
         B = times_shifted.shape[0]
 
         # Shift query times by the same offset used for history
@@ -177,6 +205,11 @@ class FactorizedEventModel(EventModel):
             device = query_times.device
 
         times_shifted, locations, mask, t_shift = self._extract_history(state, device)
+        query_times, query_locations = self._transform_queries(
+            state,
+            query_times.to(device),
+            query_locations.to(device),
+        )
 
         t_q_shifted = (query_times.squeeze(-1) - t_shift.squeeze()).clamp(min=0.0)  # (M,)
         M = t_q_shifted.shape[0]
@@ -213,8 +246,13 @@ class FactorizedEventModel(EventModel):
         times: Tensor,
         locations: Tensor,
         lengths: Tensor,
+        state: StateContext,
         device,
     ) -> Dict[str, Tensor]:
+        times = state.payload.get("times", times).to(device)
+        locations = state.payload.get("locations", locations).to(device)
+        lengths = state.payload.get("lengths", lengths).to(device)
+
         B, T = times.shape
         n_idx = torch.arange(T, device=device)
         mask = (n_idx.unsqueeze(0) < lengths.unsqueeze(1)).float()  # (B, T)
@@ -255,12 +293,20 @@ class FactorizedEventModel(EventModel):
         return {
             "loss": mean_nll,
             "nll": mean_nll,
+            "temporal_nll": float((-tll).item()),   # mean temporal NLL/event
+            "spatial_nll": float((-sll).item()),    # mean spatial NLL/event
             "nll_per_event": nll_per_event,
             "total_events": mask.sum(),
             "tll": tll,
             "sll": sll,
             "sll_matrix": sll_mat,
             "mask": mask,
+            "extra_metrics": self.raw_reporting_metrics(
+                state=state,
+                nll=mean_nll,
+                temporal_nll=-tll,
+                spatial_nll=-sll,
+            ),
         }
 
     def training_loss(
@@ -275,10 +321,16 @@ class FactorizedEventModel(EventModel):
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        del state, state_regularization_terms, x_field_at_events, marks
+        del state_regularization_terms, x_field_at_events, marks
         if device is None:
             device = times.device
-        return self._compute(times=times, locations=locations, lengths=lengths, device=device)
+        return self._compute(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+            state=state,
+            device=device,
+        )
 
     def eval_nll(
         self,

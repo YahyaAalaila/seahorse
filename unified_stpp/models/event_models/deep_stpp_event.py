@@ -1,4 +1,4 @@
-"""EventModel for DeepSTPP — owns HawkesGaussianDecoder."""
+"""EventModel for upstream-faithful DeepSTPP fixed-window likelihoods."""
 
 from __future__ import annotations
 
@@ -9,25 +9,12 @@ import torch
 from torch import Tensor
 
 from ..abstractions import EventCapabilities, EventModel, StateContext
+from ..model_registry import register_event
 
 
-def _sliding_history_windows_with_times(
-    times: Tensor, locations: Tensor, l_steps: int, seq_len: int
-) -> Tensor:
-    """Build history windows in DeepSTPP layout [times | flattened locations]."""
-    bsz, _, d = locations.shape
-    first_t = times[:, :1].expand(-1, seq_len - 1)
-    padded_t = torch.cat([first_t, times[:, : l_steps + 1]], dim=1)
-    first_s = locations[:, :1, :].expand(-1, seq_len - 1, -1)
-    padded_s = torch.cat([first_s, locations[:, : l_steps + 1, :]], dim=1)
-
-    t_windows = torch.stack([padded_t[:, n : n + seq_len] for n in range(l_steps)], dim=1)
-    s_windows = torch.stack([padded_s[:, n : n + seq_len, :] for n in range(l_steps)], dim=1)
-    return torch.cat([t_windows, s_windows.reshape(bsz, l_steps, seq_len * d)], dim=-1)
-
-
+@register_event("deep_stpp")
 class DeepSTPPEventModel(EventModel):
-    """DeepSTPP event model.  Owns HawkesGaussianDecoder."""
+    """DeepSTPP event model over paper-style fixed windows."""
 
     def __init__(
         self,
@@ -36,6 +23,7 @@ class DeepSTPPEventModel(EventModel):
         spatial_dim: int,
         field_cov_dim: int = 0,
         seq_len: int = 20,
+        lookahead: int = 1,
         num_points: int = 20,
         sigma_min: float = 1e-4,
         n_layers: int = 3,
@@ -44,6 +32,7 @@ class DeepSTPPEventModel(EventModel):
     ):
         super().__init__()
         from ..spatial_models.hawkes_gaussian import HawkesGaussianDecoder
+
         self.hawkes_decoder = HawkesGaussianDecoder(
             hidden_dim=hidden_dim,
             spatial_dim=spatial_dim,
@@ -55,6 +44,7 @@ class DeepSTPPEventModel(EventModel):
             **dec_extra,
         )
         self.seq_len = int(seq_len)
+        self.lookahead = int(lookahead)
         self.num_points = int(num_points)
         self.spatial_dim = int(spatial_dim)
         self.expose_decoded_params = bool(expose_decoded_params)
@@ -62,12 +52,14 @@ class DeepSTPPEventModel(EventModel):
     @property
     def capabilities(self) -> EventCapabilities:
         return EventCapabilities(
-            training_objective="exact_nll",
-            has_eval_nll=True,
+            training_objective="nll",
+            metric_key="nll",
+            objective_description="exact NLL",
+            nll_kind="exact",
+            nll_description="exact joint NLL/event (paper DeepSTPP window semantics)",
+            supports_raw_reporting=True,
+            raw_nll_description="exact joint NLL/event (raw/original data space; DeepSTPP paper transform corrected)",
             has_intensity=True,
-            has_density=False,
-            has_score=False,
-            has_native_sampler=False,
             exposes_eventwise_terms=True,
         )
 
@@ -91,45 +83,27 @@ class DeepSTPPEventModel(EventModel):
             f"but query batch={batch_size}."
         )
 
-    def _build_query_history_x_field(
-        self,
-        *,
-        history_times: Tensor,
-        history_locations: Tensor,
-        history_lengths: Tensor,
-    ) -> Tensor:
-        """Build DeepSTPP history payload [times | flattened locations] per query."""
-        bsz = history_times.shape[0]
-        d = history_locations.shape[-1]
-        out_times = torch.empty(
-            bsz, self.seq_len, device=history_times.device, dtype=history_times.dtype
-        )
-        out_locs = torch.empty(
-            bsz,
-            self.seq_len,
-            d,
-            device=history_locations.device,
-            dtype=history_locations.dtype,
-        )
-        for b in range(bsz):
-            n = int(history_lengths[b].item())
-            if n < 1:
-                out_times[b] = torch.zeros(self.seq_len, device=history_times.device, dtype=history_times.dtype)
-                out_locs[b] = torch.zeros(self.seq_len, d, device=history_locations.device, dtype=history_locations.dtype)
-                continue
-            t_hist = history_times[b, :n]
-            s_hist = history_locations[b, :n, :]
-            if n >= self.seq_len:
-                t_win = t_hist[n - self.seq_len : n]
-                s_win = s_hist[n - self.seq_len : n]
-            else:
-                t_pad = t_hist[:1].expand(self.seq_len - n)
-                s_pad = s_hist[:1].expand(self.seq_len - n, d)
-                t_win = torch.cat([t_pad, t_hist], dim=0)
-                s_win = torch.cat([s_pad, s_hist], dim=0)
-            out_times[b] = t_win
-            out_locs[b] = s_win
-        return torch.cat([out_times, out_locs.reshape(bsz, self.seq_len * d)], dim=-1)
+    @staticmethod
+    def _pad_by_sequence(
+        flat_values: Tensor,
+        seq_ids: Tensor,
+        counts: Tensor,
+        batch_size: int,
+    ) -> tuple[Tensor, Tensor]:
+        max_count = int(counts.max().item()) if counts.numel() > 0 else 0
+        out = flat_values.new_zeros((batch_size, max_count) + flat_values.shape[1:])
+        mask = flat_values.new_zeros(batch_size, max_count)
+        if flat_values.shape[0] == 0 or max_count == 0:
+            return out, mask
+
+        cursor = torch.zeros(batch_size, dtype=torch.long, device=seq_ids.device)
+        for i in range(flat_values.shape[0]):
+            seq_idx = int(seq_ids[i].item())
+            pos = int(cursor[seq_idx].item())
+            out[seq_idx, pos] = flat_values[i]
+            mask[seq_idx, pos] = 1.0
+            cursor[seq_idx] += 1
+        return out, mask
 
     def _compute(
         self,
@@ -140,12 +114,30 @@ class DeepSTPPEventModel(EventModel):
         state_ctx: StateContext,
         device,
     ) -> Dict[str, Tensor]:
-        bsz = times.shape[0]
-        max_len = int(lengths.max().item())
-        if max_len < 2:
+        del times, locations
+
+        if self.lookahead != 1:
+            raise ValueError(
+                f"DeepSTPPEventModel currently supports lookahead=1, got {self.lookahead}."
+            )
+
+        bsz = int(lengths.shape[0])
+        paper_st_x = self._get_state_term(state_ctx, "paper_st_x")
+        paper_st_y = self._get_state_term(state_ctx, "paper_st_y")
+        seq_ids = self._get_state_term(state_ctx, "paper_seq_ids").long()
+        counts = self._get_state_term(state_ctx, "paper_window_counts").long()
+        n_windows = int(paper_st_x.shape[0])
+
+        if n_windows == 0:
             zeros_per_seq = torch.zeros(bsz, device=device)
-            zero_scalar = torch.tensor(0.0, device=device)
-            empty_l = 0
+            zero_scalar = torch.tensor(0.0, device=device, dtype=torch.float32)
+            extra_metrics = self.raw_reporting_metrics(
+                state=state_ctx,
+                nll=zero_scalar,
+                temporal_nll=zero_scalar,
+                spatial_nll=zero_scalar,
+                total_events=zero_scalar,
+            )
             return {
                 "loss": zero_scalar,
                 "nll": zero_scalar,
@@ -153,48 +145,36 @@ class DeepSTPPEventModel(EventModel):
                 "total_events": zero_scalar,
                 "sll": zero_scalar,
                 "tll": zero_scalar,
-                "nll_matrix": torch.zeros(bsz, empty_l, device=device),
-                "sll_matrix": torch.zeros(bsz, empty_l, device=device),
-                "tll_matrix": torch.zeros(bsz, empty_l, device=device),
-                "mask": torch.zeros(bsz, empty_l, device=device),
+                "nll_matrix": torch.zeros(bsz, 0, device=device),
+                "sll_matrix": torch.zeros(bsz, 0, device=device),
+                "tll_matrix": torch.zeros(bsz, 0, device=device),
+                "mask": torch.zeros(bsz, 0, device=device),
+                "extra_metrics": extra_metrics,
             }
 
-        l_steps = max_len - 1
-        z_all = self._get_state_term(state_ctx, "z")
-        z_cond = z_all[:, :l_steps, :]
-
-        t_target = times[:, 1 : 1 + l_steps].unsqueeze(-1)
-        s_target = locations[:, 1 : 1 + l_steps, :]
-        t_prev = times[:, :l_steps].unsqueeze(-1)
-
-        n_idx = torch.arange(l_steps, device=device)
-        mask = (n_idx.unsqueeze(0) < (lengths.unsqueeze(1) - 1)).float()
-
-        hist_windows = _sliding_history_windows_with_times(
-            times, locations, l_steps, self.seq_len
-        )
-        x_field_flat = hist_windows.reshape(bsz * l_steps, -1)
-
-        h = z_cond.shape[-1]
-        d = s_target.shape[-1]
-        z_flat = z_cond.reshape(bsz * l_steps, h)
-        t_flat = t_target.reshape(bsz * l_steps, 1)
-        s_flat = s_target.reshape(bsz * l_steps, d)
-        t_prev_flat = t_prev.reshape(bsz * l_steps, 1)
+        z_flat = self._get_state_term(state_ctx, "z")
+        target = paper_st_y[:, 0, :]
+        t_flat = target[:, 2:3]
+        s_flat = target[:, : self.spatial_dim]
 
         w_i, b_i, _sigma, inv_var = self.hawkes_decoder.decode(z_flat)
-
-        t_hist = x_field_flat[:, : self.seq_len]
-        s_hist = x_field_flat[:, self.seq_len :].reshape(bsz * l_steps, self.seq_len, d)
-        tn_ti_h = (t_prev_flat - t_hist).clamp(min=0.0)
-        tn_ti_bg = torch.zeros(bsz * l_steps, self.num_points, device=device)
+        t_hist = torch.cumsum(paper_st_x[:, :, 2], dim=-1)
+        s_hist = paper_st_x[:, :, : self.spatial_dim]
+        tn_ti_h = t_hist[:, -1:].sub(t_hist)
+        tn_ti_bg = torch.zeros(
+            n_windows,
+            self.num_points,
+            device=device,
+            dtype=t_hist.dtype,
+        )
         tn_ti = torch.cat([tn_ti_h, tn_ti_bg], dim=-1)
-        dt = (t_flat - t_prev_flat).clamp(min=1e-6).reshape(bsz * l_steps)
-        t_ti = (tn_ti + dt.unsqueeze(-1)).clamp(min=1e-6)
+        t_ti = (tn_ti + t_flat).clamp(min=1e-6)
 
         background = self.hawkes_decoder.background
         if background is not None:
-            bg = background.unsqueeze(0).expand(bsz * l_steps, -1, -1)
+            bg = background.to(device=device, dtype=s_hist.dtype).unsqueeze(0).expand(
+                n_windows, -1, -1
+            )
             centers = torch.cat([s_hist, bg], dim=1)
         else:
             centers = s_hist
@@ -202,39 +182,48 @@ class DeepSTPPEventModel(EventModel):
 
         tll_flat = self.hawkes_decoder.log_ft(w_i, b_i, tn_ti, t_ti)
         sll_flat = self.hawkes_decoder.log_s_intensity(w_i, b_i, t_ti, s_diff, inv_var)
-        tll_matrix = tll_flat.reshape(bsz, l_steps)
-        sll_matrix = sll_flat.reshape(bsz, l_steps)
-        nll_matrix = -(tll_matrix + sll_matrix)
+        nll_flat = -(tll_flat + sll_flat)
 
-        nll_masked = nll_matrix * mask
-        total_nll = nll_masked.sum(dim=1)
-        n_events = mask.sum(dim=1)
-        n_events_total = n_events.sum().clamp(min=1)
-        mean_nll = total_nll.sum() / n_events_total
-        sll = (sll_matrix * mask).sum() / n_events_total
-        tll = (tll_matrix * mask).sum() / n_events_total
+        nll_matrix, mask = self._pad_by_sequence(nll_flat, seq_ids, counts, bsz)
+        sll_matrix, _ = self._pad_by_sequence(sll_flat, seq_ids, counts, bsz)
+        tll_matrix, _ = self._pad_by_sequence(tll_flat, seq_ids, counts, bsz)
+
+        counts_float = counts.to(device=device, dtype=nll_flat.dtype)
+        per_seq_total = nll_flat.new_zeros(bsz)
+        per_seq_total.scatter_add_(0, seq_ids, nll_flat)
+        nll_per_event = per_seq_total / counts_float.clamp(min=1.0)
+
+        mean_nll = nll_flat.mean()
+        sll = sll_flat.mean()
+        tll = tll_flat.mean()
 
         out = {
             "loss": mean_nll,
             "nll": mean_nll,
-            "nll_per_event": total_nll / n_events.clamp(min=1),
-            "total_events": n_events.sum(),
+            "temporal_nll": float((-tll).item()),
+            "spatial_nll": float((-sll).item()),
+            "nll_per_event": nll_per_event,
+            "total_events": counts.sum().to(device=device, dtype=mean_nll.dtype),
             "sll": sll,
             "tll": tll,
             "nll_matrix": nll_matrix,
             "sll_matrix": sll_matrix,
             "tll_matrix": tll_matrix,
             "mask": mask,
+            "extra_metrics": self.raw_reporting_metrics(
+                state=state_ctx,
+                nll=mean_nll,
+                temporal_nll=-tll,
+                spatial_nll=-sll,
+            ),
         }
         kl_loss = state_ctx.payload.get("kl_loss")
         if isinstance(kl_loss, Tensor):
             out["kl_loss"] = kl_loss
         if self.expose_decoded_params:
-            out["w_i"] = w_i.reshape(bsz, l_steps, -1)
-            out["b_i"] = b_i.reshape(bsz, l_steps, -1)
-            out["inv_var"] = inv_var.reshape(
-                bsz, l_steps, inv_var.shape[1], inv_var.shape[2]
-            )
+            out["w_i"], _ = self._pad_by_sequence(w_i, seq_ids, counts, bsz)
+            out["b_i"], _ = self._pad_by_sequence(b_i, seq_ids, counts, bsz)
+            out["inv_var"], _ = self._pad_by_sequence(inv_var, seq_ids, counts, bsz)
         return out
 
     def training_loss(
@@ -307,53 +296,77 @@ class DeepSTPPEventModel(EventModel):
             device = query_times.device
 
         batch_size = query_times.shape[0]
-        history_times = self._broadcast_or_match(
-            self._get_state_term(state, "times"), batch_size, "times"
-        ).to(device=device, dtype=query_times.dtype)
-        history_locations = self._broadcast_or_match(
-            self._get_state_term(state, "locations"), batch_size, "locations"
-        ).to(device=device, dtype=query_locations.dtype)
-        history_lengths = self._broadcast_or_match(
-            self._get_state_term(state, "lengths").long(), batch_size, "lengths"
-        ).to(device=device)
-
-        z_final = state.payload.get("z_final")
-        if isinstance(z_final, Tensor):
-            z_hist = self._broadcast_or_match(z_final, batch_size, "z_final").to(device=device)
-        else:
-            z_all = self._broadcast_or_match(
-                self._get_state_term(state, "all_states"), batch_size, "all_states"
-            ).to(device=device)
-            idx = (history_lengths - 1).clamp(min=0)
-            b_idx = torch.arange(batch_size, device=device)
-            z_hist = z_all[b_idx, idx, :]
-
-        b_idx = torch.arange(batch_size, device=device)
-        prev_idx = (history_lengths - 1).clamp(min=0)
-        if history_times.shape[1] > 0:
-            t_prev = history_times[b_idx, prev_idx].unsqueeze(-1)
-        else:
-            t_prev = torch.zeros(batch_size, 1, device=device, dtype=query_times.dtype)
-
-        x_field = self._build_query_history_x_field(
-            history_times=history_times,
-            history_locations=history_locations,
-            history_lengths=history_lengths,
-        )
-        d = query_locations.shape[-1]
-        t_hist = x_field[:, : self.seq_len]
-        s_hist = x_field[:, self.seq_len :].reshape(batch_size, self.seq_len, d)
-
-        tn_ti_h = (t_prev - t_hist).clamp(min=0.0)
-        tn_ti_bg = torch.zeros(
+        query_z = self._broadcast_or_match(
+            self._get_state_term(state, "query_z"),
             batch_size,
-            self.num_points,
-            device=device,
-            dtype=tn_ti_h.dtype,
+            "query_z",
+        ).to(device=device)
+        query_st_x = self._broadcast_or_match(
+            self._get_state_term(state, "query_st_x"),
+            batch_size,
+            "query_st_x",
+        ).to(device=device)
+        query_last_time_raw = self._broadcast_or_match(
+            self._get_state_term(state, "query_last_time_raw"),
+            batch_size,
+            "query_last_time_raw",
+        ).to(device=device, dtype=query_times.dtype)
+
+        input_normalized_flag = (
+            float(self._get_state_term(state, "input_normalized_flag").reshape(-1)[0].item())
+            > 0.5
         )
+        input_time_mean = self._get_state_term(state, "input_time_mean").to(
+            device=device,
+            dtype=query_times.dtype,
+        )
+        input_time_std = self._get_state_term(state, "input_time_std").to(
+            device=device,
+            dtype=query_times.dtype,
+        ).clamp(min=1e-8)
+        input_loc_mean = self._get_state_term(state, "input_loc_mean").to(
+            device=device,
+            dtype=query_locations.dtype,
+        )
+        input_loc_std = self._get_state_term(state, "input_loc_std").to(
+            device=device,
+            dtype=query_locations.dtype,
+        ).clamp(min=1e-8)
+        paper_dt_min = self._get_state_term(state, "paper_dt_min").to(
+            device=device,
+            dtype=query_times.dtype,
+        )
+        paper_dt_range = self._get_state_term(state, "paper_dt_range").to(
+            device=device,
+            dtype=query_times.dtype,
+        ).clamp(min=1e-8)
+        paper_loc_min = self._get_state_term(state, "paper_loc_min").to(
+            device=device,
+            dtype=query_locations.dtype,
+        )
+        paper_loc_range = self._get_state_term(state, "paper_loc_range").to(
+            device=device,
+            dtype=query_locations.dtype,
+        ).clamp(min=1e-8)
+
+        if input_normalized_flag:
+            query_times_raw = query_times * input_time_std + input_time_mean
+            query_locations_raw = query_locations * input_loc_std + input_loc_mean
+        else:
+            query_times_raw = query_times
+            query_locations_raw = query_locations
+
+        query_dt = query_times_raw - query_last_time_raw
+        query_dt_paper = (query_dt - paper_dt_min) / paper_dt_range
+        query_locs_paper = (query_locations_raw - paper_loc_min) / paper_loc_range
+
+        d = query_locations.shape[-1]
+        t_hist = torch.cumsum(query_st_x[:, :, 2], dim=-1)
+        s_hist = query_st_x[:, :, :d]
+        tn_ti_h = t_hist[:, -1:].sub(t_hist)
+        tn_ti_bg = torch.zeros(batch_size, self.num_points, device=device, dtype=tn_ti_h.dtype)
         tn_ti = torch.cat([tn_ti_h, tn_ti_bg], dim=-1)
-        dt = (query_times - t_prev).clamp(min=1e-6)
-        t_ti = (tn_ti + dt).clamp(min=1e-6)
+        t_ti = (tn_ti + query_dt_paper).clamp(min=1e-6)
 
         background = self.hawkes_decoder.background
         if background is not None:
@@ -363,9 +376,9 @@ class DeepSTPPEventModel(EventModel):
             centers = torch.cat([s_hist, bg], dim=1)
         else:
             centers = s_hist
-        s_diff = query_locations.unsqueeze(1) - centers
+        s_diff = query_locs_paper.unsqueeze(1) - centers
 
-        w_i, b_i, _sigma, inv_var = self.hawkes_decoder.decode(z_hist)
+        w_i, b_i, _sigma, inv_var = self.hawkes_decoder.decode(query_z)
         log_v_i = torch.log(w_i) - b_i * t_ti
         log_lamb_t = torch.logsumexp(log_v_i, dim=-1)
         log_v_norm = log_v_i - log_lamb_t.unsqueeze(-1)
@@ -381,11 +394,11 @@ class DeepSTPPEventModel(EventModel):
         self,
         *,
         state: StateContext,
-        grid_times: "torch.Tensor",
-        grid_locs: "torch.Tensor",
+        grid_times: torch.Tensor,
+        grid_locs: torch.Tensor,
         **kwargs,
-    ) -> "torch.Tensor":
-        """Surface query contract: routes to intensity() for DeepSTPP."""
+    ) -> torch.Tensor:
+        del kwargs
         t = grid_times.unsqueeze(-1) if grid_times.ndim == 1 else grid_times
         return self.intensity(
             state=state,

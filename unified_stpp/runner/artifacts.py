@@ -22,8 +22,14 @@ from typing import TYPE_CHECKING, Optional
 import yaml
 
 if TYPE_CHECKING:
+    from unified_stpp.config.benchmark import BenchmarkConfig
     from unified_stpp.config import STPPConfig
     from unified_stpp.runner.results import RunResult
+
+
+def _yaml_safe_obj(value):
+    """Convert run artifact payloads to YAML-safe JSON-like values."""
+    return json.loads(json.dumps(value, default=str))
 
 
 def make_run_id() -> str:
@@ -59,9 +65,7 @@ def write_bench_meta(
     splits_dir: str,
     datasets: list[str],
     presets: list[str],
-    seeds: list[int],
-    normalize: bool,
-    n_workers: int,
+    benchmark_config: "BenchmarkConfig",
     overrides: list[str],
     hpo_configs_dir: Optional[str],
 ) -> None:
@@ -98,9 +102,14 @@ def write_bench_meta(
         "splits_dir":      splits_dir,
         "datasets":        datasets,
         "presets":         presets,
-        "seeds":           seeds,
-        "normalize":       normalize,
-        "n_workers":       n_workers,
+        "seeds":           benchmark_config.seeds,
+        "normalize":       benchmark_config.normalize,
+        "n_workers":       benchmark_config.n_workers,
+        "backend":         benchmark_config.backend,
+        "run_hpo":         benchmark_config.run_hpo,
+        "tune_dataset":    benchmark_config.tune_dataset,
+        "primary_metric":  benchmark_config.primary_metric,
+        "benchmark_config": benchmark_config.model_dump(mode="json"),
         "overrides":       overrides,
         "hpo_configs_dir": hpo_configs_dir,
         "python_version":  sys.version.split()[0],
@@ -112,6 +121,11 @@ def write_bench_meta(
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / "bench_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
+
+    rerun_path = out_dir / "rerun.sh"
+    with open(rerun_path, "w") as f:
+        f.write("#!/bin/bash\n" + sys.executable + " -m unified_stpp " + " ".join(argv) + "\n")
+    rerun_path.chmod(0o755)
 
 
 def update_latest_symlink(run_dir: Path) -> None:
@@ -136,8 +150,10 @@ def save_run_artifacts(run_dir: Path, result: "RunResult", cfg: "STPPConfig") ->
     - ``run_result.json``      — all metrics, norm_stats, effective_config
     - ``artifacts.json``       — manifest mapping artifact roles to relative paths
     """
+    resolved = result.effective_config if result.effective_config else cfg.model_dump(mode="json")
+    resolved = _yaml_safe_obj(resolved)
     with open(run_dir / "resolved_config.yaml", "w") as f:
-        yaml.dump(cfg.model_dump(mode="json"), f, default_flow_style=False, sort_keys=False)
+        yaml.safe_dump(resolved, f, default_flow_style=False, sort_keys=False)
 
     result.to_json(run_dir / "run_result.json")
 
@@ -153,6 +169,57 @@ def save_run_artifacts(run_dir: Path, result: "RunResult", cfg: "STPPConfig") ->
     }
     with open(run_dir / "artifacts.json", "w") as f:
         json.dump(manifest, f, indent=2)
+
+
+def checkpoint_file(run_dir: Path, selection: str = "best") -> Path:
+    """Return the preferred Lightning checkpoint file under *run_dir*."""
+    choice = str(selection).strip().lower()
+    if choice not in {"best", "last"}:
+        raise ValueError(
+            f"Unknown checkpoint selection {selection!r}. Expected 'best' or 'last'."
+        )
+    return run_dir / "checkpoints" / f"{choice}.ckpt"
+
+
+def load_state_dict(run_dir: Path, selection: str = "best") -> dict:
+    """Load model weights from *run_dir*, supporting two formats.
+
+    Preference order:
+    1. ``checkpoints/{selection}.ckpt`` — Lightning checkpoint written by ``fit()``.
+       State-dict keys are prefixed with ``"model."``; the prefix is stripped.
+    2. ``model.ckpt`` — plain ``state_dict`` written by ``runner.save()``.
+
+    Raises ``FileNotFoundError`` if neither file exists.
+    """
+    import torch
+
+    pl_ckpt = checkpoint_file(run_dir, selection=selection)
+    if pl_ckpt.exists():
+        ckpt = torch.load(pl_ckpt, map_location="cpu", weights_only=False)
+        pl_state = ckpt["state_dict"]
+        return {
+            k[len("model."):]: v
+            for k, v in pl_state.items()
+            if k.startswith("model.")
+        }
+
+    plain_ckpt = run_dir / "model.ckpt"
+    if plain_ckpt.exists():
+        return torch.load(plain_ckpt, map_location="cpu", weights_only=False)
+
+    raise FileNotFoundError(
+        f"No checkpoint found in {run_dir}. "
+        f"Expected 'checkpoints/{selection}.ckpt' or 'model.ckpt'."
+    )
+
+
+def load_norm_stats(run_dir: Path) -> "Optional[dict]":
+    """Load ``norm_stats`` from ``run_result.json`` in *run_dir*, or ``None``."""
+    result_json = run_dir / "run_result.json"
+    if result_json.exists():
+        with open(result_json) as f:
+            return json.load(f).get("norm_stats")
+    return None
 
 
 def _extend_viz_manifest(run_dir: Path, viz_artifacts: dict) -> None:

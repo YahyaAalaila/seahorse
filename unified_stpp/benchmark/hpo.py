@@ -1,86 +1,22 @@
 """
-YAML-as-search-space parser and Ray Tune wrapper for HPO.
+Ray Tune wrapper for HPO.
 
-YAML value interpretation:
-  scalar          → fixed (not tuned)
-  [a, b, c]       → tune.choice([a, b, c])
-  {min: x, max: y}       → tune.uniform / tune.loguniform (inferred by param name)
-  {min: x, max: y, scale: log}  → tune.loguniform (explicit)
-  {min: i, max: j}  (both int)  → tune.randint(i, j+1)
+Search-space YAML syntax is documented in
+:meth:`unified_stpp.config.tuning.TuningConfig.parse_config`.
 """
 
 from __future__ import annotations
 
-from copy import deepcopy
-from typing import Any
+import json
+import os
+import resource
+import subprocess
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-# Parameter names that trigger log-scale by default
-_LOG_SCALE_KEYWORDS = ("lr", "learning_rate", "weight_decay", "alpha", "beta", "lambda")
-
-
-def _is_log_param(name: str) -> bool:
-    return any(k in name.lower() for k in _LOG_SCALE_KEYWORDS)
-
-
-def _parse_value(key: str, value: Any, search_space: dict, fixed: dict, prefix: str):
-    """Recursively classify one config leaf as tunable or fixed."""
-    full_key = f"{prefix}.{key}" if prefix else key
-
-    if isinstance(value, dict):
-        # Check for search-space shorthand {min, max} or {min, max, scale}
-        if "min" in value and "max" in value:
-            lo, hi = value["min"], value["max"]
-            scale = value.get("scale", "log" if _is_log_param(key) else "linear")
-            if isinstance(lo, int) and isinstance(hi, int) and scale not in ("log", "ln"):
-                search_space[full_key] = ("randint", lo, hi + 1)
-            elif scale == "log":
-                search_space[full_key] = ("loguniform", float(lo), float(hi))
-            else:
-                search_space[full_key] = ("uniform", float(lo), float(hi))
-        else:
-            # Nested dict — recurse
-            for k, v in value.items():
-                _parse_value(k, v, search_space, fixed, full_key)
-    elif isinstance(value, list):
-        search_space[full_key] = ("choice", value)
-    else:
-        fixed[full_key] = value
-
-
-def parse_tunable_config(config_dict: dict) -> tuple[dict, dict]:
-    """Split a (possibly nested) config dict into Ray Tune search space + fixed dict.
-
-    Returns
-    -------
-    search_space : dict mapping dotted keys to ``(kind, *args)`` tuples.
-    fixed        : dict mapping dotted keys to scalar values.
-
-    The ``search_space`` dict can be converted to Ray Tune primitives with
-    :func:`_to_ray_space`.
-    """
-    search_space: dict[str, Any] = {}
-    fixed: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        _parse_value(k, v, search_space, fixed, "")
-    return search_space, fixed
-
-
-def _to_ray_space(search_space: dict) -> dict:
-    """Convert parsed search_space tuples to ``ray.tune`` primitives."""
-    from ray import tune  # type: ignore[import]
-
-    ray_space = {}
-    for key, spec in search_space.items():
-        kind = spec[0]
-        if kind == "choice":
-            ray_space[key] = tune.choice(spec[1])
-        elif kind == "uniform":
-            ray_space[key] = tune.uniform(spec[1], spec[2])
-        elif kind == "loguniform":
-            ray_space[key] = tune.loguniform(spec[1], spec[2])
-        elif kind == "randint":
-            ray_space[key] = tune.randint(spec[1], spec[2])
-    return ray_space
+if TYPE_CHECKING:
+    from unified_stpp.config.tuning import TuningConfig
 
 
 def _unflatten(flat: dict) -> dict:
@@ -95,15 +31,80 @@ def _unflatten(flat: dict) -> dict:
     return out
 
 
+def _mem_debug_enabled() -> bool:
+    return os.environ.get("UNIFIED_STPP_HPO_MEM_DEBUG", "").lower() not in {
+        "",
+        "0",
+        "false",
+        "no",
+    }
+
+
+def _current_rss_mb() -> float:
+    rss_kb = subprocess.check_output(
+        ["ps", "-o", "rss=", "-p", str(os.getpid())],
+        text=True,
+    ).strip()
+    return float(rss_kb) / 1024.0
+
+
+def _peak_rss_mb() -> float:
+    peak = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    if sys.platform == "darwin":
+        return peak / (1024.0 * 1024.0)
+    return peak / 1024.0
+
+
+def _estimate_size_bytes(obj, *, _seen: "set[int] | None" = None) -> int:
+    """Recursively estimate the in-memory footprint of a Python object graph."""
+    import sys as _sys
+
+    if _seen is None:
+        _seen = set()
+    obj_id = id(obj)
+    if obj_id in _seen:
+        return 0
+    _seen.add(obj_id)
+
+    size = _sys.getsizeof(obj)
+    if isinstance(obj, dict):
+        size += sum(
+            _estimate_size_bytes(k, _seen=_seen) + _estimate_size_bytes(v, _seen=_seen)
+            for k, v in obj.items()
+        )
+    elif isinstance(obj, (list, tuple, set, frozenset)):
+        size += sum(_estimate_size_bytes(v, _seen=_seen) for v in obj)
+    elif hasattr(obj, "nbytes"):
+        try:
+            size += int(obj.nbytes)
+        except (TypeError, ValueError):
+            pass
+    return size
+
+
+def _emit_mem_event(stage: str, **payload) -> None:
+    if not _mem_debug_enabled():
+        return
+    event = {
+        "kind": "hpo_mem",
+        "stage": stage,
+        "pid": os.getpid(),
+        "rss_mb": round(_current_rss_mb(), 2),
+        "peak_rss_mb": round(_peak_rss_mb(), 2),
+    }
+    event.update(payload)
+    print(json.dumps(event, sort_keys=True), flush=True)
+
+
 def run_hpo(
     config_dict: dict,
-    train_seqs: list[dict],
-    val_seqs: list[dict],
-    n_trials: int = 50,
-    algorithm: str = "asha",
-    metric: str = "val_nll",
-    n_cpus_per_trial: int = 1,
-    n_gpus_per_trial: float = 0.0,
+    tuning: "TuningConfig",
+    *,
+    train_seqs: "list[dict] | None" = None,
+    val_seqs: "list[dict] | None" = None,
+    train_path: "str | os.PathLike[str] | None" = None,
+    val_path: "str | os.PathLike[str] | None" = None,
+    return_analysis: bool = False,
 ):
     """Run HPO over the tunable parameters in *config_dict*.
 
@@ -113,11 +114,12 @@ def run_hpo(
                       (discrete choice) or ``{min, max}`` dicts (continuous range).
                       Pass ``STPPConfig.model_dump(mode="json")`` when starting
                       from a validated config with no search-space entries.
-    train_seqs/val_seqs: Data sequences for each trial.
-    n_trials:         Maximum number of trials.
-    algorithm:        ``"asha"`` (default) | ``"bayesian"`` | ``"grid"``.
-    metric:           Metric to minimise (logged by ``STPPRunner.fit``).
-    n_cpus/gpus_per_trial: Resources per Ray trial.
+    train_seqs/val_seqs: Optional pre-loaded data sequences for each trial.
+                         When omitted, trials load splits from ``train_path`` /
+                         ``val_path`` inside the trial process.
+    train_path/val_path: Optional dataset paths for path-based trial loading.
+    tuning:           :class:`TuningConfig` controlling the HPO procedure
+                      (algorithm, scheduler, budget, resources, etc.).
 
     Returns
     -------
@@ -130,46 +132,101 @@ def run_hpo(
     try:
         import ray
         from ray import tune
-        from ray.tune.schedulers import ASHAScheduler
     except ImportError as exc:
         raise ImportError(
             "HPO requires Ray Tune: pip install 'unified-stpp[hpo]'"
         ) from exc
 
     from unified_stpp.runner import STPPRunner
+    from unified_stpp.training.data_module import STPPDataModule
+    from unified_stpp.utils import load_jsonl
 
-    search_space_raw, fixed = parse_tunable_config(config_dict)
+    if train_seqs is None or val_seqs is None:
+        if train_path is None or val_path is None:
+            raise ValueError(
+                "run_hpo requires either pre-loaded train_seqs/val_seqs or "
+                "train_path/val_path."
+            )
+        train_path = str(Path(train_path).expanduser().resolve())
+        val_path = str(Path(val_path).expanduser().resolve())
+    else:
+        _emit_mem_event(
+            "driver_after_load",
+            train_estimated_mb=round(_estimate_size_bytes(train_seqs) / (1024.0 * 1024.0), 2),
+            val_estimated_mb=round(_estimate_size_bytes(val_seqs) / (1024.0 * 1024.0), 2),
+            train_len=len(train_seqs),
+            val_len=len(val_seqs),
+        )
 
-    if not search_space_raw:
+    ray_space, fixed = tuning.build_ray_config(config_dict)
+
+    if not ray_space:
         from unified_stpp.config import STPPConfig
         return STPPConfig(**config_dict)  # nothing to tune
 
-    ray_space = _to_ray_space(search_space_raw)
+    metric = tuning.metric
 
     def _trial_fn(trial_config: dict):
-        # Merge trial params (flat) back into config
         merged_flat = dict(fixed)
         merged_flat.update(trial_config)
         merged_nested = _unflatten(merged_flat)
 
         from unified_stpp.config import STPPConfig
 
-        trial_cfg = STPPConfig(**merged_nested)
-        runner = STPPRunner(trial_cfg)
-        result = runner.fit(train_seqs, val_seqs, dataset_id="hpo_trial")
-        tune.report({metric: result.val_nll})
+        rss_trial_start_mb = _current_rss_mb()
+        _emit_mem_event(
+            "trial_start",
+            input_mode="captured" if train_seqs is not None else "path",
+        )
+        if train_seqs is not None and val_seqs is not None:
+            trial_train = train_seqs
+            trial_val = val_seqs
+            train_estimated_mb = _estimate_size_bytes(trial_train) / (1024.0 * 1024.0)
+            val_estimated_mb = _estimate_size_bytes(trial_val) / (1024.0 * 1024.0)
+        else:
+            assert train_path is not None and val_path is not None
+            trial_train = load_jsonl(train_path)
+            trial_val = load_jsonl(val_path)
+            train_estimated_mb = _estimate_size_bytes(trial_train) / (1024.0 * 1024.0)
+            val_estimated_mb = _estimate_size_bytes(trial_val) / (1024.0 * 1024.0)
+            _emit_mem_event(
+                "trial_after_split_load",
+                train_estimated_mb=round(train_estimated_mb, 2),
+                val_estimated_mb=round(val_estimated_mb, 2),
+                train_len=len(trial_train),
+                val_len=len(trial_val),
+            )
 
-    if algorithm == "asha":
-        # metric/mode must not be set on the scheduler when also passed to tune.run()
-        scheduler = ASHAScheduler()
-        search_alg = None
-    elif algorithm == "bayesian":
-        from ray.tune.search.bayesopt import BayesOptSearch  # type: ignore[import]
-        scheduler = None
-        search_alg = BayesOptSearch()
-    else:
-        scheduler = None
-        search_alg = None
+        trial_cfg = STPPConfig(**merged_nested)
+        bundle = trial_cfg.build_data_bundle(trial_train, trial_val, None)
+        dm = STPPDataModule(
+            bundle,
+            batch_size=trial_cfg.data.batch_size,
+            num_workers=trial_cfg.data.num_workers,
+            seed=trial_cfg.data.seed,
+        )
+        rss_after_dataset_mb = _current_rss_mb()
+        _emit_mem_event(
+            "trial_after_dataset_build",
+            train_estimated_mb=round(train_estimated_mb, 2),
+            val_estimated_mb=round(val_estimated_mb, 2),
+            train_dataset_len=len(dm.train_dataset),
+        )
+        runner = STPPRunner(trial_cfg)
+        result = runner.fit(
+            trial_train,
+            trial_val,
+            dataset_id="hpo_trial",
+            data_module=dm,
+        )
+        tune.report({
+            metric: result.val_objective,
+            "mem_rss_trial_start_mb": round(rss_trial_start_mb, 2),
+            "mem_rss_after_dataset_mb": round(rss_after_dataset_mb, 2),
+            "mem_peak_rss_mb": round(_peak_rss_mb(), 2),
+            "mem_train_estimated_mb": round(train_estimated_mb, 2),
+            "mem_val_estimated_mb": round(val_estimated_mb, 2),
+        })
 
     if not ray.is_initialized():
         ray.init(ignore_reinit_error=True)
@@ -177,13 +234,16 @@ def run_hpo(
     analysis = tune.run(
         _trial_fn,
         config=ray_space,
-        num_samples=n_trials,
-        scheduler=scheduler,
-        search_alg=search_alg,
-        resources_per_trial={"cpu": n_cpus_per_trial, "gpu": n_gpus_per_trial},
+        num_samples=tuning.n_trials,
+        scheduler=tuning.build_scheduler(),
+        search_alg=tuning.build_search_alg(),
+        resources_per_trial=tuning.resources_per_trial,
         metric=metric,
-        mode="min",
-        verbose=1,
+        mode=tuning.mode,
+        verbose=tuning.verbose,
+        fail_fast=tuning.fail_fast,
+        max_concurrent_trials=tuning.max_concurrent_trials,
+        **({"seed": tuning.seed} if tuning.seed is not None else {}),
     )
 
     best_flat = dict(fixed)
@@ -192,4 +252,7 @@ def run_hpo(
 
     from unified_stpp.config import STPPConfig
 
-    return STPPConfig(**best_nested)
+    best_config = STPPConfig(**best_nested)
+    if return_analysis:
+        return best_config, analysis
+    return best_config

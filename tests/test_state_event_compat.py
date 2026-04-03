@@ -14,6 +14,7 @@ _ACTIVE_PRESETS = (
     "neural_stpp_jump_sc",
     "deep_stpp",
     "auto_stpp",
+    "auto_stpp_faithful",
     "smash",
 )
 

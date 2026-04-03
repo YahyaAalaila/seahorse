@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from ..abstractions import EventCapabilities, EventModel, StateContext
+from ..model_registry import register_event
 
 
 def normalize_to_neg_one_to_one(img: Tensor) -> Tensor:
@@ -426,6 +427,82 @@ class ScoreMatchingProcess(nn.Module):
         log_prb = (score_mark + 1e-10).log()
         return -(one_hot * log_prb).sum(dim=-1)
 
+    @torch.no_grad()
+    def NLL_cal(
+        self,
+        x_start: Tensor,
+        cond: Tensor,
+        n_quad: int = 20,
+    ) -> Tuple[float, float, float]:
+        """Approximate NLL via native SMASH mechanics.
+
+        Temporal: exact log-density of the model's implicit TPP (intensity quadrature).
+        Spatial:  Tweedie approximation at the model's fixed sigma_s.
+
+        Neither uses sampling, KDE, or external density estimators.
+
+        Parameters
+        ----------
+        x_start : (N_total, 1, 1+loc_dim) — [delta_t, s1, s2] from smash_img
+        cond    : (N_total, 1, cond_dim) — per-event conditioning from smash_cond
+        n_quad  : number of quadrature points for the compensator integral
+
+        Returns
+        -------
+        (nll_total, nll_temporal, nll_spatial) — floats, nat-sums over N_total events
+        """
+        N_total = x_start.shape[0]
+        device = x_start.device
+        dtype = x_start.dtype
+
+        # ---- Temporal NLL via compensator integral --------------------------------
+        delta_t = x_start[:, 0, 0]  # (N_total,) — inter-arrival times
+
+        # t_grid[i, j] = delta_t[i] * j / (n_quad-1)  — (N_total, n_quad)
+        t_frac = torch.linspace(0.0, 1.0, n_quad, device=device, dtype=dtype)
+        t_grid = delta_t.unsqueeze(1) * t_frac.unsqueeze(0)  # (N_total, n_quad)
+
+        # Batched intensity query: reshape to (N_total*n_quad, 1, 1)
+        t_flat = t_grid.reshape(N_total * n_quad, 1, 1)
+        cond_flat = cond.repeat_interleave(n_quad, dim=0)  # (N_total*n_quad, 1, cond_dim)
+        lambda_flat = self.model.get_intensity(t_flat, cond_flat)  # (..., 1, num_types)
+        lambda_flat = lambda_flat.sum(-1).squeeze(1)              # (N_total*n_quad,)
+        lambda_grid = lambda_flat.reshape(N_total, n_quad)        # (N_total, n_quad)
+
+        # Trapezoid rule: compensator[i] = integral_0^{delta_t[i]} lambda(u) du
+        widths = t_grid[:, 1:] - t_grid[:, :-1]                  # (N_total, n_quad-1)
+        compensator = (0.5 * (lambda_grid[:, :-1] + lambda_grid[:, 1:]) * widths).sum(dim=1)
+
+        # log lambda at the actual event time delta_t_i
+        lambda_at_dt = self.model.get_intensity(
+            delta_t.view(N_total, 1, 1), cond
+        )  # (N_total, 1, num_types)
+        lambda_at_dt = lambda_at_dt.sum(-1).squeeze(1)            # (N_total,)
+        log_lambda = torch.log(lambda_at_dt.clamp(min=1e-10))     # (N_total,)
+
+        temporal_logp = log_lambda - compensator                  # (N_total,)
+
+        # ---- Spatial NLL via Tweedie approximation at fixed sigma_s ---------------
+        # Evaluate score_loc at the clean (unperturbed) event location.
+        # Tweedie approximation: log p_{sigma_s}(s | H) ≈
+        #     -sigma_s^2 * ||score_loc(s, cond)||^2 / 2 - (d/2) * log(2*pi*sigma_s^2)
+        sigma_s = self.sigma[1].to(device=device, dtype=dtype)    # scalar
+
+        score_loc = self.model.get_score_loc(x_start, cond)       # (N_total, 1, loc_dim)
+        score_s = score_loc.squeeze(1)                             # (N_total, loc_dim)
+        loc_dim = score_s.shape[-1]
+
+        score_s_norm_sq = (score_s ** 2).sum(dim=-1)              # (N_total,)
+        sigma_s_sq = sigma_s ** 2
+        spatial_logp = (
+            -sigma_s_sq * score_s_norm_sq / 2.0
+            - (loc_dim / 2.0) * math.log(2.0 * math.pi * float(sigma_s_sq.item()))
+        )  # (N_total,)
+
+        nll_temporal = float(-temporal_logp.sum().item())
+        nll_spatial  = float(-spatial_logp.sum().item())
+        return nll_temporal + nll_spatial, nll_temporal, nll_spatial
+
     def forward(self, img: Tensor, cond: Tensor, *args, **kwargs) -> Tensor:
         _b, _c, n = img.shape
         if n != self.seq_length:
@@ -437,6 +514,7 @@ class ScoreMatchingProcess(nn.Module):
         return self.p_losses_mark(img, cond=cond, *args, **kwargs)
 
 
+@register_event("smash")
 class SMASHEventModel(EventModel):
     """Coarse EventModel wrapper for SMASH."""
 
@@ -479,12 +557,16 @@ class SMASHEventModel(EventModel):
     def capabilities(self) -> EventCapabilities:
         return EventCapabilities(
             training_objective="score_matching",
-            has_eval_nll=False,
-            has_intensity=False,
-            has_density=False,
+            metric_key="sm",
+            objective_description="denoising score matching",
+            nll_kind="approx",
+            nll_description=(
+                "framework-added approx NLL (non-upstream): exact temporal "
+                "(intensity quadrature) + Tweedie spatial at fixed σ_s"
+            ),
+            nll_footnote="‡ framework-added approx NLL (non-upstream)",
             has_score=True,
             has_native_sampler=True,
-            exposes_eventwise_terms=False,
         )
 
     @staticmethod
@@ -563,11 +645,39 @@ class SMASHEventModel(EventModel):
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        del times, locations, lengths, state, state_regularization_terms, x_field_at_events, marks, device
-        raise NotImplementedError(
-            "SMASH does not expose exact/approximate eval_nll in this integration. "
-            "Use training_loss (score-matching objective) and sample_native()."
-        )
+        """Framework-added approximate per-event NLL for benchmark reporting.
+
+        Temporal NLL: exact log-density of the model's implicit TPP
+            (numerical quadrature of the compensator integral).
+        Spatial NLL:  Tweedie approximation at the model's fixed sigma_s.
+
+        This metric is not part of the upstream SMASH training/evaluation code.
+        Neither component uses sampling, KDE, or any external density estimator.
+        val/sm (validation/training) remains the score-matching objective;
+        this method is invoked only at test time for benchmark reporting.
+        """
+        del times, locations, lengths, state_regularization_terms, x_field_at_events, marks
+
+        smash_img  = self._get_state_term(state, "smash_img")   # (N_total, 1, 1+loc_dim)
+        smash_cond = self._get_state_term(state, "smash_cond")  # (N_total, 1, cond_dim)
+
+        if device is None:
+            device = smash_cond.device
+
+        if smash_img.shape[0] == 0:
+            z = torch.tensor(0.0, device=device)
+            return {"nll": z, "loss": z, "temporal_nll": 0.0, "spatial_nll": 0.0, "total_events": z}
+
+        nll_total, nll_temporal, nll_spatial = self.score_matching.NLL_cal(smash_img, smash_cond)
+        n = float(smash_img.shape[0])
+        nll_per_event = torch.tensor(nll_total / n, device=device)
+        return {
+            "nll":          nll_per_event,
+            "loss":         nll_per_event,
+            "temporal_nll": nll_temporal / n,
+            "spatial_nll":  nll_spatial / n,
+            "total_events": torch.tensor(n, device=device),
+        }
 
     def score(
         self,
@@ -672,6 +782,80 @@ class SMASHEventModel(EventModel):
             ).reshape(score_mark.shape[0], score_mark.shape[1])
             out["mark_probs"] = score_mark
             # Return one-based marks to match SMASH preprocessing convention.
+            out["marks"] = mark + 1
+        return out
+
+    def sample_upstream_flattened(
+        self,
+        *,
+        state: StateContext,
+        per_step: int = 250,
+        total_steps: Optional[int] = None,
+        n_samples: Optional[int] = None,
+        device=None,
+    ) -> Dict[str, Tensor]:
+        """Faithful upstream SMASH sampling over all flattened valid histories.
+
+        This mirrors the upstream decoder sampling semantics more closely than
+        sample_native(), which is a framework convenience for next-event queries.
+        """
+        cond = self._get_state_term(state, "smash_cond")
+        if device is None:
+            device = cond.device
+        cond = cond.to(device=device)
+
+        batch_size = cond.shape[0]
+        target_steps = int(total_steps or self.score_matching.sampling_timesteps)
+        if batch_size == 0:
+            channels = int(n_samples or self.score_matching.n_samples)
+            samples = torch.zeros(
+                0,
+                channels,
+                3,
+                device=device,
+                dtype=cond.dtype,
+            )
+            return {"samples": samples}
+
+        prev_n_samples = self.score_matching.n_samples
+        prev_channels = self.score_matching.channels
+        if n_samples is not None:
+            self.score_matching.n_samples = int(n_samples)
+            self.score_matching.channels = int(n_samples)
+
+        current_step = 0
+        last_sample: Optional[Tuple[Tensor, Optional[Tensor]]] = None
+        samples: Optional[Tensor] = None
+        score_mark: Optional[Tensor] = None
+        try:
+            while current_step < target_steps:
+                step = min(int(per_step), target_steps - current_step)
+                is_last = current_step + step >= target_steps
+                samples, score_mark = self.score_matching.sample_from_last(
+                    batch_size=batch_size,
+                    step=step,
+                    is_last=is_last,
+                    cond=cond,
+                    last_sample=last_sample,
+                )
+                last_sample = (samples, score_mark)
+                current_step += step
+        finally:
+            if n_samples is not None:
+                self.score_matching.n_samples = prev_n_samples
+                self.score_matching.channels = prev_channels
+
+        if samples is None:
+            raise RuntimeError("SMASH upstream sampling produced no samples.")
+
+        out: Dict[str, Tensor] = {"samples": samples}
+        if score_mark is not None:
+            mark = torch.multinomial(
+                score_mark.reshape(-1, self.num_types) + 1e-10,
+                1,
+                replacement=False,
+            ).reshape(score_mark.shape[0], score_mark.shape[1])
+            out["mark_probs"] = score_mark
             out["marks"] = mark + 1
         return out
 

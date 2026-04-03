@@ -6,6 +6,9 @@ from .cnf_spatial import (
     ActNorm,
     SelfAttentiveCNFSpatial,
 )
+from .neural_cond_gmm import ConditionalGMMSpatial
+from .neural_attncnf import NeuralAttnCNFSpatial
+from .neural_jumpcnf import NeuralJumpCNFSpatial
 from .gaussian_mixture import GaussianMixtureSpatialModel
 from .independent_cnf import IndependentCNF
 
@@ -16,6 +19,9 @@ __all__ = [
     "EventTimeEncoding",
     "ActNorm",
     "SelfAttentiveCNFSpatial",
+    "ConditionalGMMSpatial",
+    "NeuralAttnCNFSpatial",
+    "NeuralJumpCNFSpatial",
     "GaussianMixtureSpatialModel",
     "IndependentCNF",
 ]

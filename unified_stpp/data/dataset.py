@@ -24,8 +24,9 @@ class STPPDataset(Dataset):
     def __init__(
         self,
         sequences: List[Dict],
-        normalize_time: bool = True,
-        normalize_space: bool = True,
+        normalize_time: bool = False,
+        normalize_space: bool = False,
+        normalize_covariates: Optional[bool] = None,
         min_length: int = 3,
         cov_mean: Optional[np.ndarray] = None,
         cov_std: Optional[np.ndarray] = None,
@@ -33,8 +34,9 @@ class STPPDataset(Dataset):
         """
         Args:
             sequences: list of sequence dicts (times, locations, field_covariates, …)
-            normalize_time: z-score normalise event times
-            normalize_space: z-score normalise event locations
+            normalize_time: z-score normalise event times. Legacy path only.
+            normalize_space: z-score normalise event locations. Legacy path only.
+            normalize_covariates: z-score normalise field_covariates. Legacy path only.
             min_length: drop sequences shorter than this
             cov_mean: if provided, use this mean to normalise field_covariates
                       instead of computing it from this split's data.
@@ -45,26 +47,54 @@ class STPPDataset(Dataset):
         # Filter short sequences
         self.sequences = [s for s in sequences if len(s["times"]) >= min_length]
 
-        # Compute normalization stats for times and locations
-        all_times = np.concatenate([s["times"] for s in self.sequences])
-        all_locs = np.concatenate([s["locations"] for s in self.sequences])
-
-        self.time_mean = all_times.mean() if normalize_time else 0.0
-        self.time_std = all_times.std() + 1e-8 if normalize_time else 1.0
-        self.loc_mean = all_locs.mean(axis=0) if normalize_space else np.zeros(all_locs.shape[1])
-        self.loc_std = all_locs.std(axis=0) + 1e-8 if normalize_space else np.ones(all_locs.shape[1])
-
         self.normalize_time = normalize_time
         self.normalize_space = normalize_space
+        self.normalize_covariates = (
+            bool(normalize_time or normalize_space)
+            if normalize_covariates is None
+            else bool(normalize_covariates)
+        )
+        self.coordinate_space = (
+            "zscore"
+            if (self.normalize_time or self.normalize_space or self.normalize_covariates)
+            else "raw"
+        )
+
+        first_seq = self.sequences[0] if self.sequences else None
+        if first_seq is not None:
+            spatial_dim = int(np.asarray(first_seq["locations"]).shape[-1])
+        else:
+            spatial_dim = 2
+
+        if self.normalize_time or self.normalize_space:
+            all_times = np.concatenate([s["times"] for s in self.sequences])
+            all_locs = np.concatenate([s["locations"] for s in self.sequences])
+            self.time_mean = all_times.mean() if normalize_time else 0.0
+            self.time_std = all_times.std() + 1e-8 if normalize_time else 1.0
+            self.loc_mean = (
+                all_locs.mean(axis=0)
+                if normalize_space
+                else np.zeros(spatial_dim, dtype=np.float32)
+            )
+            self.loc_std = (
+                all_locs.std(axis=0) + 1e-8
+                if normalize_space
+                else np.ones(spatial_dim, dtype=np.float32)
+            )
+        else:
+            self.time_mean = 0.0
+            self.time_std = 1.0
+            self.loc_mean = np.zeros(spatial_dim, dtype=np.float32)
+            self.loc_std = np.ones(spatial_dim, dtype=np.float32)
 
         # Field covariate normalization stats.
         # If caller supplies external stats (e.g. from the training split) use
         # those; otherwise compute from this split's data so that the dataset
         # is self-contained when used standalone.
-        if cov_mean is not None and cov_std is not None:
+        if self.normalize_covariates and cov_mean is not None and cov_std is not None:
             self.cov_mean = np.asarray(cov_mean, dtype=np.float32)
             self.cov_std  = np.asarray(cov_std,  dtype=np.float32)
-        else:
+        elif self.normalize_covariates:
             cov_arrays = [
                 s["field_covariates"] for s in self.sequences
                 if "field_covariates" in s
@@ -78,9 +108,46 @@ class STPPDataset(Dataset):
             else:
                 self.cov_mean = None
                 self.cov_std  = None
+        else:
+            self.cov_mean = None
+            self.cov_std = None
 
     def __len__(self):
         return len(self.sequences)
+
+    def batch_by_size(self, max_events: int) -> list:
+        """Group sequence indices into batches where total events ≤ max_events.
+
+        Sequences sorted by length descending to minimise padding waste.
+        Returns list[list[int]] compatible with DataLoader(batch_sampler=...).
+        """
+        indices = sorted(
+            range(len(self.sequences)),
+            key=lambda i: len(self.sequences[i]["times"]),
+            reverse=True,
+        )
+        batches: list = []
+        current: list = []
+        current_total = 0
+        for i in indices:
+            n = len(self.sequences[i]["times"])
+            if n > max_events:
+                # Sequence longer than the entire budget: isolate it
+                if current:
+                    batches.append(current)
+                    current = []
+                    current_total = 0
+                batches.append([i])
+            elif current_total + n > max_events and current:
+                batches.append(current)
+                current = [i]
+                current_total = n
+            else:
+                current.append(i)
+                current_total += n
+        if current:
+            batches.append(current)
+        return batches
 
     def __getitem__(self, idx):
         seq = self.sequences[idx]
@@ -96,6 +163,7 @@ class STPPDataset(Dataset):
             "times": torch.tensor(times, dtype=torch.float32),
             "locations": torch.tensor(locs, dtype=torch.float32),
             "length": len(times),
+            "coordinate_space": self.coordinate_space,
         }
 
         if "event_covariates" in seq and seq["event_covariates"] is not None:
@@ -105,7 +173,7 @@ class STPPDataset(Dataset):
 
         if "field_covariates" in seq and seq["field_covariates"] is not None:
             cov = seq["field_covariates"].copy()
-            if self.cov_mean is not None and len(cov) > 0:
+            if self.normalize_covariates and self.cov_mean is not None and len(cov) > 0:
                 cov = (cov - self.cov_mean) / self.cov_std
             item["field_covariates"] = torch.tensor(cov, dtype=torch.float32)
 
@@ -143,6 +211,7 @@ class PaperSlidingWindowDataset(Dataset):
         """
         self._windows  = np.asarray(windows, dtype=np.float32)
         self._n_events = int(self._windows.shape[1])  # T = lookback + lookahead
+        self.coordinate_space = "paper_minmax"
 
         # Expose same attrs as STPPDataset.
         # Convention: (x - loc_mean) / loc_std = x_mm,
@@ -172,6 +241,7 @@ class PaperSlidingWindowDataset(Dataset):
             "times":     torch.tensor(t,  dtype=torch.float32),
             "locations": torch.tensor(xy, dtype=torch.float32),
             "length":    self._n_events,
+            "coordinate_space": self.coordinate_space,
         }
 
 
@@ -193,6 +263,12 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
     N_max = lengths.max().item()
     B = len(batch)
     d = batch[0]["locations"].shape[-1]
+    coordinate_space = batch[0].get("coordinate_space", "raw")
+    for item in batch[1:]:
+        if item.get("coordinate_space", coordinate_space) != coordinate_space:
+            raise ValueError(
+                "collate_fn requires a consistent coordinate_space within one batch."
+            )
 
     times = torch.zeros(B, N_max)
     locations = torch.zeros(B, N_max, d)
@@ -235,6 +311,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
         "lengths": lengths,
         "pad_mask": pad_mask,
         "txys": txys,
+        "coordinate_space": coordinate_space,
         "event_covariates": event_covariates,
         "field_covariates": field_covariates,
         "marks": marks_out,

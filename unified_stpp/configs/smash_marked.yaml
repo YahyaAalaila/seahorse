@@ -5,9 +5,9 @@ model:
   n_marks: 5
   encoder:
     type: smash_transformer
-    d_model: 128
-    d_rnn: 512
-    d_inner: 256
+    d_model: 64
+    d_rnn: 256
+    d_inner: 128
     n_layers: 4
     n_head: 4
     d_k: 16
@@ -17,25 +17,30 @@ model:
   decoder:
     type: smash
     num_types: 5
-    sigma_time: 0.1
-    sigma_loc: 0.1
+    sigma_time: 0.05
+    sigma_loc: 0.05
     num_noise: 50
     samplingsteps: 500
-    n_samples: 300
-    langevin_step: 0.05
+    n_samples: 100
+    langevin_step: 0.005
     sampling_method: normal
-    loss_lambda: 1.0
+    loss_lambda: 0.5
     loss_lambda2: 1.0
     smooth: 0.0
-    log_normalization: false
+    log_normalization: true
     minmax_normalize_time: true
+    minmax_normalize_loc: true
     mark_shift: 1
 
 training:
   lr: 1.0e-3
-  weight_decay: 1.0e-5
-  grad_clip: 5.0
-  n_epochs: 50
+  weight_decay: 1.0e-2
+  grad_clip: 1.0
+  n_epochs: 1000
+  adam_beta2: 0.99
+  lr_schedule: linear_decay
+  lr_warmup_epochs: 5
+  lr_final: 5.0e-5
   batch_size: 64
 
 data:

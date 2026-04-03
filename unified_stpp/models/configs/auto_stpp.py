@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, ClassVar, Dict
 
 import numpy as np
 
@@ -49,6 +49,10 @@ def _bbox_from_dm(dm: "STPPDataModule") -> dict:
 @ConfigRegistry.register("auto_stpp")
 @dataclasses.dataclass
 class AutoSTPPConfig(BaseModelConfig):
+    _STATE_MODEL: ClassVar[str] = "auto_stpp"
+    _EVENT_MODEL: ClassVar[str] = "auto_stpp"
+    _SUPPORTED_PROTOCOLS: ClassVar[frozenset] = frozenset({"raw", "standard", "sliding_window"})
+
     # Encoder params
     enc_num_heads: int = 2
     enc_num_layers: int = 3
@@ -112,12 +116,8 @@ class AutoSTPPConfig(BaseModelConfig):
             _dec_cfg=dec_cfg,
         )
 
-    def build_model(self):
-        from unified_stpp.models.event_models import AutoSTPPEventModel
-        from unified_stpp.models.state_models import AutoSTPPStateModel
-        from unified_stpp.models.unified_model import UnifiedSTPP
-
-        state_model = AutoSTPPStateModel(
+    def _state_kwargs(self) -> dict:
+        return dict(
             hidden_dim=self.hidden_dim,
             spatial_dim=self.spatial_dim,
             event_cov_dim=self.event_cov_dim,
@@ -126,7 +126,9 @@ class AutoSTPPConfig(BaseModelConfig):
             enc_dropout=self.enc_dropout,
             **self._enc_cfg,
         )
-        event_model = AutoSTPPEventModel(
+
+    def _event_kwargs(self) -> dict:
+        return dict(
             hidden_dim=self.hidden_dim,
             spatial_dim=self.spatial_dim,
             field_cov_dim=self.field_cov_dim,
@@ -138,11 +140,6 @@ class AutoSTPPConfig(BaseModelConfig):
             y_lo=self.y_lo,
             y_hi=self.y_hi,
             **self._dec_cfg,
-        )
-        return UnifiedSTPP(
-            state_model=state_model,
-            event_model=event_model,
-            hidden_dim=self.hidden_dim,
         )
 
     @classmethod

@@ -4,10 +4,10 @@ model:
   spatial_dim: 2
   n_marks: 0
   encoder:
-    type: smash_transformer
-    d_model: 128
-    d_rnn: 64
-    d_inner: 256
+    type: dstpp_transformer
+    d_model: 64
+    d_rnn: 256
+    d_inner: 128
     n_layers: 4
     n_head: 4
     d_k: 16
@@ -18,21 +18,25 @@ model:
     type: diffusion_stpp
     # Denoising network hidden units
     hidden_units: 64
-    # DDPM diffusion parameters
-    timesteps: 1000
-    sampling_timesteps: 50
-    objective: pred_x0
+    # DDPM diffusion parameters — aligned with original paper defaults
+    timesteps: 100
+    sampling_timesteps: 100
+    objective: pred_noise
     beta_schedule: cosine
     loss_type: l2
-  # Apply min-max scaling on reconstructed delta-times per batch.
+  # Diffusion tokens use fixed global min-max scaling on reconstructed delta-times.
   minmax_normalize_time: true
 
 training:
-  lr: 2.0e-4
-  weight_decay: 1.0e-5
+  lr: 1.0e-3
+  adam_beta2: 0.99
+  weight_decay: 0.0
   grad_clip: 1.0
   n_epochs: 200
   batch_size: 64
+  lr_schedule: linear_decay
+  lr_warmup_epochs: 5
+  lr_final: 5.0e-5
 
 # Keep the repository-wide data contract unchanged.
 data:

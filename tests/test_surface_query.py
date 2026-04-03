@@ -54,7 +54,7 @@ class _MockDataModule:
 
 
 class _MockRunner:
-    """Minimal runner stub: real model, mock data module."""
+    """Minimal runner stub: real model, identity norm stats."""
 
     def __init__(self, preset, config=None):
         torch.manual_seed(0)
@@ -67,8 +67,13 @@ class _MockRunner:
             field_cov_dim=0,
         )
         self.model.eval()
-        self._data_module = _MockDataModule()
-        self._lightning_module = object()  # non-None sentinel
+        self.norm_stats = {
+            "normalize": False,
+            "time_mean": _MockDataset.time_mean,
+            "time_std":  _MockDataset.time_std,
+            "loc_mean":  list(_MockDataset.loc_mean),
+            "loc_std":   list(_MockDataset.loc_std),
+        }
 
 
 # Config used for CNF presets to keep ODE solves fast during tests
@@ -350,7 +355,7 @@ def _check_surface_result(tc, result, surface_type, comparable, n_grid=_N_GRID):
 # ---------------------------------------------------------------------------
 
 class TestSurfaceQueryPhase1(unittest.TestCase):
-    """deep_stpp and auto_stpp return surface_type='intensity'."""
+    """deep_stpp and auto_stpp variants return surface_type='intensity'."""
 
     def _check(self, preset):
         from unified_stpp.evaluation.surface import SurfaceQuery
@@ -370,6 +375,9 @@ class TestSurfaceQueryPhase1(unittest.TestCase):
 
     def test_auto_stpp(self):
         self._check("auto_stpp")
+
+    def test_auto_stpp_faithful(self):
+        self._check("auto_stpp_faithful")
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +631,9 @@ class TestQuerySurfaceContract(unittest.TestCase):
     def test_auto_stpp(self):
         self._check("auto_stpp")
 
+    def test_auto_stpp_faithful(self):
+        self._check("auto_stpp_faithful")
+
     def test_neural_stpp_jump_sc(self):
         self._check("neural_stpp_jump_sc", config=_FAST_CNF_CONFIG)
 
@@ -646,7 +657,7 @@ class TestQuerySurfaceContract(unittest.TestCase):
     # ---- surface_query_type declaration ------------------------------------
 
     def test_surface_query_type_intensity_families(self):
-        for preset in ("deep_stpp", "auto_stpp", "hawkes_gmm"):
+        for preset in ("deep_stpp", "auto_stpp", "auto_stpp_faithful", "hawkes_gmm"):
             with self.subTest(preset=preset):
                 model = build_model(
                     config={}, preset=preset, spatial_dim=2, hidden_dim=16,

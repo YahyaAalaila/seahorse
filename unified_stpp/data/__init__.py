@@ -13,6 +13,13 @@ from importlib import import_module
 
 from .contract import fingerprint_batch, validate_batch
 from .dataset import PaperSlidingWindowDataset, STPPDataset, collate_fn
+from .transforms import (
+    CoordinateTransformArtifact,
+    IdentityTransformArtifact,
+    PaperAffineTransformArtifact,
+    ZScoreTransformArtifact,
+    transform_from_spec,
+)
 
 
 _DIRECT_EXPORTS = {
@@ -21,6 +28,11 @@ _DIRECT_EXPORTS = {
     "PaperSlidingWindowDataset": PaperSlidingWindowDataset,
     "validate_batch": validate_batch,
     "fingerprint_batch": fingerprint_batch,
+    "CoordinateTransformArtifact": CoordinateTransformArtifact,
+    "IdentityTransformArtifact": IdentityTransformArtifact,
+    "PaperAffineTransformArtifact": PaperAffineTransformArtifact,
+    "ZScoreTransformArtifact": ZScoreTransformArtifact,
+    "transform_from_spec": transform_from_spec,
 }
 
 

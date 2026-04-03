@@ -1,0 +1,41 @@
+# Upstream-faithful AutoSTPP preset.
+#
+# Raw benchmark data contract stays in the framework's standard normalized form.
+# This preset restores raw inputs internally, constructs paper-style sliding
+# windows, MinMax-maps them to the unit square, and evaluates the exact Cuboid
+# compensator / likelihood used by upstream AutoSTPP.
+
+model:
+  preset: auto_stpp_faithful
+  hidden_dim: 128
+  spatial_dim: 2
+  decoder:
+    type: autoint_faithful
+    lookback: 20
+    lookahead: 1
+    n_prodnet: 2
+    hidden_size: 128
+    num_layers: 2
+    activation: tanh
+    bias: true
+    trunc: false
+    max_history: 20
+    temporal_diag_mode: exact
+    temporal_mc_samples: 10
+    report_orig_space_metrics: true
+
+training:
+  optimizer: adam
+  adam_beta1: 0.9
+  lr: 4.0e-3
+  weight_decay: 0.0
+  grad_clip: 0.0
+  n_epochs: 50
+  batch_size: 128
+  lr_step_size: 20
+  lr_step_gamma: 0.5
+  test_nll_space: raw
+
+data:
+  protocol: raw
+  normalize: true

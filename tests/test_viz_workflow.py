@@ -7,7 +7,6 @@ TestMultiPlot                   — _plot_grid, plot_surface_panel, plot_model_c
 TestAnimation                   — animate_surface_sequence (single + multi-model, 2D + 3D)
 TestDataModuleHelper            — STPPDataModule.get_original_sequence()
 TestSurfaceVizWorkflow          — SurfaceVizConfig defaults + SurfaceVisualizationWorkflow
-TestBenchmarkSurfaceViz         — _run_single tuple, Benchmark.run surface_viz, comparison panel
 """
 
 from __future__ import annotations
@@ -63,6 +62,7 @@ def _make_surface(t_query: float = 1.0, comparable: bool = True,
 def _make_runner(preset: str = "poisson_gmm"):
     """Build a minimal mock runner that satisfies SurfaceQuery and workflow."""
     from unified_stpp.training.data_module import STPPDataModule
+    from unified_stpp.data import STPPDataset
 
     np.random.seed(0)
     # Simple synthetic sequences (5 events each)
@@ -75,14 +75,19 @@ def _make_runner(preset: str = "poisson_gmm"):
     train_seqs = [_seq() for _ in range(4)]
     val_seqs   = [_seq() for _ in range(2)]
 
+    train_ds = STPPDataset(train_seqs, normalize_time=True, normalize_space=True)
+    val_ds = STPPDataset(val_seqs, normalize_time=True, normalize_space=True)
+    val_ds.time_mean = train_ds.time_mean
+    val_ds.time_std  = train_ds.time_std
+    val_ds.loc_mean  = train_ds.loc_mean
+    val_ds.loc_std   = train_ds.loc_std
+    from unified_stpp.data import collate_fn as _collate
+    from unified_stpp.data.registry import DataBundle
     dm = STPPDataModule(
-        train_seqs=train_seqs,
-        val_seqs=val_seqs,
-        test_seqs=None,
+        DataBundle(train_dataset=train_ds, val_dataset=val_ds, test_dataset=None,
+                   collate_fn=_collate, train_batch_sampler=None),
         batch_size=4,
-        normalize=True,
     )
-    dm.setup()
 
     model = build_model(
         config={},
@@ -94,10 +99,18 @@ def _make_runner(preset: str = "poisson_gmm"):
     )
     model.eval()
 
-    # Minimal runner duck-type — SurfaceQuery only needs _lightning_module is not None
+    _ns = {
+        "normalize": True,
+        "time_mean": float(train_ds.time_mean),
+        "time_std":  float(train_ds.time_std),
+        "loc_mean":  list(map(float, train_ds.loc_mean)),
+        "loc_std":   list(map(float, train_ds.loc_std)),
+    }
+
+    # Minimal runner duck-type for SurfaceVisualizationWorkflow
     class _MockRunner:
-        _lightning_module = object()  # non-None sentinel
         _data_module = dm
+        norm_stats = _ns
 
         @property
         def model(self_inner):
@@ -320,18 +333,20 @@ class TestDataModuleHelper(unittest.TestCase):
     def test_get_original_sequence(self):
         """get_original_sequence() returns un-normalized times and locs."""
         from unified_stpp.training.data_module import STPPDataModule
+        from unified_stpp.data import STPPDataset
 
         rng = np.random.default_rng(1)
         seq = {"times": np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
                "locations": np.array([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6],
                                        [0.7, 0.8], [0.9, 1.0]])}
+        from unified_stpp.data import collate_fn as _collate
+        from unified_stpp.data.registry import DataBundle
+        ds = STPPDataset([seq], normalize_time=True, normalize_space=True)
         dm = STPPDataModule(
-            train_seqs=[seq],
-            val_seqs=[seq],
+            DataBundle(train_dataset=ds, val_dataset=ds, test_dataset=None,
+                       collate_fn=_collate, train_batch_sampler=None),
             batch_size=2,
-            normalize=True,
         )
-        dm.setup()
 
         result = dm.get_original_sequence("val", 0)
         self.assertIn("times", result)
@@ -343,11 +358,18 @@ class TestDataModuleHelper(unittest.TestCase):
     def test_get_original_sequence_invalid_split(self):
         """get_original_sequence() with missing split raises ValueError."""
         from unified_stpp.training.data_module import STPPDataModule
+        from unified_stpp.data import STPPDataset
 
         seq = {"times": np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
                "locations": np.array([[0.1, 0.2]] * 5)}
-        dm = STPPDataModule(train_seqs=[seq], val_seqs=[seq], batch_size=2)
-        dm.setup()
+        from unified_stpp.data import collate_fn as _collate
+        from unified_stpp.data.registry import DataBundle
+        ds = STPPDataset([seq], normalize_time=False, normalize_space=False)
+        dm = STPPDataModule(
+            DataBundle(train_dataset=ds, val_dataset=ds, test_dataset=None,
+                       collate_fn=_collate, train_batch_sampler=None),
+            batch_size=2,
+        )
 
         with self.assertRaises(ValueError):
             dm.get_original_sequence("test", 0)  # test_seqs=None → ValueError
@@ -841,149 +863,6 @@ class TestMultiPlot3D(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# TestBenchmarkSurfaceViz
-# ---------------------------------------------------------------------------
-
-class TestBenchmarkSurfaceViz(unittest.TestCase):
-    """Tests for benchmark-level surface visualization integration."""
-
-    @classmethod
-    def setUpClass(cls):
-        rng = np.random.default_rng(7)
-
-        def _seq():
-            times = np.cumsum(rng.exponential(0.5, 8))
-            locs  = rng.uniform(0, 1, (8, 2))
-            return {"times": times, "locations": locs}
-
-        cls.train_seqs = [_seq() for _ in range(4)]
-        cls.val_seqs   = [_seq() for _ in range(2)]
-        cls.test_seqs  = [_seq() for _ in range(2)]
-
-    def _minimal_config(self, preset: str = "poisson_gmm"):
-        from unified_stpp.config import STPPConfig
-        cfg = STPPConfig.from_preset(preset)
-        raw = cfg.model_dump(mode="json")
-        raw.setdefault("training", {})
-        raw["training"]["n_epochs"] = 1
-        raw["data"]["protocol"] = "unified"
-        raw["data"]["normalize"] = True
-        return STPPConfig(**raw)
-
-    def test_run_single_no_viz_returns_tuple(self):
-        """_run_single(..., surface_viz=None) → (RunResult, None)."""
-        from unified_stpp.benchmark.benchmark import _run_single
-        from unified_stpp.runner.results import RunResult
-
-        cfg = self._minimal_config()
-        result, surfaces = _run_single(
-            "poisson_gmm", "toy", 42, cfg,
-            self.train_seqs, self.val_seqs, self.test_seqs,
-            surface_viz=None,
-        )
-        self.assertIsInstance(result, RunResult)
-        self.assertIsNone(surfaces)
-
-    def test_run_single_with_viz_returns_surfaces(self):
-        """_run_single with surface_viz enabled → (RunResult, list[SurfaceResult])."""
-        from unified_stpp.benchmark.benchmark import _run_single
-        from unified_stpp.evaluation.surface import SurfaceResult
-
-        cfg = self._minimal_config()
-        viz = SurfaceVizConfig(
-            enabled=True, n_grid=_N_GRID, n_samples=10,
-            n_time_steps=2, history_length=4,
-            save_individual=False, save_panel=False, animate=False,
-        )
-        result, surfaces = _run_single(
-            "poisson_gmm", "toy", 42, cfg,
-            self.train_seqs, self.val_seqs, self.test_seqs,
-            surface_viz=viz,
-        )
-        self.assertIsNotNone(surfaces)
-        self.assertIsInstance(surfaces, list)
-        self.assertGreater(len(surfaces), 0)
-        self.assertIsInstance(surfaces[0], SurfaceResult)
-
-    def test_runners_populated_sequential(self):
-        """Benchmark.run(n_workers=1) → bench.runners_ is dict keyed by preset."""
-        from unified_stpp.benchmark.benchmark import Benchmark
-
-        bench = Benchmark(
-            presets=["poisson_gmm"],
-            splits={"toy": (self.train_seqs, self.val_seqs, self.test_seqs)},
-            seeds=[42],
-            base_overrides={"training": {"n_epochs": 1}},
-        )
-        bench.run(n_workers=1)
-        self.assertIsInstance(bench.runners_, dict)
-        self.assertIn("poisson_gmm", bench.runners_)
-
-    def test_benchmark_run_surfaces_by_dataset(self):
-        """Benchmark.run(surface_viz=...) → table.surfaces_by_dataset populated."""
-        from unified_stpp.benchmark.benchmark import Benchmark
-
-        viz = SurfaceVizConfig(
-            enabled=True, n_grid=_N_GRID, n_samples=10,
-            n_time_steps=2, history_length=4,
-            save_individual=False, save_panel=False, animate=False,
-        )
-        bench = Benchmark(
-            presets=["poisson_gmm"],
-            splits={"toy": (self.train_seqs, self.val_seqs, self.test_seqs)},
-            seeds=[42],
-            base_overrides={"training": {"n_epochs": 1}},
-        )
-        table = bench.run(surface_viz=viz)
-        self.assertIn("toy", table.surfaces_by_dataset)
-        self.assertIn("poisson_gmm", table.surfaces_by_dataset["toy"])
-
-    def test_save_surface_comparison_creates_png(self):
-        """save_surface_comparison with ≥2 models → comparison_{dataset}.png exists."""
-        import matplotlib
-        matplotlib.use("Agg")
-        from unified_stpp.benchmark.results import BenchmarkTable
-        from unified_stpp.runner.results import RunResult
-
-        surfaces_a = [_make_surface(float(t)) for t in range(2)]
-        surfaces_b = [_make_surface(float(t)) for t in range(2)]
-        table = BenchmarkTable(
-            runs=[],
-            surfaces_by_dataset={"toy": {"model_a": surfaces_a, "model_b": surfaces_b}},
-        )
-        with tempfile.TemporaryDirectory() as d:
-            artifacts = table.save_surface_comparison(d, render_mode="2d")
-            self.assertIn("comparison_toy", artifacts)
-            self.assertTrue(artifacts["comparison_toy"].exists())
-
-    def test_report_includes_surface_section(self):
-        """report() with surfaces_by_dataset ≥2 models → HTML contains 'Surface Comparison'."""
-        import matplotlib
-        matplotlib.use("Agg")
-        import math
-        from unified_stpp.benchmark.results import BenchmarkTable
-        from unified_stpp.runner.results import RunResult
-
-        # Minimal RunResult to satisfy report()
-        run = RunResult(
-            preset="model_a", dataset_id="toy", seed=0,
-            val_nll=1.0, test_nll=1.0,
-            train_time_sec=0.1, n_params=10,
-            effective_config={},
-        )
-        surfaces_a = [_make_surface(float(t)) for t in range(2)]
-        surfaces_b = [_make_surface(float(t)) for t in range(2)]
-        table = BenchmarkTable(
-            runs=[run],
-            surfaces_by_dataset={"toy": {"model_a": surfaces_a, "model_b": surfaces_b}},
-        )
-        with tempfile.TemporaryDirectory() as d:
-            table.report(d)
-            html = (Path(d) / "report.html").read_text()
-            self.assertIn("Surface Comparison", html)
-
-
-# ---------------------------------------------------------------------------
 # TestRunnerEvaluate  (post-fit evaluation path)
 # ---------------------------------------------------------------------------
 
@@ -1087,6 +966,7 @@ class TestNeuralSTPPPreflightCheck(unittest.TestCase):
         """Mock runner whose event_model.capabilities has all three query paths False."""
         from unified_stpp.models.abstractions import EventCapabilities
         from unified_stpp.training.data_module import STPPDataModule
+        from unified_stpp.data import STPPDataset
 
         rng = np.random.default_rng(7)
         def _seq():
@@ -1094,14 +974,21 @@ class TestNeuralSTPPPreflightCheck(unittest.TestCase):
             locs  = rng.uniform(0, 1, (8, 2))
             return {"times": times, "locations": locs}
 
+        train_seqs = [_seq() for _ in range(4)]
+        val_seqs   = [_seq() for _ in range(2)]
+        train_ds = STPPDataset(train_seqs, normalize_time=True, normalize_space=True)
+        val_ds = STPPDataset(val_seqs, normalize_time=True, normalize_space=True)
+        val_ds.time_mean = train_ds.time_mean
+        val_ds.time_std  = train_ds.time_std
+        val_ds.loc_mean  = train_ds.loc_mean
+        val_ds.loc_std   = train_ds.loc_std
+        from unified_stpp.data import collate_fn as _collate
+        from unified_stpp.data.registry import DataBundle
         dm = STPPDataModule(
-            train_seqs=[_seq() for _ in range(4)],
-            val_seqs=[_seq() for _ in range(2)],
-            test_seqs=None,
+            DataBundle(train_dataset=train_ds, val_dataset=val_ds, test_dataset=None,
+                       collate_fn=_collate, train_batch_sampler=None),
             batch_size=4,
-            normalize=True,
         )
-        dm.setup()
 
         caps = EventCapabilities(has_intensity=False, has_density=False, has_native_sampler=False)
 

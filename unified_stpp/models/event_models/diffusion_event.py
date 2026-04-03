@@ -16,6 +16,7 @@ Capabilities
 from __future__ import annotations
 
 import math
+from random import random
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -24,6 +25,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from ..abstractions import EventCapabilities, EventModel, StateContext
+from ..model_registry import register_event
 
 
 # ---------------------------------------------------------------------------
@@ -38,12 +40,58 @@ def unnormalize_to_zero_to_one(x: Tensor) -> Tensor:
     return (x + 1) * 0.5
 
 
+def exists(x) -> bool:
+    return x is not None
+
+
+def default(val, d):
+    if exists(val):
+        return val
+    return d() if callable(d) else d
+
+
+def mean_flat(tensor: Tensor) -> Tensor:
+    return tensor.mean(dim=list(range(1, len(tensor.shape))))
+
+
+def discretized_gaussian_log_likelihood(z: Tensor, mean: Tensor, log_std: Tensor) -> Tensor:
+    c = torch.tensor([math.log(2 * math.pi)], device=z.device, dtype=z.dtype)
+    inv_sigma = torch.exp(-log_std)
+    tmp = (z - mean) * inv_sigma
+    log_probs = -0.5 * (tmp * tmp + 2 * log_std + c)
+    assert log_probs.shape == z.shape
+    return log_probs
+
+
+def normal_kl(mean1, logvar1, mean2, logvar2) -> Tensor:
+    tensor = None
+    for obj in (mean1, logvar1, mean2, logvar2):
+        if isinstance(obj, torch.Tensor):
+            tensor = obj
+            break
+    if tensor is None:
+        raise AssertionError("at least one argument must be a Tensor")
+
+    logvar1, logvar2 = [
+        x if isinstance(x, torch.Tensor) else torch.tensor(x, device=tensor.device, dtype=tensor.dtype)
+        for x in (logvar1, logvar2)
+    ]
+
+    return 0.5 * (
+        -1.0
+        + logvar2
+        - logvar1
+        + torch.exp(logvar1 - logvar2)
+        + ((mean1 - mean2) ** 2) * torch.exp(-logvar2)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Beta schedules
 # ---------------------------------------------------------------------------
 
-def _linear_beta_schedule(timesteps: int) -> Tensor:
-    return torch.linspace(1e-4, 0.02, timesteps)
+def _linear_beta_schedule(timesteps: int, max_beta: float = 0.01) -> Tensor:
+    return torch.linspace(1e-4, max_beta, timesteps)
 
 
 def _cosine_beta_schedule(timesteps: int, s: float = 0.008) -> Tensor:
@@ -78,61 +126,161 @@ class _SinusoidalPosEmb(nn.Module):
 # ---------------------------------------------------------------------------
 
 class STDiffusionNet(nn.Module):
-    """MLP denoising network for ST diffusion.
-
-    Accepts a noisy event token x (B, 1, seq_length), a diffusion step t (B,),
-    and an optional conditioning vector cond (B, 1, cond_dim).  Returns the
-    model prediction (B, 1, seq_length) — either predicted noise or predicted
-    x_0 depending on the parent GaussianDiffusionST's objective.
-    """
+    """Faithful upstream DSTPP denoiser."""
 
     def __init__(
         self,
-        seq_length: int,
-        hidden_units: int = 64,
+        n_steps: int,
+        dim: int,
+        num_units: int = 64,
+        self_condition: bool = False,
         condition: bool = True,
         cond_dim: int = 64,
     ):
+        del n_steps
         super().__init__()
-        self.seq_length = int(seq_length)
-        self.condition = bool(condition)
+        self.channels = 1
+        self.self_condition = self_condition
+        self.condition = condition
+        self.cond_dim = int(cond_dim)
+        self.dim = int(dim)
 
-        time_dim = hidden_units
+        sinu_pos_emb = _SinusoidalPosEmb(num_units)
+        time_dim = num_units
         self.time_mlp = nn.Sequential(
-            _SinusoidalPosEmb(hidden_units),
-            nn.Linear(hidden_units, time_dim),
+            sinu_pos_emb,
+            nn.Linear(num_units, time_dim),
             nn.GELU(),
             nn.Linear(time_dim, time_dim),
         )
 
-        in_dim = seq_length + time_dim + (cond_dim if condition else 0)
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden_units * 2),
-            nn.SiLU(),
-            nn.Linear(hidden_units * 2, hidden_units * 2),
-            nn.SiLU(),
-            nn.Linear(hidden_units * 2, hidden_units),
-            nn.SiLU(),
-            nn.Linear(hidden_units, seq_length),
+        self.linears_spatial = nn.ModuleList(
+            [
+                nn.Linear(dim - 1, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+            ]
         )
+        self.linears_temporal = nn.ModuleList(
+            [
+                nn.Linear(1, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+                nn.ReLU(),
+                nn.Linear(num_units, num_units),
+            ]
+        )
+
+        self.output_spatial = nn.Sequential(
+            nn.Linear(num_units, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, dim - 1),
+        )
+        self.output_temporal = nn.Sequential(
+            nn.Linear(num_units, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, 1),
+        )
+
+        self.linear_t = nn.Sequential(
+            nn.Linear(num_units * 2, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, 2),
+        )
+        self.linear_s = nn.Sequential(
+            nn.Linear(num_units * 2, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, 2),
+        )
+
+        self.cond_all = nn.Sequential(
+            nn.Linear(cond_dim * 3, num_units),
+            nn.ReLU(),
+            nn.Linear(num_units, num_units),
+        )
+        self.cond_temporal = nn.ModuleList([nn.Linear(cond_dim, num_units) for _ in range(3)])
+        self.cond_spatial = nn.ModuleList([nn.Linear(cond_dim, num_units) for _ in range(3)])
+        self.cond_joint = nn.ModuleList([nn.Linear(cond_dim, num_units) for _ in range(3)])
+
+    def get_attn(
+        self,
+        x: Tensor,
+        t: Tensor,
+        x_self_cond: Optional[Tensor] = None,
+        cond: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor]:
+        del x, x_self_cond
+        if cond is None:
+            raise ValueError("STDiffusionNet requires cond for faithful DSTPP attention weights.")
+        cond_all = self.cond_all(cond)
+        t_embedding = self.time_mlp(t).unsqueeze(dim=1)
+        cond_all = torch.cat((cond_all, t_embedding), dim=-1)
+        alpha_s = F.softmax(self.linear_s(cond_all), dim=-1).squeeze(dim=1)
+        alpha_t = F.softmax(self.linear_t(cond_all), dim=-1).squeeze(dim=1)
+        return alpha_s, alpha_t
 
     def forward(
         self,
         x: Tensor,
         t: Tensor,
+        x_self_cond: Optional[Tensor] = None,
         cond: Optional[Tensor] = None,
     ) -> Tensor:
-        B = x.shape[0]
-        x_flat = x.reshape(B, self.seq_length)
-        t_emb = self.time_mlp(t.float())  # (B, time_dim)
+        del x_self_cond
+        if cond is None:
+            raise ValueError("STDiffusionNet requires cond for faithful DSTPP conditioning.")
 
-        if self.condition and cond is not None:
-            cond_flat = cond.reshape(B, -1)
-            h = torch.cat([x_flat, t_emb, cond_flat], dim=-1)
-        else:
-            h = torch.cat([x_flat, t_emb], dim=-1)
+        x_spatial = x[:, :, 1:].clone()
+        x_temporal = x[:, :, :1].clone()
 
-        return self.net(h).unsqueeze(1)  # (B, 1, seq_length)
+        hidden_dim = self.cond_dim
+        cond_temporal = cond[:, :, :hidden_dim]
+        cond_spatial = cond[:, :, hidden_dim : 2 * hidden_dim]
+        cond_joint = cond[:, :, 2 * hidden_dim :]
+
+        cond_all = self.cond_all(cond)
+        t_embedding = self.time_mlp(t).unsqueeze(dim=1)
+        cond_all = torch.cat((cond_all, t_embedding), dim=-1)
+
+        alpha_s = F.softmax(self.linear_s(cond_all), dim=-1).squeeze(dim=1).unsqueeze(dim=2)
+        alpha_t = F.softmax(self.linear_t(cond_all), dim=-1).squeeze(dim=1).unsqueeze(dim=2)
+
+        for idx in range(3):
+            x_spatial = self.linears_spatial[2 * idx](x_spatial)
+            x_temporal = self.linears_temporal[2 * idx](x_temporal)
+            x_spatial = x_spatial + t_embedding
+            x_temporal = x_temporal + t_embedding
+
+            cond_joint_emb = self.cond_joint[idx](cond_joint)
+            cond_temporal_emb = self.cond_temporal[idx](cond_temporal)
+            cond_spatial_emb = self.cond_spatial[idx](cond_spatial)
+
+            x_spatial = x_spatial + cond_joint_emb + cond_spatial_emb
+            x_temporal = x_temporal + cond_joint_emb + cond_temporal_emb
+
+            x_spatial = self.linears_spatial[2 * idx + 1](x_spatial)
+            x_temporal = self.linears_temporal[2 * idx + 1](x_temporal)
+
+        x_spatial = self.linears_spatial[-1](x_spatial)
+        x_temporal = self.linears_temporal[-1](x_temporal)
+
+        x_output = torch.cat((x_temporal, x_spatial), dim=1)
+        x_output_t = (x_output * alpha_t).sum(dim=1, keepdim=True)
+        x_output_s = (x_output * alpha_s).sum(dim=1, keepdim=True)
+        return torch.cat(
+            (self.output_temporal(x_output_t), self.output_spatial(x_output_s)),
+            dim=-1,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -140,16 +288,16 @@ class STDiffusionNet(nn.Module):
 # ---------------------------------------------------------------------------
 
 class GaussianDiffusionST(nn.Module):
-    """DDPM / DDIM wrapper for spatiotemporal event tokens.
+    """Faithful upstream DSTPP Gaussian diffusion wrapper.
 
-    Faithfully re-implements the GaussianDiffusion_ST machinery from the
-    Diffusion STPP paper.  Event tokens have shape (B, 1, seq_length) where
-    seq_length = 1 + spatial_dim (inter-event time + location coordinates).
-
-    NLL_cal() computes the approximate variational bound in bits-per-dim.  It
-    loops over all *timesteps* timesteps and is intentionally expensive —
-    consistent with the original paper evaluation protocol.  Use
-    sampling_timesteps for fast DDIM sampling instead.
+    Notes on units
+    --------------
+    The upstream implementation labels its variational-bound terms as
+    "bits-per-dim", but numerically divides by ``log(e)=1``. The internal
+    tensors returned by :meth:`NLL_cal` therefore follow the upstream numeric
+    convention: effectively nats per token dimension. DiffusionEventModel then
+    converts those into the benchmark-facing ``test_nll`` in nats per event
+    token and preserves the upstream-style per-dim values in ``extra_metrics``.
     """
 
     def __init__(
@@ -157,24 +305,28 @@ class GaussianDiffusionST(nn.Module):
         model: STDiffusionNet,
         *,
         seq_length: int,
-        timesteps: int = 1000,
-        sampling_timesteps: int = 50,
-        objective: str = "pred_x0",
+        timesteps: int = 100,
+        sampling_timesteps: int = 100,
+        objective: str = "pred_noise",
         beta_schedule: str = "cosine",
         loss_type: str = "l2",
+        p2_loss_weight_gamma: float = 0.0,
+        p2_loss_weight_k: float = 1.0,
+        ddim_sampling_eta: float = 1.0,
     ):
         super().__init__()
-        assert objective in ("pred_x0", "pred_noise"), f"Unknown objective: {objective!r}"
-        assert loss_type in ("l1", "l2"), f"Unknown loss_type: {loss_type!r}"
+        assert objective in {"pred_noise", "pred_x0", "pred_v"}, (
+            "objective must be 'pred_noise', 'pred_x0', or 'pred_v'"
+        )
+        assert loss_type in {"l1", "l2", "Euclid"}, f"Unknown loss_type: {loss_type!r}"
 
         self.model = model
         self.seq_length = int(seq_length)
-        self.num_timesteps = int(timesteps)
-        self.sampling_timesteps = int(sampling_timesteps)
+        self.channels = self.model.channels
+        self.self_condition = getattr(self.model, "self_condition", False)
         self.objective = objective
         self.loss_type = loss_type
-        self.is_ddim_sampling = sampling_timesteps < timesteps
-        self.channels = 1
+        self.ddim_sampling_eta = float(ddim_sampling_eta)
 
         if beta_schedule == "linear":
             betas = _linear_beta_schedule(timesteps)
@@ -187,31 +339,38 @@ class GaussianDiffusionST(nn.Module):
         alphas_cumprod = torch.cumprod(alphas, dim=0)
         alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
 
-        self.register_buffer("betas", betas)
-        self.register_buffer("alphas_cumprod", alphas_cumprod)
-        self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
+        timesteps, = betas.shape
+        self.num_timesteps = int(timesteps)
+        self.sampling_timesteps = int(sampling_timesteps)
+        self.is_ddim_sampling = self.sampling_timesteps < self.num_timesteps
 
-        # Forward process q(x_t | x_0)
-        self.register_buffer("sqrt_alphas_cumprod", alphas_cumprod.sqrt())
-        self.register_buffer("sqrt_one_minus_alphas_cumprod", (1.0 - alphas_cumprod).sqrt())
-        self.register_buffer("log_one_minus_alphas_cumprod", (1.0 - alphas_cumprod).log())
-        self.register_buffer("sqrt_recip_alphas_cumprod", (1.0 / alphas_cumprod).sqrt())
-        self.register_buffer("sqrt_recipm1_alphas_cumprod", (1.0 / alphas_cumprod - 1).sqrt())
+        register_buffer = lambda name, val: self.register_buffer(name, val.to(torch.float32))
+        register_buffer("betas", betas)
+        register_buffer("alphas_cumprod", alphas_cumprod)
+        register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
+        register_buffer("sqrt_alphas_cumprod", torch.sqrt(alphas_cumprod))
+        register_buffer("sqrt_one_minus_alphas_cumprod", torch.sqrt(1.0 - alphas_cumprod))
+        register_buffer("log_one_minus_alphas_cumprod", torch.log(1.0 - alphas_cumprod))
+        register_buffer("sqrt_recip_alphas_cumprod", torch.sqrt(1.0 / alphas_cumprod))
+        register_buffer("sqrt_recipm1_alphas_cumprod", torch.sqrt(1.0 / alphas_cumprod - 1))
 
-        # Posterior q(x_{t-1} | x_t, x_0)
         posterior_variance = betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
-        self.register_buffer("posterior_variance", posterior_variance)
-        self.register_buffer(
+        register_buffer("posterior_variance", posterior_variance)
+        register_buffer(
             "posterior_log_variance_clipped",
-            posterior_variance.clamp(min=1e-20).log(),
+            torch.log(posterior_variance.clamp(min=posterior_variance[1])),
         )
-        self.register_buffer(
+        register_buffer(
             "posterior_mean_coef1",
-            betas * alphas_cumprod_prev.sqrt() / (1.0 - alphas_cumprod),
+            betas * torch.sqrt(alphas_cumprod_prev) / (1.0 - alphas_cumprod),
         )
-        self.register_buffer(
+        register_buffer(
             "posterior_mean_coef2",
-            (1.0 - alphas_cumprod_prev) * alphas.sqrt() / (1.0 - alphas_cumprod),
+            (1.0 - alphas_cumprod_prev) * torch.sqrt(alphas) / (1.0 - alphas_cumprod),
+        )
+        register_buffer(
+            "p2_loss_weight",
+            (p2_loss_weight_k + alphas_cumprod / (1 - alphas_cumprod)) ** -p2_loss_weight_gamma,
         )
 
     # ------------------------------------------------------------------
@@ -224,12 +383,11 @@ class GaussianDiffusionST(nn.Module):
         return out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
 
     def q_sample(self, x_start: Tensor, t: Tensor, noise: Optional[Tensor] = None) -> Tensor:
-        """Sample x_t ~ q(x_t | x_0) (forward diffusion)."""
-        if noise is None:
-            noise = torch.randn_like(x_start)
-        sqrt_alpha_bar = self._extract(self.sqrt_alphas_cumprod, t, x_start.shape)
-        sqrt_one_minus = self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape)
-        return sqrt_alpha_bar * x_start + sqrt_one_minus * noise
+        noise = default(noise, lambda: torch.randn_like(x_start))
+        return (
+            self._extract(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start
+            + self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise
+        )
 
     def _predict_start_from_noise(self, x_t: Tensor, t: Tensor, noise: Tensor) -> Tensor:
         sqrt_recip = self._extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape)
@@ -239,39 +397,84 @@ class GaussianDiffusionST(nn.Module):
     def _predict_noise_from_start(self, x_t: Tensor, t: Tensor, x_0: Tensor) -> Tensor:
         sqrt_recip = self._extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape)
         sqrt_recipm1 = self._extract(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
-        return (sqrt_recip * x_t - x_0) / sqrt_recipm1.clamp(min=1e-8)
+        return (sqrt_recip * x_t - x_0) / sqrt_recipm1
+
+    def _predict_v(self, x_start: Tensor, t: Tensor, noise: Tensor) -> Tensor:
+        return (
+            self._extract(self.sqrt_alphas_cumprod, t, x_start.shape) * noise
+            - self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * x_start
+        )
+
+    def _predict_start_from_v(self, x_t: Tensor, t: Tensor, v: Tensor) -> Tensor:
+        return (
+            self._extract(self.sqrt_alphas_cumprod, t, x_t.shape) * x_t
+            - self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape) * v
+        )
+
+    def q_mean_variance(self, x_start: Tensor, t: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        mean = self._extract(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start
+        variance = self._extract(1.0 - self.alphas_cumprod, t, x_start.shape)
+        log_variance = self._extract(self.log_one_minus_alphas_cumprod, t, x_start.shape)
+        return mean, variance, log_variance
 
     def model_predictions(
-        self, x: Tensor, t: Tensor, cond: Optional[Tensor]
+        self,
+        x: Tensor,
+        t: Tensor,
+        x_self_cond: Optional[Tensor] = None,
+        clip_x_start: bool = False,
+        cond: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
-        """Run denoising model; return (pred_noise, pred_x_start)."""
-        model_out = self.model(x, t, cond)
+        model_out = self.model(x, t, x_self_cond, cond=cond)
+        maybe_clip = (lambda z: z.clamp(-1.0, 1.0)) if clip_x_start else (lambda z: z)
         if self.objective == "pred_noise":
             pred_noise = model_out
             x_start = self._predict_start_from_noise(x, t, pred_noise)
-        else:  # pred_x0
-            x_start = model_out.clamp(-1.0, 1.0)
+            x_start = maybe_clip(x_start)
+        elif self.objective == "pred_x0":
+            x_start = maybe_clip(model_out)
+            pred_noise = self._predict_noise_from_start(x, t, x_start)
+        else:
+            v = model_out
+            x_start = self._predict_start_from_v(x, t, v)
+            x_start = maybe_clip(x_start)
             pred_noise = self._predict_noise_from_start(x, t, x_start)
         return pred_noise, x_start
 
     def q_posterior(
         self, x_start: Tensor, x_t: Tensor, t: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        """Posterior q(x_{t-1} | x_t, x_0): mean and log-variance."""
-        mean = (
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        posterior_mean = (
             self._extract(self.posterior_mean_coef1, t, x_t.shape) * x_start
             + self._extract(self.posterior_mean_coef2, t, x_t.shape) * x_t
         )
-        log_var = self._extract(self.posterior_log_variance_clipped, t, x_t.shape)
-        return mean, log_var
+        posterior_variance = self._extract(self.posterior_variance, t, x_t.shape)
+        posterior_log_variance_clipped = self._extract(self.posterior_log_variance_clipped, t, x_t.shape)
+        return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(
-        self, x: Tensor, t: Tensor, cond: Optional[Tensor]
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Model posterior: (model_mean, log_var, x_start)."""
-        _, x_start = self.model_predictions(x, t, cond)
-        model_mean, log_var = self.q_posterior(x_start, x, t)
-        return model_mean, log_var, x_start
+        self,
+        x: Tensor,
+        t: Tensor,
+        x_self_cond: Optional[Tensor] = None,
+        clip_denoised: bool = True,
+        cond: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        _, x_start = self.model_predictions(
+            x,
+            t,
+            x_self_cond,
+            clip_x_start=clip_denoised,
+            cond=cond,
+        )
+        if clip_denoised:
+            x_start.clamp_(-1.0, 1.0)
+        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(
+            x_start=x_start,
+            x_t=x,
+            t=t,
+        )
+        return model_mean, posterior_variance, posterior_log_variance, x_start
 
     # ------------------------------------------------------------------
     # Training loss
@@ -280,27 +483,44 @@ class GaussianDiffusionST(nn.Module):
     def p_losses(
         self,
         x_start: Tensor,
-        cond: Optional[Tensor],
-        t: Optional[Tensor] = None,
+        t: Tensor,
+        noise: Optional[Tensor] = None,
+        cond: Optional[Tensor] = None,
     ) -> Tensor:
-        """Denoising loss (ELBO Monte Carlo estimate for a single random t)."""
-        b = x_start.shape[0]
-        if t is None:
-            t = torch.randint(0, self.num_timesteps, (b,), device=x_start.device).long()
-        noise = torch.randn_like(x_start)
-        x_t = self.q_sample(x_start, t, noise)
-        model_out = self.model(x_t, t, cond)
-        target = noise if self.objective == "pred_noise" else x_start
-        if self.loss_type == "l1":
-            return F.l1_loss(model_out, target)
-        return F.mse_loss(model_out, target)
+        b, _c, _n = x_start.shape
+        noise = default(noise, lambda: torch.randn_like(x_start))
+        x = self.q_sample(x_start=x_start, t=t, noise=noise)
+
+        x_self_cond = None
+        if self.self_condition and random() < 0.5:
+            with torch.no_grad():
+                _pred_noise, x_self_cond = self.model_predictions(x, t)
+                x_self_cond.detach_()
+
+        model_out = self.model(x, t, x_self_cond, cond)
+
+        if self.objective == "pred_noise":
+            target = noise
+        elif self.objective == "pred_x0":
+            target = x_start
+        else:
+            target = self._predict_v(x_start, t, noise)
+
+        if self.loss_type in {"l1", "l2"}:
+            loss = F.l1_loss(model_out, target, reduction="none") if self.loss_type == "l1" else F.mse_loss(model_out, target, reduction="none")
+        else:
+            loss = F.pairwise_distance(model_out, target)
+
+        if self.loss_type in {"l1", "l2"}:
+            loss = loss.view(b, -1).mean(dim=1)
+        loss = loss * self._extract(self.p2_loss_weight, t, loss.shape)
+        return loss.mean()
 
     def forward(self, img: Tensor, cond: Optional[Tensor]) -> Tensor:
-        """Training entry point: normalize, sample t, compute denoising loss."""
         b = img.shape[0]
         img = normalize_to_neg_one_to_one(img)
         t = torch.randint(0, self.num_timesteps, (b,), device=img.device).long()
-        return self.p_losses(img, cond, t)
+        return self.p_losses(img, t, cond=cond)
 
     # ------------------------------------------------------------------
     # VB / NLL approximation
@@ -314,80 +534,51 @@ class GaussianDiffusionST(nn.Module):
         cond: Optional[Tensor],
         clip_denoised: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        """Per-batch variational bound terms in bits-per-dim.
-
-        Returns (vb, vb_temporal, vb_spatial, model_mean).
-        """
-        # True posterior
-        true_mean, true_log_var = self.q_posterior(x_start, x_t, t)
-        # Model posterior
-        model_mean, log_var, _ = self.p_mean_variance(x_t, t, cond)
-
-        # Expand scalar log-variances (B, 1, 1) → (B, 1, seq_len) for per-dim decomposition
-        log_var = log_var.expand_as(x_t)
-        true_log_var = true_log_var.expand_as(x_t)
-
-        def _kl(mu1, lv1, mu2, lv2):
-            return 0.5 * (-1.0 + lv2 - lv1 + (lv1.exp() + (mu1 - mu2) ** 2) / lv2.exp())
-
-        dims = list(range(1, x_start.ndim))
-        kl = _kl(true_mean, true_log_var, model_mean, log_var)
-        kl_bpd = kl.mean(dim=dims) / math.log(2.0)
-
-        # Decoder NLL at t=0 (Gaussian log-likelihood)
-        dec_nll = 0.5 * (
-            (x_start - model_mean) ** 2 / (log_var.exp() + 1e-8)
-            + log_var + math.log(2.0 * math.pi)
+        true_mean, _true_variance, true_log_variance_clipped = self.q_posterior(
+            x_start=x_start,
+            x_t=x_t,
+            t=t,
         )
-        dec_nll_bpd = dec_nll.mean(dim=dims) / math.log(2.0)
+        model_mean, _model_variance, model_log_variance, pred_xstart = self.p_mean_variance(
+            x=x_t,
+            t=t,
+            clip_denoised=clip_denoised,
+            cond=cond,
+        )
+        kl = normal_kl(true_mean, true_log_variance_clipped, model_mean, model_log_variance)
+        kl_all = mean_flat(kl)
+        decoder_nll = -discretized_gaussian_log_likelihood(
+            x_start,
+            model_mean,
+            0.5 * model_log_variance,
+        )
+        decoder_nll_all = mean_flat(decoder_nll)
 
-        # Temporal / spatial decomposition (first dim = time, rest = space)
-        if x_start.shape[-1] > 1:
-            kl_t = _kl(
-                true_mean[..., :1], true_log_var[..., :1],
-                model_mean[..., :1], log_var[..., :1],
-            )
-            kl_s = _kl(
-                true_mean[..., 1:], true_log_var[..., 1:],
-                model_mean[..., 1:], log_var[..., 1:],
-            )
-            kl_t_bpd = kl_t.mean(dim=dims) / math.log(2.0)
-            kl_s_bpd = kl_s.mean(dim=dims) / math.log(2.0)
-        else:
-            kl_t_bpd = kl_bpd
-            kl_s_bpd = torch.zeros_like(kl_bpd)
+        kl_temporal = mean_flat(kl[:, :, :1])
+        kl_spatial = mean_flat(kl[:, :, -(self.seq_length - 1) :])
+        decoder_nll_temporal = mean_flat(decoder_nll[:, :, :1])
+        decoder_nll_spatial = mean_flat(decoder_nll[:, :, -(self.seq_length - 1) :])
 
-        # t=0 → use decoder NLL; t>0 → use KL
-        output = torch.where(t == 0, dec_nll_bpd, kl_bpd)
-        output_t = torch.where(t == 0, dec_nll_bpd, kl_t_bpd)
-        output_s = torch.where(t == 0, torch.zeros_like(kl_s_bpd), kl_s_bpd)
-
-        return output, output_t, output_s, model_mean
+        output = torch.where(t == 0, decoder_nll_all, kl_all)
+        output_temporal = torch.where(t == 0, decoder_nll_temporal, kl_temporal)
+        output_spatial = torch.where(t == 0, decoder_nll_spatial, kl_spatial)
+        return output, output_temporal, output_spatial, pred_xstart
 
     def _prior_bpd(self, x_start: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        """KL(q(x_T | x_0) || N(0,I)) in bits-per-dim — prior term."""
         b = x_start.shape[0]
         t = torch.full((b,), self.num_timesteps - 1, device=x_start.device, dtype=torch.long)
-        mean = self._extract(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start
-        log_var = self._extract(self.log_one_minus_alphas_cumprod, t, x_start.shape)
-
-        # Expand to full token shape for per-dim decomposition
-        mean = mean.expand_as(x_start)
-        log_var = log_var.expand_as(x_start)
-
-        dims = list(range(1, x_start.ndim))
-        kl = 0.5 * (-1.0 - log_var + mean ** 2 + log_var.exp())
-        kl_bpd = kl.mean(dim=dims) / math.log(2.0)
-
-        if x_start.shape[-1] > 1:
-            kl_t = 0.5 * (-1.0 - log_var[..., :1] + mean[..., :1] ** 2 + log_var[..., :1].exp())
-            kl_s = 0.5 * (-1.0 - log_var[..., 1:] + mean[..., 1:] ** 2 + log_var[..., 1:].exp())
-            kl_t_bpd = kl_t.mean(dim=dims) / math.log(2.0)
-            kl_s_bpd = kl_s.mean(dim=dims) / math.log(2.0)
-        else:
-            kl_t_bpd, kl_s_bpd = kl_bpd, torch.zeros_like(kl_bpd)
-
-        return kl_bpd, kl_t_bpd, kl_s_bpd
+        qt_mean, _qt_variance, qt_log_variance = self.q_mean_variance(x_start, t)
+        kl_prior = normal_kl(
+            mean1=qt_mean,
+            logvar1=qt_log_variance,
+            mean2=0.0,
+            logvar2=0.0,
+        )
+        return (
+            mean_flat(kl_prior),
+            mean_flat(kl_prior[:, :, :1]),
+            mean_flat(kl_prior[:, :, -(self.seq_length - 1) :]),
+        )
 
     @torch.no_grad()
     def NLL_cal(
@@ -395,18 +586,9 @@ class GaussianDiffusionST(nn.Module):
         x_start: Tensor,
         cond: Optional[Tensor],
         clip_denoised: bool = True,
+        noise: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Approximate NLL via variational bound (faithful to the original paper).
-
-        Loops over ALL num_timesteps timesteps — intentionally expensive.
-        Returns (total_bpd, temporal_bpd, spatial_bpd) as (B,) tensors
-        where B = batch size (number of event tokens = total_events).
-
-        Notes
-        -----
-        x_start must already be in [0, 1] (pre-minmax-normalized).
-        Internally normalised to [-1, 1] as per the DDPM convention.
-        """
+        """Return upstream-style per-dim VB terms for total/temporal/spatial NLL."""
         x_start = normalize_to_neg_one_to_one(x_start)
         device = x_start.device
         batch_size = x_start.shape[0]
@@ -417,7 +599,7 @@ class GaussianDiffusionST(nn.Module):
 
         for t in reversed(range(self.num_timesteps)):
             t_batch = torch.full((batch_size,), t, device=device, dtype=torch.long)
-            x_t = self.q_sample(x_start=x_start, t=t_batch)
+            x_t = self.q_sample(x_start=x_start, t=t_batch, noise=noise)
             vb, vb_t, vb_s, _ = self._vb_terms_bpd(
                 x_start=x_start,
                 x_t=x_t,
@@ -434,7 +616,6 @@ class GaussianDiffusionST(nn.Module):
         vb_s_sum = torch.cat(vb_s_all, dim=1).sum(dim=1)
 
         prior, prior_t, prior_s = self._prior_bpd(x_start)
-
         return vb_sum + prior, vb_t_sum + prior_t, vb_s_sum + prior_s
 
     # ------------------------------------------------------------------
@@ -442,43 +623,71 @@ class GaussianDiffusionST(nn.Module):
     # ------------------------------------------------------------------
 
     @torch.no_grad()
-    def _p_sample(self, x: Tensor, t: int, cond: Optional[Tensor]) -> Tensor:
+    def _p_sample(
+        self,
+        x: Tensor,
+        t: int,
+        cond: Optional[Tensor],
+        x_self_cond: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor]:
         b = x.shape[0]
         batched_t = torch.full((b,), t, device=x.device, dtype=torch.long)
-        model_mean, log_var, _ = self.p_mean_variance(x, batched_t, cond)
-        noise = torch.randn_like(x) if t > 0 else torch.zeros_like(x)
-        return model_mean + (0.5 * log_var).exp() * noise
+        model_mean, _variance, model_log_variance, x_start = self.p_mean_variance(
+            x=x,
+            t=batched_t,
+            x_self_cond=x_self_cond,
+            clip_denoised=True,
+            cond=cond,
+        )
+        noise = torch.randn_like(x) if t > 0 else 0.0
+        pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
+        return pred_img, x_start
 
     @torch.no_grad()
     def _p_sample_loop(self, shape: Tuple, cond: Optional[Tensor]) -> Tensor:
         device = self.betas.device
         x = torch.randn(shape, device=device)
+        x_start = None
         for t in reversed(range(self.num_timesteps)):
-            x = self._p_sample(x, t, cond)
+            self_cond = x_start if self.self_condition else None
+            x, x_start = self._p_sample(x, t, cond, x_self_cond=self_cond)
         return unnormalize_to_zero_to_one(x)
 
     @torch.no_grad()
     def _ddim_sample(self, shape: Tuple, cond: Optional[Tensor]) -> Tensor:
+        batch = shape[0]
         device = self.betas.device
-        # times goes from T-1 down to -1; t_now is always ≥ 0, t_next may be -1 (sentinel)
-        times = torch.linspace(self.num_timesteps - 1, -1, self.sampling_timesteps + 1)
-        time_pairs = list(zip(times[:-1].int().tolist(), times[1:].int().tolist()))
+        total_timesteps = self.num_timesteps
+        sampling_timesteps = self.sampling_timesteps
+        eta = self.ddim_sampling_eta
+
+        times = torch.linspace(-1, total_timesteps - 1, steps=sampling_timesteps + 1)
+        times = list(reversed(times.int().tolist()))
+        time_pairs = list(zip(times[:-1], times[1:]))
 
         x = torch.randn(shape, device=device)
-        for t_now, t_next in time_pairs:
-            t_batch = torch.full((shape[0],), t_now, device=device, dtype=torch.long)
-            pred_noise, x_start = self.model_predictions(x, t_batch, cond)
-            x_start.clamp_(-1.0, 1.0)
+        x_start = None
+        for time, time_next in time_pairs:
+            time_cond = torch.full((batch,), time, device=device, dtype=torch.long)
+            self_cond = x_start if self.self_condition else None
+            pred_noise, x_start = self.model_predictions(
+                x,
+                time_cond,
+                self_cond,
+                clip_x_start=True,
+                cond=cond,
+            )
 
-            if t_next < 0:
+            if time_next < 0:
                 x = x_start
                 continue
 
-            alpha_bar = self.alphas_cumprod[t_now]
-            alpha_bar_next = self.alphas_cumprod[t_next]
-            c = (1.0 - alpha_bar_next).sqrt()
-            x = x_start * alpha_bar_next.sqrt() + c * pred_noise
-
+            alpha = self.alphas_cumprod[time]
+            alpha_next = self.alphas_cumprod[time_next]
+            sigma = eta * ((1 - alpha / alpha_next) * (1 - alpha_next) / (1 - alpha)).sqrt()
+            c = (1 - alpha_next - sigma ** 2).sqrt()
+            noise = torch.randn_like(x)
+            x = x_start * alpha_next.sqrt() + c * pred_noise + sigma * noise
         return unnormalize_to_zero_to_one(x)
 
     @torch.no_grad()
@@ -494,6 +703,7 @@ class GaussianDiffusionST(nn.Module):
 # EventModel adapter
 # ---------------------------------------------------------------------------
 
+@register_event("diffusion_stpp")
 class DiffusionEventModel(EventModel):
     """Coarse EventModel wrapper for Diffusion STPP.
 
@@ -540,13 +750,16 @@ class DiffusionEventModel(EventModel):
     @property
     def capabilities(self) -> EventCapabilities:
         return EventCapabilities(
-            training_objective="approx_nll",
-            has_eval_nll=True,
-            has_intensity=False,
-            has_density=False,
-            has_score=False,
+            training_objective="elbo",
+            metric_key="elbo",
+            objective_description="variational ELBO (1-step)",
+            nll_kind="approx",
+            nll_description=(
+                "full DSTPP variational bound; benchmark-facing test_nll is approximate "
+                "nats/event-token, with upstream per-dim diagnostics saved in extra_metrics"
+            ),
+            nll_footnote="‡ approx NLL (full VB)",
             has_native_sampler=True,
-            exposes_eventwise_terms=False,
         )
 
     @staticmethod
@@ -630,21 +843,33 @@ class DiffusionEventModel(EventModel):
             zero = torch.tensor(0.0, device=device)
             return {"nll": zero, "total_events": zero}
 
-        # NLL_cal expects x_start in [0, 1] (it normalises to [-1,1] internally).
-        total_bpd, temporal_bpd, spatial_bpd = self.diffusion.NLL_cal(img, cond)
+        total_per_dim, temporal_per_dim, spatial_per_dim = self.diffusion.NLL_cal(img, cond)
+        token_dim = self.diffusion.seq_length
+        spatial_dim = token_dim - 1
 
-        # Convert bits-per-dim (per-event) → nats per event.
-        # total_bpd is (N_flat,); mean over events then convert.
-        nll_nats = total_bpd.mean() * self.diffusion.seq_length * math.log(2.0)
+        # Upstream numerics are effectively in nats per token dimension.
+        total_upstream_per_dim = total_per_dim.mean()
+        temporal_upstream_per_dim = temporal_per_dim.mean()
+        spatial_upstream_per_dim = spatial_per_dim.mean()
+
+        # Benchmark-facing metric: approximate nats per event token.
+        nll_nats = total_upstream_per_dim * token_dim
+        temporal_nll = temporal_upstream_per_dim
+        spatial_nll = spatial_upstream_per_dim * spatial_dim
 
         if not isinstance(total_events, Tensor):
             total_events = torch.as_tensor(total_events, device=nll_nats.device, dtype=nll_nats.dtype)
 
         return {
             "nll": nll_nats.to(device=device),
-            "nll_temporal_bpd": temporal_bpd.mean(),
-            "nll_spatial_bpd": spatial_bpd.mean(),
+            "temporal_nll": temporal_nll.to(device=device),
+            "spatial_nll": spatial_nll.to(device=device),
             "total_events": total_events,
+            "extra_metrics": {
+                "test_nll_upstream_per_dim": total_upstream_per_dim.to(device=device),
+                "temporal_nll_upstream_per_dim": temporal_upstream_per_dim.to(device=device),
+                "spatial_nll_upstream_per_dim": spatial_upstream_per_dim.to(device=device),
+            },
         }
 
     def sample_native(

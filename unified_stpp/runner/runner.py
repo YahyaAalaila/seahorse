@@ -11,18 +11,31 @@ import warnings
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
 
 from unified_stpp.config import STPPConfig
 from unified_stpp.models.configs import ConfigRegistry
-from unified_stpp.utils import deep_update
 from unified_stpp.training.lightning_module import STPPLightningModule
 from unified_stpp.training.data_module import STPPDataModule
-from unified_stpp.models.sampling import IntensityEvaluator
-from .artifacts import make_run_id, update_latest_symlink, save_run_artifacts, _extend_viz_manifest
+from unified_stpp.utils import deep_update
+from .artifacts import (
+    make_run_id, update_latest_symlink, save_run_artifacts, _extend_viz_manifest,
+    checkpoint_file, load_state_dict, load_norm_stats,
+)
 from .results import RunResult
+
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+def _require(value, msg: str):
+    """Return *value* unchanged, or raise ``ValueError(msg)`` if it is ``None``."""
+    if value is None:
+        raise ValueError(msg)
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +89,7 @@ class STPPRunner:
     -------
     >>> runner = STPPRunner.from_preset("auto_stpp")
     >>> result = runner.fit(train_seqs, val_seqs, test_seqs)
-    >>> print(result.val_nll)
+    >>> print(result.val_objective)
     >>> runner.save("/tmp/my_run/")
     """
 
@@ -101,6 +114,29 @@ class STPPRunner:
         """Build a runner from a custom YAML config file."""
         return cls(STPPConfig.from_yaml(path))
 
+    @classmethod
+    def from_config_source(
+        cls,
+        preset: "str | None",
+        config: "str | None",
+        *,
+        cli_values: Optional[dict] = None,
+        override_list: Optional[list[str]] = None,
+    ) -> "STPPRunner":
+        """Build a runner from a preset/YAML source plus CLI-layer overrides.
+
+        ``config`` takes precedence when both parameters are provided.
+        Programmatic callers must supply at least one source.
+        """
+        return cls(
+            STPPConfig.from_source(
+                preset=preset,
+                config=config,
+                cli_values=cli_values,
+                override_list=override_list,
+            )
+        )
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
@@ -111,6 +147,14 @@ class STPPRunner:
         if self._lightning_module is None:
             raise RuntimeError("Model not built yet — call fit() first.")
         return self._lightning_module.model
+
+    @property
+    def norm_stats(self) -> dict:
+        """Normalization statistics from training (raises if not fitted)."""
+        return _require(
+            self._norm_stats,
+            "norm_stats not available — call fit() or load() before accessing norm_stats.",
+        )
 
     @property
     def data_module(self) -> STPPDataModule:
@@ -130,7 +174,6 @@ class STPPRunner:
         test_seqs: Optional[list[dict]] = None,
         data_module: Optional[STPPDataModule] = None,
         dataset_id: str = "unknown",
-        surface_viz=None,
     ) -> RunResult:
         """Train the model and return a ``RunResult``.
 
@@ -141,8 +184,6 @@ class STPPRunner:
         test_seqs:    Optional test sequences; ``result.test_nll`` is ``nan`` if omitted.
         data_module:  Override the auto-built data module (researcher escape hatch).
         dataset_id:   Human-readable name stored in the returned ``RunResult``.
-        surface_viz:  Optional ``SurfaceVizConfig``; if ``enabled=True``, runs the
-                      surface visualization workflow after training and saves artifacts.
         """
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
         run_dir = self._prepare_run_dir(self.config.model.preset)
@@ -156,7 +197,7 @@ class STPPRunner:
         t0 = time.perf_counter()
         with _quiet_lightning():
             trainer.fit(lm, datamodule=dm)
-        return self._finalize_fit(trainer, lm, dm, dataset_id, t0, run_dir, surface_viz)
+        return self._finalize_fit(trainer, lm, dm, dataset_id, t0, run_dir)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -169,13 +210,16 @@ class STPPRunner:
         test_seqs: Optional[list[dict]],
         data_module: Optional[STPPDataModule],
     ) -> STPPDataModule:
-        """Build (or accept) and set up the data module."""
-        dm = data_module or STPPDataModule.from_splits(
-            self.config.data, train_seqs, val_seqs, test_seqs,
-            model_preset=self.config.model.preset,
+        """Build (or accept) the data module."""
+        if data_module is not None:
+            return data_module
+        bundle = self.config.build_data_bundle(train_seqs, val_seqs, test_seqs)
+        return STPPDataModule(
+            bundle,
+            batch_size=self.config.data.batch_size,
+            num_workers=self.config.data.num_workers,
+            seed=self.config.data.seed,
         )
-        dm.setup()
-        return dm
 
     def _prepare_run_dir(self, preset_name: str) -> Path:
         """Create a unique run directory and save the original config (crash-safe)."""
@@ -196,7 +240,9 @@ class STPPRunner:
             self.config.model.preset, self.config.training.device
         )
         loggers = self.config.logging.build_loggers(run_dir)
-        trainer = self.config.training.build_trainer(run_dir, accelerator, loggers)
+        trainer = self.config.training.build_trainer(
+            run_dir, accelerator, loggers, monitor_key=lm.val_monitor_key
+        )
         return model, lm, trainer
 
     def _finalize_fit(
@@ -207,7 +253,6 @@ class STPPRunner:
         dataset_id: str,
         start_time: float,
         run_dir: Path,
-        surface_viz=None,
     ) -> RunResult:
         """Stash trained state, collect result, update symlink."""
         self._lightning_module = lm
@@ -216,31 +261,85 @@ class STPPRunner:
         result = self._collect_result(
             trainer, lm, dm, dataset_id, time.perf_counter() - start_time, run_dir
         )
-
+        self._restore_selected_checkpoint(lm, run_dir)
         self._norm_stats = result.norm_stats
-
-        if surface_viz is not None and getattr(surface_viz, "enabled", False):
-            from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
-            viz_artifacts = SurfaceVisualizationWorkflow(surface_viz).run(self, run_dir)
-            _extend_viz_manifest(run_dir, viz_artifacts)
-
         update_latest_symlink(run_dir)
         return result
 
     def _build_model(self, dm: STPPDataModule):
         """Construct and return the UnifiedSTPP model."""
-        mc = self.config.model
-        overrides = dict(mc.build_overrides)
-        deep_update(overrides, ConfigRegistry.data_init_overrides(mc.preset, dm))
-        return ConfigRegistry.build(
-            mc.preset,
-            overrides=overrides,
-            hidden_dim=mc.hidden_dim,
-            spatial_dim=mc.spatial_dim,
-            n_marks=mc.n_marks,
-            event_cov_dim=mc.event_cov_dim,
-            field_cov_dim=mc.field_cov_dim,
-        )
+        data_overrides = ConfigRegistry.data_init_overrides(self.config.model.preset, dm)
+        self._effective_model_overrides = data_overrides or {}
+        return self.config.model.build_model(extra_overrides=data_overrides or None)
+
+    def _extract_fit_metrics(
+        self,
+        trainer: pl.Trainer,
+        lm: STPPLightningModule,
+        dm: STPPDataModule,
+    ) -> tuple[float, float, float, float, dict[str, float]]:
+        """Return fit metrics and test-time extra diagnostics after training.
+
+        val_objective is taken from the best checkpoint score when available.
+        test_nll / temporal_nll / spatial_nll are nan when no test dataset is present.
+        """
+        from pytorch_lightning.callbacks import ModelCheckpoint
+        ckpt_callback = next(c for c in trainer.callbacks if isinstance(c, ModelCheckpoint))
+
+        raw_val = trainer.callback_metrics.get(lm.val_monitor_key)
+        val_objective = float(raw_val) if raw_val is not None else float("nan")
+        if ckpt_callback.best_model_score is not None:
+            val_objective = float(ckpt_callback.best_model_score)
+
+        test_nll = float("nan")
+        temporal_nll = float("nan")
+        spatial_nll = float("nan")
+        test_extra_metrics: dict[str, float] = {}
+        if dm._bundle.test_dataset is not None:
+            test_results = trainer.test(
+                lm,
+                datamodule=dm,
+                verbose=False,
+                ckpt_path=self.config.training.checkpoint_select,
+            )
+            if test_results:
+                r = test_results[0]
+                test_nll = float(r.get("test/nll", float("nan")))
+                temporal_nll = float(r.get("test/temporal_nll", float("nan")))
+                spatial_nll = float(r.get("test/spatial_nll", float("nan")))
+                for key, value in r.items():
+                    if not key.startswith("test/"):
+                        continue
+                    metric_name = key[len("test/") :]
+                    if metric_name in {"nll", "temporal_nll", "spatial_nll"}:
+                        continue
+                    test_extra_metrics[metric_name] = float(value)
+
+        return val_objective, test_nll, temporal_nll, spatial_nll, test_extra_metrics
+
+    def _extract_checkpoint_path(self, trainer: pl.Trainer) -> "Optional[Path]":
+        """Return the selected checkpoint path if save_checkpoints is enabled."""
+        from pytorch_lightning.callbacks import ModelCheckpoint
+        ckpt_callback = next(c for c in trainer.callbacks if isinstance(c, ModelCheckpoint))
+        if not self.config.logging.save_checkpoints:
+            return None
+        selected = self.config.training.checkpoint_select
+        if selected == "best" and ckpt_callback.best_model_path:
+            return Path(ckpt_callback.best_model_path)
+        if selected == "last":
+            last_ckpt = checkpoint_file(self._run_dir or Path(ckpt_callback.dirpath), selection="last")
+            if last_ckpt.exists():
+                return last_ckpt
+        return None
+
+    def _restore_selected_checkpoint(self, lm: STPPLightningModule, run_dir: Path) -> None:
+        """Keep the in-memory runner aligned with the configured checkpoint policy."""
+        try:
+            state = load_state_dict(run_dir, selection=self.config.training.checkpoint_select)
+        except FileNotFoundError:
+            return
+        lm.model.load_state_dict(state)
+    
 
     def _collect_result(
         self,
@@ -251,152 +350,56 @@ class STPPRunner:
         train_time: float,
         run_dir: Path,
     ) -> RunResult:
-        """Extract metrics and normalization stats; return RunResult."""
-        from pytorch_lightning.callbacks import ModelCheckpoint
+        """Assemble and persist a RunResult from the completed training run."""
         cfg = self.config
-        ckpt_callback = next(c for c in trainer.callbacks if isinstance(c, ModelCheckpoint))
-
-        raw_val = trainer.callback_metrics.get("val/nll")
-        val_nll = float(raw_val) if raw_val is not None else float("nan")
-        if ckpt_callback.best_model_score is not None:
-            val_nll = float(ckpt_callback.best_model_score)
-
-        test_nll = float("nan")
-        if dm._test_dataset is not None:
-            test_results = trainer.test(lm, datamodule=dm, verbose=False)
-            if test_results:
-                test_nll = float(test_results[0].get("test/nll", float("nan")))
-
-        ckpt_path: Optional[Path] = None
-        if cfg.logging.save_checkpoints and ckpt_callback.best_model_path:
-            ckpt_path = Path(ckpt_callback.best_model_path)
-
-        ds = dm._train_dataset
-        norm_stats = {
-            "normalize": cfg.data.normalize,
-            "time_mean": float(getattr(ds, "time_mean", 0.0)),
-            "time_std":  float(getattr(ds, "time_std",  1.0)),
-            "loc_mean":  list(np.asarray(getattr(ds, "loc_mean", [0.0, 0.0])).tolist()),
-            "loc_std":   list(np.asarray(getattr(ds, "loc_std",  [1.0, 1.0])).tolist()),
-        }
-
+        val_objective, test_nll, temporal_nll, spatial_nll, test_extra_metrics = self._extract_fit_metrics(
+            trainer, lm, dm
+        )
+        ckpt_path = self._extract_checkpoint_path(trainer)
+        norm_stats = dm.get_norm_stats(cfg.data.normalize)
+        caps = lm.model.event_model.capabilities
+        nll_report_space = "native"
+        nll_description = caps.nll_description
+        if (
+            cfg.training.test_nll_space == "raw"
+            and "native_nll" in test_extra_metrics
+            and caps.supports_raw_reporting
+        ):
+            nll_report_space = "raw"
+            nll_description = caps.raw_nll_description or caps.nll_description
         result = RunResult(
             preset=cfg.model.preset,
             dataset_id=dataset_id,
             seed=cfg.data.seed,
-            val_nll=val_nll,
+            val_objective=val_objective,
+            val_metric_key=caps.metric_key,
             test_nll=test_nll,
             train_time_sec=train_time,
             n_params=sum(p.numel() for p in lm.model.parameters() if p.requires_grad),
-            effective_config=cfg.model_dump(),
+            effective_config=self._effective_config_dump(),
             checkpoint_path=ckpt_path,
             norm_stats=norm_stats,
             run_dir=run_dir,
+            training_objective=caps.training_objective,
+            objective_description=caps.objective_description,
+            nll_kind=caps.nll_kind,
+            nll_description=nll_description,
+            nll_footnote=caps.nll_footnote,
+            nll_report_space=nll_report_space,
+            temporal_nll=temporal_nll,
+            spatial_nll=spatial_nll,
+            extra_metrics=test_extra_metrics,
         )
         save_run_artifacts(run_dir, result, cfg)
         return result
 
-    # ------------------------------------------------------------------
-    # Intensity grid (post-training visualization)
-    # ------------------------------------------------------------------
-
-    def intensity_grid(
-        self,
-        history_times: np.ndarray,
-        history_locs: np.ndarray,
-        t_query: float,
-        n_grid: int = 50,
-        x_range: Optional[tuple] = None,
-        y_range: Optional[tuple] = None,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Evaluate λ*(t_query, · | history) on a spatial grid.
-
-        Returns (xs, ys, intensity_grid) all as numpy arrays in *original*
-        (un-normalised) coordinates.
-
-        Only supports the ``"unified"`` protocol.  For the paper protocol,
-        use ``IntensityEvaluator`` directly with your own normalisation.
-        """
-        if self._lightning_module is None or self._data_module is None:
-            raise RuntimeError("Call fit() before intensity_grid().")
-
-        protocol = self.config.data.protocol
-        if protocol != "standard":
-            raise NotImplementedError(
-                f"intensity_grid() only supports protocol='standard'; "
-                f"got {protocol!r}.  Use IntensityEvaluator directly."
-            )
-
-        model = self.model
-        model.eval()
-        dm = self._data_module
-        ds = dm._train_dataset  # provides normalization stats
-
-        device = next(model.parameters()).device
-
-        # ---- Normalize history -----------------------------------------------
-        t_arr = np.asarray(history_times, dtype=np.float64)
-        s_arr = np.asarray(history_locs, dtype=np.float64)
-
-        t_norm = (t_arr - ds.time_mean) / max(ds.time_std, 1e-8)
-        s_norm = (s_arr - ds.loc_mean) / np.maximum(ds.loc_std, 1e-8)
-
-        # ---- Build evaluator -------------------------------------------------
-        N = len(t_norm)
-        evaluator = IntensityEvaluator(
-            model=model,
-            history_times=torch.tensor(
-                t_norm, dtype=torch.float32, device=device
-            ).unsqueeze(0),
-            history_locations=torch.tensor(
-                s_norm, dtype=torch.float32, device=device
-            ).unsqueeze(0),
-            history_lengths=torch.tensor([N], dtype=torch.long, device=device),
-        )
-
-        # ---- Grid bounds in normalized space ---------------------------------
-        d = s_norm.shape[-1]
-        if d == 2:
-            if x_range is None:
-                x_lo = float(s_norm[:, 0].min() - 0.5)
-                x_hi = float(s_norm[:, 0].max() + 0.5)
-            else:
-                x_lo = (x_range[0] - ds.loc_mean[0]) / max(ds.loc_std[0], 1e-8)
-                x_hi = (x_range[1] - ds.loc_mean[0]) / max(ds.loc_std[0], 1e-8)
-
-            if y_range is None:
-                y_lo = float(s_norm[:, 1].min() - 0.5)
-                y_hi = float(s_norm[:, 1].max() + 0.5)
-            else:
-                y_lo = (y_range[0] - ds.loc_mean[1]) / max(ds.loc_std[1], 1e-8)
-                y_hi = (y_range[1] - ds.loc_mean[1]) / max(ds.loc_std[1], 1e-8)
-        else:
-            x_lo = float(s_norm[:, 0].min() - 0.5)
-            x_hi = float(s_norm[:, 0].max() + 0.5)
-            y_lo, y_hi = 0.0, 0.0  # unused for d=1
-
-        t_query_norm = (t_query - ds.time_mean) / max(ds.time_std, 1e-8)
-
-        s_min = torch.tensor([x_lo, y_lo][:d], dtype=torch.float32, device=device)
-        s_max = torch.tensor([x_hi, y_hi][:d], dtype=torch.float32, device=device)
-
-        # ---- Evaluate -------------------------------------------------------
-        with torch.no_grad():
-            xs_norm, ys_norm, lam = evaluator.intensity_grid(
-                t=t_query_norm,
-                s_min=s_min,
-                s_max=s_max,
-                n_grid=n_grid,
-            )
-
-        # ---- Denormalise grid axes ------------------------------------------
-        xs = xs_norm.cpu().numpy() * ds.loc_std[0] + ds.loc_mean[0]
-        if ys_norm is not None:
-            ys = ys_norm.cpu().numpy() * ds.loc_std[1] + ds.loc_mean[1]
-        else:
-            ys = np.zeros(0)
-
-        return xs, ys, lam.cpu().numpy()
+    def _effective_config_dump(self) -> dict:
+        """Return the config dict actually used to build the fitted model."""
+        raw = self.config.model_dump()
+        model_overrides = getattr(self, "_effective_model_overrides", None) or {}
+        if model_overrides:
+            deep_update(raw.setdefault("model", {}), model_overrides)
+        return raw
 
     # ------------------------------------------------------------------
     # Post-fit evaluation (primary analysis path)
@@ -405,104 +408,84 @@ class STPPRunner:
     def evaluate(
         self,
         val_seqs: Optional[list[dict]] = None,
+        *,
         surface_viz=None,
         run_dir: Optional[Path] = None,
     ) -> dict[str, Path]:
         """Post-fit evaluation: run analysis workflows on a fitted runner.
 
-        This is the primary path for post-fit analysis. It delegates to the
-        same workflow objects used internally by ``fit()`` — there is no
-        duplicated logic. Works both after ``fit()`` (data module is in memory)
-        and after ``load()`` (pass ``val_seqs`` to rebuild the data module).
+        Works both after ``fit()`` (data module is in memory) and after
+        ``load()`` (pass ``val_seqs`` to rebuild the data module).
 
         Parameters
         ----------
         val_seqs    : event sequences for history queries. Required after
                       ``load()`` when ``_data_module`` is not held in memory.
-                      Ignored if ``_data_module`` is already set (i.e. called
-                      directly after ``fit()``).
+                      Ignored if ``_data_module`` is already set.
         surface_viz : :class:`~unified_stpp.viz.workflow.SurfaceVizConfig`.
                       When ``enabled=True``, queries intensity/density surfaces
-                      and saves artifacts.  Delegates entirely to
-                      :class:`~unified_stpp.viz.workflow.SurfaceVisualizationWorkflow`.
+                      and saves artifacts.
         run_dir     : artifact output directory.  Defaults to ``self._run_dir``
-                      (the run's own directory, set by ``fit()`` or ``load()``).
+                      (set by ``fit()`` or ``load()``).
 
         Returns
         -------
         dict[str, Path]
-            Mapping from artifact name to path.  Empty if no workflows are
-            enabled.
+            Mapping from artifact name to path.  Empty if no workflows are enabled.
         """
-        if run_dir is None:
-            if self._run_dir is None:
-                raise ValueError(
-                    "run_dir is required when the runner has no associated run "
-                    "directory.  Pass run_dir= explicitly, or call fit() / "
-                    "load() before evaluate()."
-                )
-            run_dir = self._run_dir
-        run_dir = Path(run_dir)
-
-        if self._data_module is None:
-            if val_seqs is None:
-                raise ValueError(
-                    "val_seqs is required when calling evaluate() after load() "
-                    "(the data module is not held in memory)."
-                )
-            self._data_module = self._build_eval_data_module(val_seqs)
+        run_dir = self._resolve_run_dir(run_dir)
+        self._ensure_data_module(val_seqs)
 
         artifacts: dict[str, Path] = {}
-
-        if surface_viz is not None and getattr(surface_viz, "enabled", False):
-            from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
-            wf = SurfaceVisualizationWorkflow(surface_viz)
-            viz_artifacts = wf.run(self, run_dir)
-            _extend_viz_manifest(run_dir, viz_artifacts)
-            artifacts.update(viz_artifacts)
-
+        for wf_cfg in [surface_viz]:   # extend this list as new workflows are added
+            if wf_cfg is not None and getattr(wf_cfg, "enabled", False):
+                from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
+                wf = SurfaceVisualizationWorkflow(wf_cfg)
+                wf_artifacts = wf.run(self, run_dir)
+                _extend_viz_manifest(run_dir, wf_artifacts)
+                artifacts.update(wf_artifacts)
         return artifacts
+
+    def _resolve_run_dir(self, run_dir: Optional[Path]) -> Path:
+        """Return a resolved run directory, raising if none is available."""
+        if run_dir is not None:
+            return Path(run_dir)
+        return _require(
+            self._run_dir,
+            "run_dir is required when the runner has no associated run "
+            "directory.  Pass run_dir= explicitly, or call fit() / "
+            "load() before evaluate().",
+        )
+
+    def _ensure_data_module(self, val_seqs: Optional[list[dict]]) -> None:
+        """Ensure ``_data_module`` is set, building from val_seqs if needed."""
+        if self._data_module is not None:
+            return
+        self._data_module = self._build_eval_data_module(
+            _require(
+                val_seqs,
+                "val_seqs is required when calling evaluate() after load() "
+                "(the data module is not held in memory).",
+            )
+        )
 
     def _build_eval_data_module(self, val_seqs: list[dict]) -> STPPDataModule:
         """Build a minimal eval-only data module from val_seqs.
 
-        This is an evaluation-only reconstruction: ``val_seqs`` is passed as
-        both ``train_seqs`` and ``val_seqs`` solely to:
-
-        (a) Give :class:`~unified_stpp.viz.workflow.SurfaceVisualizationWorkflow`
-            access to raw sequences via ``get_original_sequence()``.
-        (b) Provide a ``_train_dataset`` object whose normalization attributes
-            can be overridden with the saved training-set stats.
-
-        No DataLoader is ever iterated in the evaluate path; ``batch_size`` is
-        set to 1 to make any accidental use obvious.  The normalization stats on
-        ``_train_dataset`` are overridden with ``self._norm_stats`` (loaded from
-        ``run_result.json`` during ``load()``) so the model sees the same
-        coordinate system it was trained with.
+        Used only to support ``get_original_sequence()`` access in the
+        visualization workflow.  No DataLoader is iterated in the evaluate path.
+        Normalization stats are held by the evaluator (via ``runner.norm_stats``),
+        not by this data module.
         """
-        dm = STPPDataModule(
-            train_seqs=val_seqs,
-            val_seqs=val_seqs,
-            batch_size=1,           # eval-only: DataLoader is never iterated
-            normalize=self.config.data.normalize,
+        from unified_stpp.data import STPPDataset, collate_fn as _canonical_collate
+        from unified_stpp.data.registry import DataBundle
+
+        ds = STPPDataset(val_seqs, normalize_time=False, normalize_space=False)
+        bundle = DataBundle(
+            train_dataset=ds, val_dataset=ds, test_dataset=None,
+            collate_fn=_canonical_collate, train_batch_sampler=None,
         )
-        dm.setup()
-
-        if self.config.data.normalize:
-            if not self._norm_stats or not self._norm_stats.get("normalize", False):
-                raise ValueError(
-                    "Cannot rebuild the eval data module: saved norm_stats are "
-                    "missing or indicate no normalization was used, but "
-                    "config.data.normalize=True.  Ensure the run directory "
-                    "contains run_result.json with norm_stats populated."
-                )
-            ds = dm._train_dataset
-            ds.time_mean = float(self._norm_stats["time_mean"])
-            ds.time_std  = float(self._norm_stats["time_std"])
-            ds.loc_mean  = np.array(self._norm_stats["loc_mean"], dtype=np.float64)
-            ds.loc_std   = np.array(self._norm_stats["loc_std"],  dtype=np.float64)
-
-        return dm
+        return STPPDataModule(bundle, batch_size=1)
 
     # ------------------------------------------------------------------
     # Persistence
@@ -527,45 +510,18 @@ class STPPRunner:
         """Restore a runner from a saved directory.
 
         Looks for ``config.yaml`` + (in order of preference):
-        1. ``checkpoints/best.ckpt`` — Lightning checkpoint written by ``fit()``
+        1. ``checkpoints/{training.checkpoint_select}.ckpt`` — Lightning checkpoint written by ``fit()``
         2. ``model.ckpt``           — legacy plain state-dict written by ``save()``
         """
         p = Path(path).resolve()
-        config = STPPConfig.from_yaml(p / "config.yaml", sanitize=False)
+        cfg_path = p / "resolved_config.yaml"
+        if not cfg_path.exists():
+            cfg_path = p / "config.yaml"
+        config = STPPConfig.from_yaml(cfg_path, sanitize=False)
         runner = cls(config)
-
-        mc = config.model
-        model = ConfigRegistry.build(
-            mc.preset,
-            overrides=mc.build_overrides,
-            hidden_dim=mc.hidden_dim,
-            spatial_dim=mc.spatial_dim,
-            n_marks=mc.n_marks,
-            event_cov_dim=mc.event_cov_dim,
-            field_cov_dim=mc.field_cov_dim,
-        )
-
-        pl_ckpt = p / "checkpoints" / "best.ckpt"
-        if pl_ckpt.exists():
-            # Lightning checkpoint: state_dict keys are prefixed with "model."
-            ckpt = torch.load(pl_ckpt, map_location="cpu", weights_only=False)
-            pl_state = ckpt["state_dict"]
-            state = {
-                k[len("model."):]: v
-                for k, v in pl_state.items()
-                if k.startswith("model.")
-            }
-        else:
-            # Legacy: plain state-dict saved by runner.save()
-            state = torch.load(p / "model.ckpt", map_location="cpu", weights_only=False)
-
-        model.load_state_dict(state)
-        lm = STPPLightningModule(model=model, tc=config.training)
-        runner._lightning_module = lm
+        model = config.model.build_model()
+        model.load_state_dict(load_state_dict(p, selection=config.training.checkpoint_select))
+        runner._lightning_module = STPPLightningModule(model=model, tc=config.training)
         runner._run_dir = p
-        result_json = p / "run_result.json"
-        if result_json.exists():
-            import json
-            with open(result_json) as f:
-                runner._norm_stats = json.load(f).get("norm_stats")
+        runner._norm_stats = load_norm_stats(p)
         return runner

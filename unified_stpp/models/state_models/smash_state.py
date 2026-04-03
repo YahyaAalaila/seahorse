@@ -8,29 +8,89 @@ import torch
 from torch import Tensor
 
 from ..abstractions import StateCapabilities, StateContext, StateModel
-from ..history_encoders.transformer_st import TransformerST
+from ..model_registry import register_state
+from ..history_encoders.smash_upstream_transformer import SMASHUpstreamTransformerST
 
 
+@register_state("smash")
 class SMASHStateModel(StateModel):
     """SMASH state encoder over unified_stpp batch tensors."""
 
     def __init__(
         self,
         *,
-        transformer: TransformerST,
+        transformer: SMASHUpstreamTransformerST,
         loc_dim: int,
         num_types: int,
         log_normalization: bool = False,
         minmax_normalize_time: bool = True,
+        minmax_normalize_loc: bool = True,
         mark_shift: int = 1,
+        input_time_normalized: bool = False,
+        input_space_normalized: bool = False,
+        input_time_mean: float = 0.0,
+        input_time_std: float = 1.0,
+        input_loc_mean: tuple[float, ...] = (0.0, 0.0),
+        input_loc_std: tuple[float, ...] = (1.0, 1.0),
+        token_time_min_raw: float = 0.0,
+        token_time_range_raw: float = 1.0,
+        token_time_min_log: float = 0.0,
+        token_time_range_log: float = 1.0,
+        token_loc_min: tuple[float, ...] = (0.0, 0.0),
+        token_loc_range: tuple[float, ...] = (1.0, 1.0),
     ):
         super().__init__()
         self.transformer = transformer
         self.loc_dim = int(loc_dim)
         self.num_types = int(num_types)
+        self.spatial_dim = self.loc_dim - 1 if self.num_types > 1 else self.loc_dim
         self.log_normalization = bool(log_normalization)
         self.minmax_normalize_time = bool(minmax_normalize_time)
+        self.minmax_normalize_loc = bool(minmax_normalize_loc)
         self.mark_shift = int(mark_shift)
+        self.input_time_normalized = bool(input_time_normalized)
+        self.input_space_normalized = bool(input_space_normalized)
+
+        self.register_buffer(
+            "input_time_mean",
+            torch.tensor(float(input_time_mean), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_time_std",
+            torch.tensor(float(input_time_std), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_loc_mean",
+            torch.tensor(input_loc_mean, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "input_loc_std",
+            torch.tensor(input_loc_std, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_time_min_raw",
+            torch.tensor(float(token_time_min_raw), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_time_range_raw",
+            torch.tensor(float(token_time_range_raw), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_time_min_log",
+            torch.tensor(float(token_time_min_log), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_time_range_log",
+            torch.tensor(float(token_time_range_log), dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_loc_min",
+            torch.tensor(token_loc_min, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "token_loc_range",
+            torch.tensor(token_loc_range, dtype=torch.float32),
+        )
 
     @property
     def capabilities(self) -> StateCapabilities:
@@ -46,26 +106,53 @@ class SMASHStateModel(StateModel):
         idx = torch.arange(max_len, device=lengths.device).unsqueeze(0)
         return idx < lengths.unsqueeze(1)
 
-    def _build_event_time(self, times: Tensor, lengths: Tensor) -> Tensor:
-        """Build SMASH event_time from unified absolute times."""
+    def _recover_raw_inputs(
+        self,
+        *,
+        times: Tensor,
+        locations: Tensor,
+        lengths: Tensor,
+    ) -> tuple[Tensor, Tensor, Tensor]:
         max_len = times.shape[1]
         valid_mask = self._valid_mask(lengths, max_len)
 
-        dt = torch.zeros_like(times)
-        dt[:, :1] = times[:, :1]
-        if max_len > 1:
-            dt[:, 1:] = times[:, 1:] - times[:, :-1]
+        raw_times = times
+        if self.input_time_normalized:
+            raw_times = times * self.input_time_std.to(device=times.device, dtype=times.dtype)
+            raw_times = raw_times + self.input_time_mean.to(device=times.device, dtype=times.dtype)
+        raw_times = torch.where(valid_mask, raw_times, torch.zeros_like(raw_times))
 
+        raw_locations = locations
+        if self.input_space_normalized:
+            loc_std = self.input_loc_std.to(device=locations.device, dtype=locations.dtype).view(1, 1, -1)
+            loc_mean = self.input_loc_mean.to(device=locations.device, dtype=locations.dtype).view(1, 1, -1)
+            raw_locations = locations * loc_std + loc_mean
+        raw_locations = torch.where(
+            valid_mask.unsqueeze(-1),
+            raw_locations,
+            torch.zeros_like(raw_locations),
+        )
+        return raw_times, raw_locations, valid_mask
+
+    def _build_event_time(self, raw_times: Tensor, valid_mask: Tensor) -> Tensor:
+        """Build upstream-faithful SMASH event_time from raw absolute times."""
+        dt = torch.zeros_like(raw_times)
+        dt[:, :1] = raw_times[:, :1]
+        max_len = raw_times.shape[1]
+        if max_len > 1:
+            dt[:, 1:] = raw_times[:, 1:] - raw_times[:, :-1]
+
+        time_min = self.token_time_min_raw
+        time_range = self.token_time_range_raw
         if self.log_normalization:
             dt = torch.log(dt.clamp(min=1e-4))
+            time_min = self.token_time_min_log
+            time_range = self.token_time_range_log
 
         if self.minmax_normalize_time:
-            valid_vals = dt[valid_mask]
-            if valid_vals.numel() > 0:
-                vmin = valid_vals.min()
-                vmax = valid_vals.max()
-                scale = (vmax - vmin).clamp(min=1e-8)
-                dt = (dt - vmin) / scale
+            time_min = time_min.to(device=dt.device, dtype=dt.dtype)
+            time_range = time_range.to(device=dt.device, dtype=dt.dtype).clamp(min=1e-8)
+            dt = (dt - time_min) / time_range
 
         dt = torch.where(valid_mask, dt, torch.zeros_like(dt))
         return dt
@@ -73,18 +160,21 @@ class SMASHStateModel(StateModel):
     def _build_event_loc(
         self,
         *,
-        locations: Tensor,
-        lengths: Tensor,
+        raw_locations: Tensor,
+        valid_mask: Tensor,
         marks: Optional[Tensor],
     ) -> Tensor:
-        max_len = locations.shape[1]
-        valid_mask = self._valid_mask(lengths, max_len)
+        spatial = raw_locations
+        if self.minmax_normalize_loc:
+            loc_min = self.token_loc_min.to(device=raw_locations.device, dtype=raw_locations.dtype).view(1, 1, -1)
+            loc_range = self.token_loc_range.to(device=raw_locations.device, dtype=raw_locations.dtype).view(1, 1, -1)
+            spatial = (raw_locations - loc_min) / loc_range.clamp(min=1e-8)
 
         if self.loc_dim == 2:
             return torch.where(
                 valid_mask.unsqueeze(-1),
-                locations,
-                torch.zeros_like(locations),
+                spatial,
+                torch.zeros_like(spatial),
             )
 
         if marks is None:
@@ -95,7 +185,7 @@ class SMASHStateModel(StateModel):
             marks_shifted = marks_shifted + self.mark_shift
         marks_shifted = torch.where(valid_mask, marks_shifted, torch.zeros_like(marks_shifted))
 
-        event_loc = torch.cat([marks_shifted.unsqueeze(-1).to(locations.dtype), locations], dim=-1)
+        event_loc = torch.cat([marks_shifted.unsqueeze(-1).to(spatial.dtype), spatial], dim=-1)
         return torch.where(
             valid_mask.unsqueeze(-1),
             event_loc,
@@ -114,11 +204,17 @@ class SMASHStateModel(StateModel):
     ) -> StateContext:
         del x_event, x_field_at_events
 
-        event_time_origin = times
-        event_time = self._build_event_time(times, lengths)
-        event_loc = self._build_event_loc(
+        raw_times, raw_locations, valid_mask = self._recover_raw_inputs(
+            times=times,
             locations=locations,
             lengths=lengths,
+        )
+
+        event_time_origin = raw_times
+        event_time = self._build_event_time(raw_times, valid_mask)
+        event_loc = self._build_event_loc(
+            raw_locations=raw_locations,
+            valid_mask=valid_mask,
             marks=marks,
         )
 
@@ -195,8 +291,8 @@ class SMASHStateModel(StateModel):
                 "enc_out": enc_out,
                 "non_pad_mask": non_pad_mask,
                 "lengths": lengths,
-                "times": times,
-                "locations": locations,
+                "times": raw_times,
+                "locations": raw_locations,
                 "marks": marks,
             }
         )

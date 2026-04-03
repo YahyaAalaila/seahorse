@@ -117,128 +117,128 @@ def thinning_sample(
     return times, locations, counts
 
 
-class IntensityEvaluator:
-    """Evaluate event-model intensity via StateModel/EventModel interfaces."""
+# class IntensityEvaluator:
+#     """Evaluate event-model intensity via StateModel/EventModel interfaces."""
 
-    def __init__(
-        self,
-        model,
-        *,
-        history_times: Tensor,
-        history_locations: Tensor,
-        history_lengths: Tensor,
-        marks: Optional[Tensor] = None,
-        x_event: Optional[Tensor] = None,
-        x_field_at_events: Optional[Tensor] = None,
-    ):
-        self.model = model
-        self.state_model, self.event_model = _require_state_event_models(model)
+#     def __init__(
+#         self,
+#         model,
+#         *,
+#         history_times: Tensor,
+#         history_locations: Tensor,
+#         history_lengths: Tensor,
+#         marks: Optional[Tensor] = None,
+#         x_event: Optional[Tensor] = None,
+#         x_field_at_events: Optional[Tensor] = None,
+#     ):
+#         self.model = model
+#         self.state_model, self.event_model = _require_state_event_models(model)
 
-        if history_times.ndim != 2:
-            raise ValueError("history_times must have shape (B, N).")
-        if history_locations.ndim != 3:
-            raise ValueError("history_locations must have shape (B, N, d).")
-        if history_lengths.ndim != 1:
-            raise ValueError("history_lengths must have shape (B,).")
+#         if history_times.ndim != 2:
+#             raise ValueError("history_times must have shape (B, N).")
+#         if history_locations.ndim != 3:
+#             raise ValueError("history_locations must have shape (B, N, d).")
+#         if history_lengths.ndim != 1:
+#             raise ValueError("history_lengths must have shape (B,).")
 
-        self.history_times = history_times
-        self.history_locations = history_locations
-        self.history_lengths = history_lengths
-        self.marks = marks
-        self.x_event = x_event
-        self.x_field_at_events = x_field_at_events
+#         self.history_times = history_times
+#         self.history_locations = history_locations
+#         self.history_lengths = history_lengths
+#         self.marks = marks
+#         self.x_event = x_event
+#         self.x_field_at_events = x_field_at_events
 
-    def _encode_state(self):
-        return self.state_model.encode_history(
-            times=self.history_times,
-            locations=self.history_locations,
-            lengths=self.history_lengths,
-            marks=self.marks,
-            x_event=self.x_event,
-            x_field_at_events=self.x_field_at_events,
-        )
+#     def _encode_state(self):
+#         return self.state_model.encode_history(
+#             times=self.history_times,
+#             locations=self.history_locations,
+#             lengths=self.history_lengths,
+#             marks=self.marks,
+#             x_event=self.x_event,
+#             x_field_at_events=self.x_field_at_events,
+#         )
 
-    def intensity(
-        self,
-        query_times: Tensor,
-        query_locations: Tensor,
-        x_field_at_events: Optional[Tensor] = None,
-    ) -> Tensor:
-        """Evaluate lambda*(t, s | history) for query batches."""
-        if not supports_intensity_query(self.model):
-            name = type(self.event_model).__name__
-            raise NotImplementedError(
-                f"EventModel '{name}' does not advertise has_intensity=True."
-            )
+#     def intensity(
+#         self,
+#         query_times: Tensor,
+#         query_locations: Tensor,
+#         x_field_at_events: Optional[Tensor] = None,
+#     ) -> Tensor:
+#         """Evaluate lambda*(t, s | history) for query batches."""
+#         if not supports_intensity_query(self.model):
+#             name = type(self.event_model).__name__
+#             raise NotImplementedError(
+#                 f"EventModel '{name}' does not advertise has_intensity=True."
+#             )
 
-        if query_times.ndim == 1:
-            query_times = query_times.unsqueeze(-1)
-        if query_times.ndim != 2 or query_times.shape[-1] != 1:
-            raise ValueError("query_times must have shape (B, 1).")
+#         if query_times.ndim == 1:
+#             query_times = query_times.unsqueeze(-1)
+#         if query_times.ndim != 2 or query_times.shape[-1] != 1:
+#             raise ValueError("query_times must have shape (B, 1).")
 
-        if query_locations.ndim == 3 and query_locations.shape[1] == 1:
-            query_locations = query_locations.squeeze(1)
-        if query_locations.ndim != 2:
-            raise ValueError("query_locations must have shape (B, d).")
-        if query_locations.shape[0] != query_times.shape[0]:
-            raise ValueError("query_times and query_locations batch sizes must match.")
+#         if query_locations.ndim == 3 and query_locations.shape[1] == 1:
+#             query_locations = query_locations.squeeze(1)
+#         if query_locations.ndim != 2:
+#             raise ValueError("query_locations must have shape (B, d).")
+#         if query_locations.shape[0] != query_times.shape[0]:
+#             raise ValueError("query_times and query_locations batch sizes must match.")
 
-        state_ctx = self._encode_state()
-        query_lengths = torch.ones(
-            query_times.shape[0], dtype=torch.long, device=query_times.device
-        )
-        queried_state = self.state_model.query_state(
-            state_ctx,
-            times=query_times,
-            locations=query_locations.unsqueeze(1),
-            lengths=query_lengths,
-            x_field_at_events=x_field_at_events,
-        )
+#         state_ctx = self._encode_state()
+#         query_lengths = torch.ones(
+#             query_times.shape[0], dtype=torch.long, device=query_times.device
+#         )
+#         queried_state = self.state_model.query_state(
+#             state_ctx,
+#             times=query_times,
+#             locations=query_locations.unsqueeze(1),
+#             lengths=query_lengths,
+#             x_field_at_events=x_field_at_events,
+#         )
 
-        return self.event_model.intensity(
-            state=queried_state,
-            query_times=query_times,
-            query_locations=query_locations,
-            query_lengths=query_lengths,
-            x_field_at_events=x_field_at_events,
-            marks=self.marks,
-            device=query_times.device,
-        )
+#         return self.event_model.intensity(
+#             state=queried_state,
+#             query_times=query_times,
+#             query_locations=query_locations,
+#             query_lengths=query_lengths,
+#             x_field_at_events=x_field_at_events,
+#             marks=self.marks,
+#             device=query_times.device,
+#         )
 
-    @torch.no_grad()
-    def intensity_grid(
-        self,
-        t: float,
-        s_min: Tensor,
-        s_max: Tensor,
-        n_grid: int = 50,
-        x_field_fn=None,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Evaluate intensity on a spatial grid at fixed time t."""
-        if self.history_times.shape[0] != 1:
-            raise ValueError("intensity_grid currently requires history batch size B=1.")
+#     @torch.no_grad()
+#     def intensity_grid(
+#         self,
+#         t: float,
+#         s_min: Tensor,
+#         s_max: Tensor,
+#         n_grid: int = 50,
+#         x_field_fn=None,
+#     ) -> Tuple[Tensor, Tensor, Tensor]:
+#         """Evaluate intensity on a spatial grid at fixed time t."""
+#         if self.history_times.shape[0] != 1:
+#             raise ValueError("intensity_grid currently requires history batch size B=1.")
 
-        device = self.history_times.device
-        d = s_min.shape[0]
-        if d not in (1, 2):
-            raise ValueError("Grid visualization supports spatial_dim in {1, 2}.")
+#         device = self.history_times.device
+#         d = s_min.shape[0]
+#         if d not in (1, 2):
+#             raise ValueError("Grid visualization supports spatial_dim in {1, 2}.")
 
-        if d == 2:
-            x = torch.linspace(s_min[0].item(), s_max[0].item(), n_grid, device=device)
-            y = torch.linspace(s_min[1].item(), s_max[1].item(), n_grid, device=device)
-            xx, yy = torch.meshgrid(x, y, indexing="ij")
-            s_flat = torch.stack([xx.flatten(), yy.flatten()], dim=-1)
-            n_pts = s_flat.shape[0]
+#         if d == 2:
+#             x = torch.linspace(s_min[0].item(), s_max[0].item(), n_grid, device=device)
+#             y = torch.linspace(s_min[1].item(), s_max[1].item(), n_grid, device=device)
+#             xx, yy = torch.meshgrid(x, y, indexing="ij")
+#             s_flat = torch.stack([xx.flatten(), yy.flatten()], dim=-1)
+#             n_pts = s_flat.shape[0]
 
-            t_tensor = torch.full((n_pts, 1), t, device=device)
-            x_field = None
-            if x_field_fn is not None:
-                x_field = x_field_fn(t_tensor, s_flat)
-            lam = self.intensity(t_tensor, s_flat, x_field)
-            return x, y, lam.reshape(n_grid, n_grid)
+#             t_tensor = torch.full((n_pts, 1), t, device=device)
+#             x_field = None
+#             if x_field_fn is not None:
+#                 x_field = x_field_fn(t_tensor, s_flat)
+#             lam = self.intensity(t_tensor, s_flat, x_field)
+#             return x, y, lam.reshape(n_grid, n_grid)
 
-        x = torch.linspace(s_min[0].item(), s_max[0].item(), n_grid, device=device)
-        s_flat = x.unsqueeze(-1)
-        t_tensor = torch.full((n_grid, 1), t, device=device)
-        lam = self.intensity(t_tensor, s_flat)
-        return x, None, lam
+#         x = torch.linspace(s_min[0].item(), s_max[0].item(), n_grid, device=device)
+#         s_flat = x.unsqueeze(-1)
+#         t_tensor = torch.full((n_grid, 1), t, device=device)
+#         lam = self.intensity(t_tensor, s_flat)
+#         return x, None, lam

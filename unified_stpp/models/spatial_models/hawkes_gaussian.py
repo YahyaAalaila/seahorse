@@ -45,6 +45,9 @@ class HawkesGaussianDecoder(nn.Module):
         sigma_min: float = 1e-4,
         n_layers: int = 3,
         field_cov_dim: int = 0,
+        constrain_b: str | bool = False,
+        b_max: float = 20.0,
+        s_max: Optional[float] = None,
         **kwargs,
     ):
         del field_cov_dim, kwargs
@@ -54,6 +57,9 @@ class HawkesGaussianDecoder(nn.Module):
         self.seq_len = seq_len
         self.num_points = num_points
         self.sigma_min = sigma_min
+        self.constrain_b = constrain_b
+        self.b_max = float(b_max)
+        self.s_max = None if s_max is None else float(s_max)
         m = seq_len + num_points
 
         def _mlp(out_dim: int) -> nn.Sequential:
@@ -68,7 +74,7 @@ class HawkesGaussianDecoder(nn.Module):
         self.s_dec = _mlp(m * spatial_dim)
 
         if num_points > 0:
-            self.background = nn.Parameter(torch.rand(num_points, spatial_dim) * 0.1)
+            self.background = nn.Parameter(torch.rand(num_points, spatial_dim))
         else:
             self.register_parameter("background", None)
 
@@ -87,10 +93,36 @@ class HawkesGaussianDecoder(nn.Module):
         d = self.spatial_dim
 
         w_i = F.softplus(self.w_dec(z)) + 1e-5
-        b_i = F.softplus(self.b_dec(z)) + 1e-5
+        b_raw = self.b_dec(z)
+        mode = self.constrain_b
+        if isinstance(mode, str):
+            mode = mode.strip().lower()
+        if mode in (False, None, "false", "none", "unconstrained"):
+            b_i = b_raw
+        elif mode in (True, "softplus"):
+            b_i = F.softplus(b_raw) + 1e-5
+        elif mode == "tanh":
+            b_i = torch.tanh(b_raw) * self.b_max
+        elif mode == "sigmoid":
+            b_i = torch.sigmoid(b_raw) * self.b_max
+        elif mode == "neg-sigmoid":
+            b_i = -torch.sigmoid(b_raw) * self.b_max
+        elif mode == "clamp":
+            b_i = torch.clamp(b_raw, -self.b_max, self.b_max)
+        else:
+            raise ValueError(f"Unsupported DeepSTPP constrain_b mode: {self.constrain_b!r}")
+
         sigma = F.softplus(self.s_dec(z).reshape(bsz, m, d)) + self.sigma_min
+        if self.s_max is not None:
+            sigma = torch.sigmoid(sigma) * self.s_max
         inv_var = 1.0 / sigma
         return w_i, b_i, sigma, inv_var
+
+    @staticmethod
+    def _safe_decay(b_i: Tensor) -> Tensor:
+        eps = torch.full_like(b_i, 1e-6)
+        signed_eps = torch.where(b_i < 0, -eps, eps)
+        return torch.where(b_i.abs() < 1e-6, signed_eps, b_i)
 
     @staticmethod
     def log_ft(
@@ -100,12 +132,13 @@ class HawkesGaussianDecoder(nn.Module):
         t_ti: Tensor,
     ) -> Tensor:
         """Temporal log-density term used by DeepSTPP."""
-        exp_t_ti = torch.exp(-b_i * t_ti)
-        exp_tn_ti = torch.exp(-b_i * tn_ti.clamp(min=0.0))
+        b_safe = HawkesGaussianDecoder._safe_decay(b_i)
+        exp_t_ti = torch.exp(-b_safe * t_ti)
+        exp_tn_ti = torch.exp(-b_safe * tn_ti.clamp(min=0.0))
         log_w_i = torch.log(w_i)
-        log_v_i = log_w_i - b_i * t_ti
+        log_v_i = log_w_i - b_safe * t_ti
         log_lamb_t = torch.logsumexp(log_v_i, dim=-1)
-        comp = (w_i / b_i * (exp_t_ti - exp_tn_ti)).sum(dim=-1)
+        comp = (w_i / b_safe * (exp_t_ti - exp_tn_ti)).sum(dim=-1)
         return log_lamb_t + comp
 
     @staticmethod

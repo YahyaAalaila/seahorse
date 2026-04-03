@@ -31,6 +31,7 @@ except ImportError:
     HAS_TORCHDIFFEQ = False
 
 from ..base import Decoder
+from ..model_registry import register_spatial
 
 __all__ = [
     "HypernetworkRadialFlow",
@@ -253,6 +254,8 @@ class HypernetworkRadialFlow(nn.Module):
         return s_cur, log_det_sum
 
 
+
+@register_spatial("jump_cnf")
 class JumpCNFSpatial(Decoder):
     """Backward-chained radial flow spatial decoder (SEQUENCE_COUPLED=True).
 
@@ -634,6 +637,8 @@ class SelfAttentiveODEFunc(nn.Module):
         return torch.cat([v, -div.unsqueeze(-1), zeros_t, energy_rate], dim=-1)  # (B, L, d+3)
 
 
+
+@register_spatial("self_attentive_cnf")
 class SelfAttentiveCNFSpatial(Decoder):
     """Faithful reimplementation of the SelfAttentiveCNF from NeuralSTPP (Chen et al. 2021).
 

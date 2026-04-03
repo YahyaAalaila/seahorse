@@ -7,8 +7,16 @@ call cfg.build_model() to get a fully wired UnifiedSTPP.
 
 from .base import BaseModelConfig, ConfigRegistry
 from .auto_stpp import AutoSTPPConfig
+from .auto_stpp_faithful import AutoSTPPFaithfulConfig
 from .deep_stpp import DeepSTPPConfig
-from .neural_stpp import NeuralSTPPConfig, NeuralSTPPJumpSCConfig, NeuralSTPPAttnSCConfig
+from .neural_stpp import (
+    NeuralSTPPConfig,
+    NeuralSTPPJumpSCConfig,
+    NeuralSTPPAttnSCConfig,
+    NeuralSTPPSharedCondGMMConfig,
+    NeuralSTPPSharedJumpCNFConfig,
+    NeuralSTPPSharedAttnCNFConfig,
+)
 from .smash import SMASHConfig
 from .diffusion_stpp import DiffusionSTPPConfig
 from .factorized import (
@@ -21,10 +29,14 @@ __all__ = [
     "BaseModelConfig",
     "ConfigRegistry",
     "AutoSTPPConfig",
+    "AutoSTPPFaithfulConfig",
     "DeepSTPPConfig",
     "NeuralSTPPConfig",
     "NeuralSTPPJumpSCConfig",
     "NeuralSTPPAttnSCConfig",
+    "NeuralSTPPSharedCondGMMConfig",
+    "NeuralSTPPSharedJumpCNFConfig",
+    "NeuralSTPPSharedAttnCNFConfig",
     "SMASHConfig",
     "DiffusionSTPPConfig",
     "FactorizedConfig",

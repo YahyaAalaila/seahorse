@@ -8,111 +8,148 @@ import base64
 import io
 import json
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from unified_stpp.runner.results import RunResult
 
-
-# ---------------------------------------------------------------------------
-# BenchmarkTable
-# ---------------------------------------------------------------------------
 
 @dataclass
 class BenchmarkTable:
     """Container for all RunResults from a Benchmark run."""
 
     runs: list[RunResult]
-    surfaces_by_dataset: dict = field(default_factory=dict)
-    """Nested dict: ``{dataset_id: {preset: list[SurfaceResult]}}``."""
 
     # ------------------------------------------------------------------
-    # Tabular views
+    # Primary tabular views
     # ------------------------------------------------------------------
 
-    def to_dataframe(self, metric: str = "test_nll"):
+    def to_dataframe(self, metric: str = "test_nll", group: str = "all"):
         """Return a pivot DataFrame: presets (rows) × datasets (cols).
 
-        Cells contain ``mean ± std`` across seeds (NaN if only one seed).
-        Requires ``pandas``.
+        Parameters
+        ----------
+        metric : str
+            Attribute name on RunResult (e.g. ``"test_nll"``, ``"temporal_nll"``).
+        group : str
+            ``"exact"``  — only runs where ``nll_kind == "exact"``.
+            ``"approx"`` — only runs where ``nll_kind != "exact"``.
+            ``"all"``    — all runs (default).
         """
         import pandas as pd
 
         records = []
         for r in self.runs:
+            nll_kind = getattr(r, "nll_kind", "exact")
+            if group == "exact" and nll_kind != "exact":
+                continue
+            if group == "approx" and nll_kind == "exact":
+                continue
             val = getattr(r, metric, r.extra_metrics.get(metric, math.nan))
+            footnote = getattr(r, "nll_footnote", "")
             records.append(
-                {"preset": r.preset, "dataset": r.dataset_id, "seed": r.seed, "value": val}
+                {
+                    "preset": r.preset,
+                    "dataset": r.dataset_id,
+                    "seed": r.seed,
+                    "value": val,
+                    "footnote": footnote,
+                }
             )
         if not records:
             return pd.DataFrame()
 
         df = pd.DataFrame(records)
-        agg = (
-            df.groupby(["preset", "dataset"])["value"]
-            .agg(["mean", "std"])
-            .reset_index()
-        )
+        agg = df.groupby(["preset", "dataset"]).agg(
+            mean=("value", "mean"), std=("value", "std"), footnote=("footnote", "first")
+        ).reset_index()
         agg["cell"] = agg.apply(
-            lambda row: f"{row['mean']:.4f}"
-            if math.isnan(row["std"]) or row["std"] == 0
-            else f"{row['mean']:.4f} ± {row['std']:.4f}",
+            lambda row: (
+                f"{row['mean']:.4f}"
+                if math.isnan(row["std"]) or row["std"] == 0
+                else f"{row['mean']:.4f} ± {row['std']:.4f}"
+            ) + (row["footnote"] if row["footnote"] else ""),
             axis=1,
         )
-        pivot = agg.pivot(index="preset", columns="dataset", values="cell")
-        return pivot
+        return agg.pivot(index="preset", columns="dataset", values="cell")
 
     def to_latex(self, metric: str = "test_nll") -> str:
-        """Return a LaTeX table string with bold minimum per dataset column."""
+        """Return LaTeX tables: Table 1 (exact-NLL models), Table 2 (all models).
+
+        Non-exact models receive superscript footnotes (†, ‡, …).
+        """
         import pandas as pd
 
         records = []
+        footnote_map: dict[str, str] = {}
         for r in self.runs:
             val = getattr(r, metric, r.extra_metrics.get(metric, math.nan))
+            fn = getattr(r, "nll_footnote", "")
+            if fn:
+                footnote_map[r.preset] = fn
             records.append(
-                {"preset": r.preset, "dataset": r.dataset_id, "value": val}
+                {"preset": r.preset, "dataset": r.dataset_id, "value": val, "footnote": fn}
             )
         if not records:
             return ""
 
         df = pd.DataFrame(records)
-        agg = (
-            df.groupby(["preset", "dataset"])["value"]
-            .agg(["mean", "std"])
-            .reset_index()
-        )
-        datasets = sorted(agg["dataset"].unique())
-        presets = sorted(agg["preset"].unique())
+        agg = df.groupby(["preset", "dataset"]).agg(
+            mean=("value", "mean"), std=("value", "std"), footnote=("footnote", "first")
+        ).reset_index()
 
-        # Best (min mean) per dataset
-        best_mean: dict[str, float] = {}
-        for ds in datasets:
-            sub = agg[agg["dataset"] == ds]["mean"]
-            best_mean[ds] = float(sub.min()) if len(sub) else math.nan
-
-        header = " & ".join(["Preset"] + datasets) + r" \\"
-        rows = [r"\begin{tabular}{l" + "c" * len(datasets) + "}", r"\toprule", header, r"\midrule"]
-        for preset in presets:
-            cells = [preset]
+        def _make_table(presets, title):
+            sub_agg = agg[agg["preset"].isin(presets)]
+            if sub_agg.empty:
+                return ""
+            datasets = sorted(sub_agg["dataset"].unique())
+            best_mean: dict[str, float] = {}
             for ds in datasets:
-                sub = agg[(agg["preset"] == preset) & (agg["dataset"] == ds)]
-                if sub.empty:
-                    cells.append("—")
-                else:
-                    mean = float(sub["mean"].iloc[0])
-                    std = float(sub["std"].iloc[0])
-                    cell = f"{mean:.4f}" if math.isnan(std) or std == 0 else f"{mean:.4f}{{\\scriptsize ±{std:.4f}}}"
+                vals = sub_agg[sub_agg["dataset"] == ds]["mean"]
+                best_mean[ds] = float(vals.min()) if len(vals) else math.nan
+
+            header = " & ".join(["Preset"] + datasets) + r" \\"
+            lines = [
+                f"% {title}",
+                r"\begin{tabular}{l" + "c" * len(datasets) + "}",
+                r"\toprule", header, r"\midrule",
+            ]
+            for preset in sorted(presets):
+                cells = [preset + footnote_map.get(preset, "")]
+                for ds in datasets:
+                    row = sub_agg[(sub_agg["preset"] == preset) & (sub_agg["dataset"] == ds)]
+                    if row.empty:
+                        cells.append("—")
+                        continue
+                    mean = float(row["mean"].iloc[0])
+                    std = float(row["std"].iloc[0])
+                    cell = (
+                        f"{mean:.4f}"
+                        if math.isnan(std) or std == 0
+                        else f"{mean:.4f}{{\\scriptsize ±{std:.4f}}}"
+                    )
                     if abs(mean - best_mean[ds]) < 1e-8:
                         cell = r"\textbf{" + cell + "}"
                     cells.append(cell)
-            rows.append(" & ".join(cells) + r" \\")
-        rows += [r"\bottomrule", r"\end{tabular}"]
-        return "\n".join(rows)
+                lines.append(" & ".join(cells) + r" \\")
+            lines += [r"\bottomrule", r"\end{tabular}"]
+            if footnote_map:
+                for fn_text in sorted(set(footnote_map.values())):
+                    lines.append(f"% Footnote: {fn_text}")
+            return "\n".join(lines)
 
-    # ------------------------------------------------------------------
-    # Serialisation
-    # ------------------------------------------------------------------
+        exact_presets = {
+            r.preset for r in self.runs
+            if getattr(r, "nll_kind", "exact") == "exact"
+        }
+        all_presets = {r.preset for r in self.runs}
+
+        parts = []
+        if exact_presets:
+            parts.append(_make_table(exact_presets, "Table 1 — exact NLL models only"))
+        if all_presets - exact_presets:
+            parts.append(_make_table(all_presets, "Table 2 — all models"))
+        return "\n\n".join(parts)
 
     def to_json(self, path) -> None:
         """Write all runs to a JSON file."""
@@ -129,150 +166,50 @@ class BenchmarkTable:
         return cls(runs=[RunResult.from_dict(d) for d in data])
 
     # ------------------------------------------------------------------
-    # Rich report
+    # HTML report
     # ------------------------------------------------------------------
 
-    def plot_intensities(
-        self,
-        splits: dict,
-        out_dir,
-        fmt: str = "gif",
-        n_frames: int = 24,
-        n_grid: int = 40,
-        fps: int = 8,
-        device: str = "cpu",
-    ) -> list:
-        """Render animated intensity plots; one GIF/MP4/PNG per dataset.
-
-        Parameters
-        ----------
-        splits  : ``{dataset_id: (train_seqs, val_seqs, test_seqs)}`` —
-                  same dict that was passed to :class:`Benchmark`.
-        out_dir : directory to write output files into.
-        fmt     : ``"gif"`` | ``"mp4"`` | ``"png"`` (static 4-snapshot grid).
-        n_frames: number of animation frames (gif/mp4 only).
-        n_grid  : spatial grid resolution per axis.
-        fps     : animation speed.
-        device  : torch device for model inference.
-
-        Returns
-        -------
-        List of :class:`pathlib.Path` objects for the produced files.
-        """
-        from unified_stpp.benchmark.intensity_plot import plot_bench_intensities
-        return plot_bench_intensities(
-            self, splits=splits, out_dir=out_dir,
-            fmt=fmt, n_frames=n_frames, n_grid=n_grid, fps=fps, device=device,
-        )
-
-    def save_surface_comparison(
-        self,
-        out_dir,
-        render_mode: str = "3d",
-        animate: bool = False,
-        fps: int = 4,
-    ) -> dict:
-        """Save benchmark-level cross-model comparison panels (one per dataset).
-
-        Requires ``surfaces_by_dataset`` to be populated (i.e. ``Benchmark.run()``
-        was called with ``surface_viz`` enabled).
-
-        Only datasets with ≥ 2 models produce a comparison figure.
-
-        Parameters
-        ----------
-        out_dir     : directory to write comparison figures into.
-        render_mode : ``"3d"`` (default) or ``"2d"``.
-        animate     : also produce a .gif animation per dataset.
-        fps         : animation frames per second (when ``animate=True``).
-
-        Returns
-        -------
-        dict mapping artifact name → Path.
-        """
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from unified_stpp.viz.multi_plot import plot_model_comparison
-
-        out = Path(out_dir)
-        out.mkdir(parents=True, exist_ok=True)
-        artifacts: dict = {}
-
-        for dataset_id, preset_surfaces in self.surfaces_by_dataset.items():
-            if len(preset_surfaces) < 2:
-                continue
-
-            fig = plot_model_comparison(preset_surfaces, render_mode=render_mode)
-            png_path = out / f"comparison_{dataset_id}.png"
-            fig.savefig(png_path, bbox_inches="tight")
-            plt.close(fig)
-            artifacts[f"comparison_{dataset_id}"] = png_path
-
-            if animate:
-                from unified_stpp.viz.animation import animate_surface_sequence
-                gif_path = out / f"comparison_{dataset_id}.gif"
-                actual_path = animate_surface_sequence(
-                    preset_surfaces,
-                    output_path=gif_path,
-                    render_mode=render_mode,
-                    fps=fps,
-                )
-                artifacts[f"comparison_anim_{dataset_id}"] = actual_path
-
-        return artifacts
-
-    def report(self, out_dir) -> None:
-        """Write a self-contained HTML report + CSV + JSON to *out_dir*.
-
-        Files produced:
-        - ``results.json``
-        - ``table_test_nll.csv``
-        - ``report.html`` (figures embedded as base64)
-        - ``comparison_{dataset_id}.png`` (when surface_viz was used)
-        """
+    def report(self, out_dir, metric: str = "test_nll") -> None:
+        """Write a self-contained HTML report + CSV + JSON to *out_dir*."""
         import pandas as pd
 
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
 
-        # JSON
         self.to_json(out / "results.json")
 
-        # CSV pivot
-        pivot = self.to_dataframe(metric="test_nll")
-        if not isinstance(pivot, pd.DataFrame) or pivot.empty:
-            pivot_csv = ""
-        else:
-            pivot_csv = pivot.to_csv()
-            (out / "table_test_nll.csv").write_text(pivot_csv)
+        metric_slug = _metric_slug(metric)
 
-        # Figures
-        fig_nll_b64 = self._make_nll_bar_chart()
+        # Primary pivot: exact-NLL models only
+        pivot_exact = self.to_dataframe(metric=metric, group="exact")
+        # Full pivot: all models
+        pivot_all = self.to_dataframe(metric=metric, group="all")
+
+        for pivot, slug in [(pivot_exact, f"table_{metric_slug}_exact"),
+                            (pivot_all, f"table_{metric_slug}_all")]:
+            if isinstance(pivot, pd.DataFrame) and not pivot.empty:
+                (out / f"{slug}.csv").write_text(pivot.to_csv())
+
+        fig_metric_b64 = self._make_metric_bar_chart(metric)
         fig_time_b64 = self._make_time_bar_chart()
 
-        # Surface comparison (if surfaces were collected)
-        surface_b64s: dict = {}
-        if self.surfaces_by_dataset:
-            surface_artifacts = self.save_surface_comparison(out, render_mode="3d")
-            for key, path in surface_artifacts.items():
-                if Path(path).suffix == ".png":
-                    with open(path, "rb") as f:
-                        surface_b64s[key] = base64.b64encode(f.read()).decode()
-
-        # HTML
         html = _render_html(
             runs=self.runs,
-            pivot_html=pivot.to_html() if not pivot.empty else "<p>No data.</p>",
-            latex=self.to_latex(),
-            fig_nll_b64=fig_nll_b64,
+            metric=metric,
+            pivot_exact_html=pivot_exact.to_html() if isinstance(pivot_exact, pd.DataFrame) and not pivot_exact.empty else "<p>No exact-NLL runs.</p>",
+            pivot_all_html=pivot_all.to_html() if isinstance(pivot_all, pd.DataFrame) and not pivot_all.empty else "<p>No data.</p>",
+            latex=self.to_latex(metric=metric),
+            fig_metric_b64=fig_metric_b64,
             fig_time_b64=fig_time_b64,
-            surface_b64s=surface_b64s,
         )
         (out / "report.html").write_text(html, encoding="utf-8")
 
-    def _make_nll_bar_chart(self) -> str:
-        """Bar chart of test NLL per preset grouped by dataset. Returns base64 PNG."""
+    # ------------------------------------------------------------------
+    # Chart helpers
+    # ------------------------------------------------------------------
+
+    def _make_metric_bar_chart(self, metric: str) -> str:
+        """Bar chart of the selected benchmark metric by preset/dataset."""
         try:
             import matplotlib
             matplotlib.use("Agg")
@@ -281,16 +218,17 @@ class BenchmarkTable:
         except ImportError:
             return ""
 
-        records = [
-            {"preset": r.preset, "dataset": r.dataset_id, "test_nll": r.test_nll}
-            for r in self.runs
-            if not math.isnan(r.test_nll)
-        ]
+        records = []
+        for r in self.runs:
+            val = getattr(r, metric, r.extra_metrics.get(metric, math.nan))
+            if math.isnan(val):
+                continue
+            records.append({"preset": r.preset, "dataset": r.dataset_id, metric: val})
         if not records:
             return ""
 
         df = pd.DataFrame(records)
-        agg = df.groupby(["dataset", "preset"])["test_nll"].mean().reset_index()
+        agg = df.groupby(["dataset", "preset"])[metric].mean().reset_index()
         datasets = sorted(agg["dataset"].unique())
         presets = sorted(agg["preset"].unique())
 
@@ -298,10 +236,13 @@ class BenchmarkTable:
         for i, ds in enumerate(datasets):
             ax = axes[0][i]
             sub = agg[agg["dataset"] == ds]
-            vals = [float(sub[sub["preset"] == p]["test_nll"].iloc[0]) if p in sub["preset"].values else 0.0 for p in presets]
+            vals = [
+                float(sub[sub["preset"] == p][metric].iloc[0]) if p in sub["preset"].values else 0.0
+                for p in presets
+            ]
             ax.bar(presets, vals)
             ax.set_title(ds)
-            ax.set_ylabel("Test NLL" if i == 0 else "")
+            ax.set_ylabel(metric if i == 0 else "")
             ax.tick_params(axis="x", rotation=30)
         plt.tight_layout()
         return _fig_to_b64(fig)
@@ -331,8 +272,12 @@ class BenchmarkTable:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Module-level helpers
 # ---------------------------------------------------------------------------
+
+def _metric_slug(metric: str) -> str:
+    return metric.replace("/", "_").replace(" ", "_")
+
 
 def _fig_to_b64(fig) -> str:
     import matplotlib.pyplot as plt
@@ -346,31 +291,169 @@ def _fig_to_b64(fig) -> str:
 
 def _render_html(
     runs: list[RunResult],
-    pivot_html: str,
+    metric: str,
+    pivot_exact_html: str,
+    pivot_all_html: str,
     latex: str,
-    fig_nll_b64: str,
+    fig_metric_b64: str,
     fig_time_b64: str,
-    surface_b64s: dict | None = None,
 ) -> str:
-    """Produce a self-contained HTML string."""
+    """Produce a self-contained HTML string with full metric-semantics annotations."""
+    # All-runs table rows — includes objective, nll_kind, footnote
     rows_html = "\n".join(
-        f"<tr><td>{r.preset}</td><td>{r.dataset_id}</td><td>{r.seed}</td>"
-        f"<td>{r.val_nll:.4f}</td>"
+        f"<tr>"
+        f"<td>{r.preset}</td>"
+        f"<td>{r.dataset_id}</td>"
+        f"<td>{r.seed}</td>"
+        f"<td>{r.val_objective:.4f} ({r.val_metric_key})</td>"
         f"<td>{'n/a' if math.isnan(r.test_nll) else f'{r.test_nll:.4f}'}</td>"
-        f"<td>{r.train_time_sec:.1f}s</td><td>{r.n_params:,}</td></tr>"
+        f"<td>{r.train_time_sec:.1f}s</td>"
+        f"<td>{r.n_params:,}</td>"
+        f"<td>{getattr(r, 'nll_kind', '—')}</td>"
+        f"<td>{getattr(r, 'nll_footnote', '') or '—'}</td>"
+        f"</tr>"
         for r in runs
     )
-    nll_img = f'<img src="data:image/png;base64,{fig_nll_b64}" alt="NLL chart" style="max-width:100%">' if fig_nll_b64 else ""
-    time_img = f'<img src="data:image/png;base64,{fig_time_b64}" alt="Time chart" style="max-width:100%">' if fig_time_b64 else ""
 
-    surface_section = ""
-    if surface_b64s:
-        imgs = "\n".join(
-            f'<p><b>{key}</b></p>'
-            f'<img src="data:image/png;base64,{b64}" alt="{key}" style="max-width:100%">'
-            for key, b64 in surface_b64s.items()
+    # Metric metadata table — one row per unique preset
+    seen_presets: set[str] = set()
+    meta_rows: list[str] = []
+    asymmetry_presets: list[str] = []
+    for r in runs:
+        if r.preset in seen_presets:
+            continue
+        seen_presets.add(r.preset)
+        nll_kind  = getattr(r, "nll_kind", "exact")
+        val_key   = getattr(r, "val_metric_key", "nll")
+        obj       = getattr(r, "training_objective", "—")
+        obj_desc  = getattr(r, "objective_description", "") or obj
+        desc      = getattr(r, "nll_description", "—")
+        fn        = getattr(r, "nll_footnote", "") or "—"
+        group     = "A – exact" if nll_kind == "exact" else ("B – approx" if nll_kind == "approx" else "C – none")
+        # Flag asymmetry: training objective is not NLL (val metric ≠ test metric family)
+        asymmetry = val_key != "nll"
+        asym_flag = " ⚠" if asymmetry else ""
+        meta_rows.append(
+            f"<tr><td>{r.preset}{asym_flag}</td><td>{obj_desc}</td>"
+            f"<td>val/{val_key} → test/nll [{nll_kind}]</td><td>{desc}</td>"
+            f"<td>{fn}</td><td>{group}</td></tr>"
         )
-        surface_section = f"<h2>Surface Comparison</h2>\n{imgs}"
+        if asymmetry:
+            asymmetry_presets.append(r.preset)
+
+    # Asymmetry notice — shown when training objective is not NLL
+    asymmetry_section = ""
+    if asymmetry_presets:
+        asym_rows = []
+        seen_asym: set[str] = set()
+        for r in runs:
+            if r.preset not in asymmetry_presets or r.preset in seen_asym:
+                continue
+            seen_asym.add(r.preset)
+            val_key  = getattr(r, "val_metric_key", "nll")
+            nll_kind = getattr(r, "nll_kind", "exact")
+            obj_desc = getattr(r, "objective_description", "") or getattr(r, "training_objective", "—")
+            desc     = getattr(r, "nll_description", "—")
+            asym_rows.append(
+                f"<tr><td>{r.preset}</td><td>{obj_desc} (val/{val_key})</td>"
+                f"<td>test/nll [{nll_kind}]</td><td>{desc}</td></tr>"
+            )
+        if asym_rows:
+            asymmetry_section = f"""
+<h2>⚠ Metric Asymmetry Notice</h2>
+<p class="note">For the following presets, <strong>val_objective</strong> (used for checkpoint
+selection and HPO) and <strong>test_nll</strong> (used for benchmark reporting) are
+<em>different quantities</em>. val_objective is the model's native training objective;
+test_nll is an approximation of NLL. Do not compare val_objective across model families.</p>
+<table>
+<thead>
+  <tr><th>Preset</th><th>Training objective (val)</th><th>Test NLL kind</th><th>test_nll description</th></tr>
+</thead>
+<tbody>
+{"".join(asym_rows)}
+</tbody>
+</table>"""
+
+    # Temporal/spatial breakdown table (only rows where data is available)
+    breakdown_rows: list[str] = []
+    for r in runs:
+        t_nll = getattr(r, "temporal_nll", math.nan)
+        s_nll = getattr(r, "spatial_nll", math.nan)
+        if math.isnan(t_nll) and math.isnan(s_nll):
+            continue
+        t_str = "n/a" if math.isnan(t_nll) else f"{t_nll:.4f}"
+        s_str = "n/a" if math.isnan(s_nll) else f"{s_nll:.4f}"
+        breakdown_rows.append(
+            f"<tr><td>{r.preset}</td><td>{r.dataset_id}</td><td>{r.seed}</td>"
+            f"<td>{t_str}</td><td>{s_str}</td></tr>"
+        )
+    breakdown_section = ""
+    if breakdown_rows:
+        breakdown_section = f"""
+<h2>Temporal / Spatial NLL Breakdown</h2>
+<table>
+<thead>
+  <tr><th>Preset</th><th>Dataset</th><th>Seed</th><th>Temporal NLL</th><th>Spatial NLL</th></tr>
+</thead>
+<tbody>
+{"".join(breakdown_rows)}
+</tbody>
+</table>"""
+
+    extra_metric_keys = sorted(
+        {
+            key
+            for r in runs
+            for key, value in (getattr(r, "extra_metrics", {}) or {}).items()
+            if isinstance(value, (int, float)) and not math.isnan(float(value))
+        }
+    )
+    extra_metrics_section = ""
+    if extra_metric_keys:
+        extra_rows = []
+        for r in runs:
+            values = []
+            for key in extra_metric_keys:
+                value = (getattr(r, "extra_metrics", {}) or {}).get(key, math.nan)
+                values.append("n/a" if math.isnan(float(value)) else f"{float(value):.4f}")
+            extra_rows.append(
+                "<tr>"
+                f"<td>{r.preset}</td><td>{r.dataset_id}</td><td>{r.seed}</td>"
+                + "".join(f"<td>{v}</td>" for v in values)
+                + "</tr>"
+            )
+        headers = "".join(f"<th>{key}</th>" for key in extra_metric_keys)
+        extra_metrics_section = f"""
+<h2>Auxiliary NLL Diagnostics</h2>
+<p class="note">Verification-only metrics saved in <code>extra_metrics</code>. For diffusion, this includes upstream-style per-dim quantities alongside the benchmark-facing <code>test_nll</code>.</p>
+<table>
+<thead>
+  <tr><th>Preset</th><th>Dataset</th><th>Seed</th>{headers}</tr>
+</thead>
+<tbody>
+{"".join(extra_rows)}
+</tbody>
+</table>"""
+
+    metric_img = (
+        f'<img src="data:image/png;base64,{fig_metric_b64}" alt="{metric} chart" '
+        'style="max-width:100%">'
+        if fig_metric_b64
+        else ""
+    )
+    time_img = (
+        f'<img src="data:image/png;base64,{fig_time_b64}" alt="Time chart" style="max-width:100%">'
+        if fig_time_b64
+        else ""
+    )
+
+    footnote_legend = (
+        "<p><strong>Footnotes:</strong> "
+        "‡ approximate NLL via model-native mechanics (e.g., variational ELBO, intensity "
+        "quadrature + Tweedie spatial). Biased vs. true NLL; not directly comparable with "
+        "exact-NLL models. Exact-NLL models are directly comparable. "
+        "Approximate-NLL models are shown for reference.</p>"
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -384,31 +467,51 @@ def _render_html(
   th {{ background: #f0f0f0; }}
   pre {{ background: #f8f8f8; padding: 1em; overflow-x: auto; }}
   h2 {{ margin-top: 2em; }}
+  .note {{ color: #666; font-size: 0.9em; margin-bottom: 1em; }}
 </style>
 </head>
 <body>
 <h1>STPP Benchmark Report</h1>
 
-<h2>Pivot Table (Test NLL)</h2>
-{pivot_html}
+<h2>Section 1 — Exact-NLL Models ({metric})</h2>
+<p class="note">Only models reporting exact joint NLL/event in normalized space.
+Directly comparable across presets.</p>
+{pivot_exact_html}
+{footnote_legend}
 
-<h2>All Runs</h2>
+<h2>Section 2 — All Models ({metric})</h2>
+<p class="note">Includes approximate and proxy objectives. See Metric Metadata table for semantics.</p>
+{pivot_all_html}
+
+<h2>Section 3 — Metric Metadata</h2>
 <table>
 <thead>
-  <tr><th>Preset</th><th>Dataset</th><th>Seed</th><th>Val NLL</th><th>Test NLL</th><th>Train Time</th><th>Params</th></tr>
+  <tr><th>Preset</th><th>Objective</th><th>Val → Test (NLL kind)</th><th>NLL description</th><th>Footnote</th><th>Group</th></tr>
+</thead>
+<tbody>
+{"".join(meta_rows)}
+</tbody>
+</table>
+{asymmetry_section}
+
+<h2>Section 4 — All Runs</h2>
+<table>
+<thead>
+  <tr><th>Preset</th><th>Dataset</th><th>Seed</th><th>Val objective (metric)</th><th>Test NLL</th>
+      <th>Train Time</th><th>Params</th><th>NLL kind</th><th>Note</th></tr>
 </thead>
 <tbody>
 {rows_html}
 </tbody>
 </table>
+{breakdown_section}
+{extra_metrics_section}
 
 <h2>Figures</h2>
-{nll_img}
+{metric_img}
 {time_img}
 
-{surface_section}
-
-<h2>LaTeX Table</h2>
+<h2>LaTeX Tables</h2>
 <pre>{latex}</pre>
 </body>
 </html>"""

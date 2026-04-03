@@ -1,0 +1,43 @@
+# Faithful shared-hidden Neural STPP Conditional-GMM preset.
+#
+# This is the first faithful preset in the shared Neural STPP subfamily:
+#   - shared NeuralPointProcess temporal backbone
+#   - local raw-time reconstruction in the state model
+#   - standardized spatial inputs for the shared family
+#   - ConditionalGMM spatial decoder on the shared aux-state slice
+
+model:
+  preset: neural_stpp_shared_cond_gmm
+  hidden_dim: 32
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  backbone:
+    tpp_hidden_dims: "32-32"
+    tpp_cond: true
+    tpp_style: gru
+    share_hidden: true
+    tpp_actfn: softplus
+    solver: dopri5
+    atol: 1.0e-4
+    rtol: 1.0e-4
+    energy_regularization: 1.0e-4
+  decoder:
+    spatial:
+      hidden_dims: "64-64-64"
+      n_mixtures: 5
+      actfn: softplus
+
+training:
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  adam_beta2: 0.98
+  grad_clip: 0.0
+  n_epochs: 200
+  patience: 30
+
+data:
+  normalize: true
+  adapter_kwargs:
+    max_events: 4000

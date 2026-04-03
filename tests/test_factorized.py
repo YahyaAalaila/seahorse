@@ -158,6 +158,39 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
         )
         self.assertTrue(torch.isfinite(out["nll"]), f"nll not finite with t1=1.0: {out['nll']}")
 
+    def test_raw_reporting_metrics_follow_transform_correction(self):
+        model = build_model(
+            config={
+                "input_transform": {
+                    "type": "zscore",
+                    "normalize_time": True,
+                    "normalize_space": True,
+                    "time_mean": 0.0,
+                    "time_std": 2.0,
+                    "loc_mean": [0.0, 0.0],
+                    "loc_std": [3.0, 4.0],
+                }
+            },
+            preset="poisson_gmm",
+            spatial_dim=2,
+            hidden_dim=16,
+            event_cov_dim=0,
+            field_cov_dim=0,
+        )
+        model.eval()
+        with torch.no_grad():
+            out = model(times=_TIMES, locations=_LOCATIONS, lengths=_LENGTHS)
+        extra = out["extra_metrics"]
+        self.assertIn("raw_space_nll", extra)
+        self.assertIn("raw_space_temporal_nll", extra)
+        self.assertIn("raw_space_spatial_nll", extra)
+        expected_correction = float(torch.log(torch.tensor(2.0 * 3.0 * 4.0)).item())
+        self.assertAlmostEqual(
+            extra["raw_space_nll"],
+            float(out["nll"].item()) + expected_correction,
+            places=5,
+        )
+
 
 class TestFactorizedEndToEnd(unittest.TestCase):
     """Test 6: end-to-end forward via UnifiedSTPP.forward — nll finite for all presets."""

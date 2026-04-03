@@ -9,8 +9,10 @@ import torch.nn as nn
 from torch import Tensor
 
 from ..abstractions import StateCapabilities, StateContext, StateModel
+from ..model_registry import register_state
 
 
+@register_state("auto_stpp")
 class AutoSTPPStateModel(StateModel):
     """AutoSTPP state model.  Owns encoder and optional mark embedding."""
 

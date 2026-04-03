@@ -1,234 +1,293 @@
-# Unified Neural Spatiotemporal Point Process Framework
+# unified_stpp
 
-A modular, research-oriented framework that unifies neural STPP methods under a common
-$\mathcal{M} = (\mathcal{E}, \mathcal{D}, \mathcal{U}, \mathcal{G})$ architecture with
-systematic covariate augmentation.
+A research framework for neural spatio-temporal point processes (STPPs).
+Multiple model families — exact-likelihood, score-based, and diffusion-based — share
+a common training pipeline, artifact layout, and CLI.
 
-## Dev Quickstart
+---
+
+## Framework Design
+
+Every STPP model is decomposed into two framework-facing pieces.
+
+**`StateModel`** encodes the observed event history into a `StateContext`:
+
+```python
+ctx = state_model.encode_history(
+    times=times,          # (B, N)
+    locations=locations,  # (B, N, d)
+    lengths=lengths,      # (B,)
+)
+```
+
+**`EventModel`** consumes that state to compute the training objective:
+
+```python
+out = event_model.training_loss(
+    times=times, locations=locations, lengths=lengths,
+    state=ctx,
+)  # must return {"loss": Tensor}; may also include "nll", sub-term matrices, etc.
+```
+
+**`UnifiedSTPP`** is the thin wrapper that routes a forward pass through both:
+
+```python
+out = model(times=times, locations=locations, lengths=lengths)
+# {"nll": Tensor, ...}
+```
+
+The framework standardizes this outer interface. Internal components — sequence encoders,
+Hawkes kernels, normalizing flows, diffusion networks — are unconstrained.
+
+## What the Framework Standardizes
+
+| Concern | How it is standardized |
+|---------|------------------------|
+| Training entry point | `python -m unified_stpp fit --preset <name> ...` |
+| Optimizer, scheduler, gradient clipping | `TrainingConfig` → Lightning `Trainer` |
+| Validation metric and early stopping | Lightning `EarlyStopping` on `val/nll` |
+| Artifact layout | `artifacts/<preset>_<run-id>/` — same structure for every model |
+| State wrapper contract | `StateModel.encode_history(...) → StateContext` |
+| Event wrapper contract | `EventModel.training_loss(state, ...) → {"loss": Tensor}` |
+
+A Hawkes-process temporal model and a self-attentive CNF spatial model train through
+the same loop because they satisfy the same outer contracts.
+
+---
+
+## Available Presets
+
+| Preset | Family | Spatial model | Objective |
+|--------|--------|---------------|-----------|
+| `poisson_gmm` | Factorized — Homogeneous Poisson | Gaussian mixture | Exact NLL |
+| `hawkes_gmm` | Factorized — Hawkes | Gaussian mixture | Exact NLL |
+| `selfcorrecting_gmm` | Factorized — Self-correcting | Gaussian mixture | Exact NLL |
+| `poisson_cnf` | Factorized — Homogeneous Poisson | CNF, time-invariant | Exact NLL |
+| `hawkes_cnf` | Factorized — Hawkes | CNF, time-invariant | Exact NLL |
+| `selfcorrecting_cnf` | Factorized — Self-correcting | CNF, time-invariant | Exact NLL |
+| `poisson_tvcnf` | Factorized — Homogeneous Poisson | CNF, time-varying | Exact NLL |
+| `hawkes_tvcnf` | Factorized — Hawkes | CNF, time-varying | Exact NLL |
+| `selfcorrecting_tvcnf` | Factorized — Self-correcting | CNF, time-varying | Exact NLL |
+| `deep_stpp` | DeepSTPP | VAE latent + Gaussian | ELBO |
+| `auto_stpp` | AutoSTPP | AutoInt integrator | Exact NLL |
+| `neural_stpp_attn_sc` | Neural STPP | Self-attentive CNF | Exact NLL |
+| `neural_stpp_jump_sc` | Neural STPP | Jump CNF | Exact NLL |
+| `smash` | SMASH | Score-based | Score matching |
+| `diffusion_stpp` | Diffusion STPP | Diffusion decoder | Diffusion ELBO |
+
+Factorized models treat the temporal and spatial marginals as independent.
+All other families learn joint spatio-temporal structure.
+
+---
+
+## Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Optional: install pre-commit hooks for linting and formatting:
+
+```bash
 pre-commit install
 ```
 
-Run a tiny end-to-end training smoke:
+---
 
-```bash
-bash scripts/tiny_train.sh
+## Data Format
+
+Input files are newline-delimited JSON (JSONL), one sequence per line:
+
+```json
+{"times": [0.1, 0.4, 1.2, 2.7], "locations": [[0.3, 0.7], [0.1, 0.5], [0.8, 0.2], [0.4, 0.9]]}
+{"times": [0.3, 1.1], "locations": [[0.6, 0.3], [0.2, 0.8]]}
 ```
 
-Or directly:
+- `times`: list of floats (absolute or relative; variable sequence length is supported)
+- `locations`: list of `[x, y]` coordinate pairs (or higher-dimensional)
+- `marks` (optional): list of integer class labels
+
+Normalization (zero-mean, unit-variance per axis) is computed on the training split
+and applied consistently to val and test. No pre-processing is required.
+
+---
+
+## Quickstart
 
 ```bash
-python train.py --preset deep_stpp --data hawkes --n_train 8 --n_val 2 --n_epochs 1 --batch_size 4 --no_save_metrics
+python -m unified_stpp fit \
+    --preset hawkes_cnf \
+    --train  data/train.jsonl \
+    --val    data/val.jsonl
 ```
 
-## Framework Overview
+Add `--test data/test.jsonl` to evaluate on a held-out set.
+Training logs per-epoch validation NLL and prints the final result on exit.
 
-Every neural STPP is decomposed into four components:
+### Artifacts
 
-| Component | Role | Interface |
-|-----------|------|-----------|
-| **Encoder** $\mathcal{E}$ | History → latent state | `(events, lengths, x_event) → (z, states)` |
-| **Dynamics** $\mathcal{D}$ | Inter-event state evolution | `(z_n, Δt, x_field) → z(t)` |
-| **Updater** $\mathcal{U}$ | State update at events | `(z⁻, t, s, x_event, x_field) → z⁺` |
-| **Decoder** $\mathcal{G}$ | State → intensity/density | `(z, t, s, x_field) → log f*(t,s)` |
+Every run writes to `artifacts/<preset>_<run-id>/`:
 
-Covariates inject at four points:
-- **(I) Encoder**: event-level covariates enrich history representation
-- **(II) Dynamics**: field covariates modulate state evolution (non-trivial only for ODE dynamics)
-- **(III) Updater**: covariates at event location inform state transitions
-- **(IV) Decoder**: field covariates directly modulate intensity/density
+```
+artifacts/hawkes_cnf_<id>/
+├── config.yaml          # full resolved config (preset defaults + any overrides)
+├── run_result.json      # val_nll, test_nll, n_params, norm_stats, runtime, ...
+├── metrics.csv          # per-epoch train/val metrics (Lightning CSV logger)
+└── checkpoints/
+    ├── best.ckpt        # checkpoint at best validation NLL
+    └── last.ckpt        # checkpoint after the final epoch
+```
 
-## Implemented Methods
+`run_result.json` includes `norm_stats` (training-split time and location statistics),
+so results can be de-normalized without re-running.
 
-| Method | Encoder | Dynamics | Updater | Decoder |
-|--------|---------|----------|---------|---------|
-| **NeuralSTPP** | GRU | Neural ODE | GRU Jump | Cumulative hazard + CNF |
-| **DeepSTPP** | Attention | Identity | Attention | Log-normal mixture + Gaussian mixture |
-| **DSTPP** | Transformer | Identity | Attention | Score-based diffusion (joint) |
+### Reloading a run
 
-## Project Structure
+```python
+from unified_stpp import STPPRunner
+
+runner = STPPRunner.load("artifacts/hawkes_cnf_<id>/")
+```
+
+`load` looks for `checkpoints/best.ckpt` first, then falls back to `model.ckpt`.
+
+---
+
+## Configuration
+
+**Preset only** — no YAML needed; runs with preset defaults:
+
+```bash
+python -m unified_stpp fit --preset hawkes_cnf --train data/train.jsonl --val data/val.jsonl
+```
+
+**YAML config** — override specific fields; everything else inherits preset defaults:
+
+```yaml
+# my_run.yaml
+model:
+  preset: hawkes_cnf
+  hidden_dim: 256
+
+training:
+  n_epochs: 100
+  lr: 5.0e-4
+  batch_size: 32
+  patience: 20
+```
+
+```bash
+python -m unified_stpp fit --config my_run.yaml --train data/train.jsonl --val data/val.jsonl
+```
+
+See [`unified_stpp/config/schema.py`](unified_stpp/config/schema.py) for the full schema
+(`DataConfig`, `ModelConfig`, `TrainingConfig`, `LoggingConfig`).
+
+---
+
+## Repository Layout
 
 ```
 unified_stpp/
-├── train.py                          # Entry point
-├── configs/
-│   ├── neural_stpp.yaml
-│   ├── deep_stpp.yaml
-│   ├── dstpp.yaml
-│   └── deep_stpp_covariates.yaml     # Covariate-augmented example
-├── unified_stpp/
-│   ├── registry.py                   # Model factory + presets
-│   ├── models/
-│   │   ├── base.py                   # Abstract base classes (Encoder, Dynamics, Updater, Decoder)
-│   │   ├── unified_model.py          # UnifiedSTPP: composes E, D, U, G
-│   │   ├── encoders/
-│   │   │   ├── gru.py                # GRU (NeuralSTPP)
-│   │   │   ├── attention.py          # Self-attention (DeepSTPP)
-│   │   │   └── transformer.py        # Transformer + continuous time encoding (DSTPP)
-│   │   ├── dynamics/
-│   │   │   ├── identity.py           # z(t) = z_n (most methods)
-│   │   │   └── neural_ode.py         # dz/dt = f(z,t,X) (NeuralSTPP)
-│   │   ├── updaters/
-│   │   │   ├── gru_jump.py           # GRU cell update (NeuralSTPP)
-│   │   │   └── attention_update.py   # Cross-attention update (DeepSTPP, DSTPP)
-│   │   ├── decoders/
-│   │   │   ├── factorized.py         # f*(t)·f*(s|t) wrapper
-│   │   │   ├── temporal.py           # Cumulative hazard, log-normal mixture
-│   │   │   ├── spatial.py            # CNF, Gaussian mixture
-│   │   │   └── diffusion.py          # Score-based joint decoder (DSTPP)
-│   │   └── covariates/
-│   │       └── __init__.py           # LiftingMap, FieldCovariateEncoder
-│   ├── data/
-│   │   ├── dataset.py                # STPPDataset + collation
-│   │   └── synthetic.py              # Hawkes + inhomogeneous Poisson generators
-│   └── training/
-│       └── trainer.py                # Training loop
-└── requirements.txt
+├── models/
+│   ├── abstractions.py          # StateModel, EventModel, StateContext (ABCs)
+│   ├── unified_model.py         # UnifiedSTPP — wires state + event models
+│   ├── configs/                 # BaseModelConfig, ConfigRegistry, per-family configs
+│   ├── state_models/            # StateModel implementations
+│   ├── event_models/            # EventModel implementations
+│   ├── temporal_models/         # Internal: parametric temporal processes
+│   ├── spatial_models/          # Internal: spatial density / flow models
+│   └── ...                      # Other internal components
+├── training/
+│   ├── lightning_module.py      # STPPLightningModule
+│   └── data_module.py           # STPPDataModule (loads, normalizes, batches)
+├── config/
+│   └── schema.py                # Pydantic STPPConfig
+├── runner/
+│   └── runner.py                # STPPRunner — fit / save / load
+├── data/
+│   └── dataset.py               # STPPDataset (normalization, padding, collation)
+└── __main__.py                  # CLI entry point
 ```
 
-## Quick Start
+---
 
-```bash
-pip install -r requirements.txt
+## How to Add a New Model Family
 
-# Train DeepSTPP on synthetic Hawkes data
-python train.py --preset deep_stpp --n_epochs 50
+Five steps to integrate a new STPP family into the framework.
 
-# Train NeuralSTPP (requires torchdiffeq)
-python train.py --preset neural_stpp --n_epochs 50
+**1. Implement internal components** (optional)
 
-# Train DSTPP (diffusion decoder)
-python train.py --preset dstpp --n_epochs 50
+Add temporal models, spatial density models, encoders, or decoders anywhere under
+`models/temporal_models/`, `models/spatial_models/`, or a new subdirectory. No
+constraints — only the outer `StateModel` and `EventModel` wrappers need to satisfy
+the framework interface.
 
-# Use a YAML config
-python train.py --config configs/deep_stpp.yaml
-
-# Covariate-augmented model on inhomogeneous data
-python train.py --preset deep_stpp --field_cov_dim 1 --data inhomogeneous
-
-# Moving hotspot benchmark (with explicit switch at t1)
-python train.py --config unified_stpp/configs/moving_hotspot_with_covariates.yaml
-python train.py --config unified_stpp/configs/moving_hotspot_without_covariates.yaml
-
-# Regime-gated Hawkes benchmark (with/without covariates)
-python train.py --config unified_stpp/configs/regime_gated_hawkes_with_covariates.yaml
-python train.py --config unified_stpp/configs/regime_gated_hawkes_without_covariates.yaml
-```
-
-## Mix-and-Match
-
-The modular design allows combining components across methods:
+**2. Implement a `StateModel` subclass**
 
 ```python
-from unified_stpp.registry import build_model
+# models/state_models/my_state.py
+from unified_stpp.models.abstractions import StateModel, StateContext
 
-# DeepSTPP encoder + NeuralSTPP decoder (CNF spatial)
-model = build_model(
-    config={
-        "encoder": {"type": "attention", "num_heads": 4, "num_layers": 2},
-        "dynamics": {"type": "identity"},
-        "updater": {"type": "attention", "num_heads": 4},
-        "decoder": {
-            "type": "factorized",
-            "temporal": {"type": "cumulative_hazard"},
-            "spatial": {"type": "cnf"},
-        },
-    },
-    spatial_dim=2,
-    hidden_dim=64,
-)
+class MyStateModel(StateModel):
+    def encode_history(self, *, times, locations, lengths, **kwargs) -> StateContext:
+        # build state from observed history
+        return StateContext(payload={"h": h})
 ```
 
-**Compatibility note**: Not all combinations are valid. See Remark 2 in the paper.
-The main constraint is dimensional: all components must agree on `hidden_dim`.
-
-## Adding Covariates
+**3. Implement an `EventModel` subclass**
 
 ```python
-# With field covariates (e.g., temperature field)
-model = build_model(
-    config={},
-    preset="deep_stpp",
-    spatial_dim=2,
-    hidden_dim=64,
-    field_cov_dim=3,  # 3-dimensional covariate field
-)
+# models/event_models/my_event.py
+from unified_stpp.models.abstractions import EventModel
 
-# Covariates automatically injected at points (I), (III), (IV).
-# Point (II) is vacuous for identity dynamics.
+class MyEventModel(EventModel):
+    def training_loss(self, *, times, locations, lengths, state, **kwargs):
+        h = state.payload["h"]
+        # compute loss
+        return {"loss": loss, "nll": nll}
 ```
 
-## Sampling from Any Model
-
-All decoders implement `sample()`, enabling autoregressive event generation from any model configuration:
+**4. Write a config class and register it**
 
 ```python
-# After training:
-sampled_times, sampled_locs, mask = model.sample(
-    history_times, history_locations, history_lengths,
-    n_samples=50, t_max=20.0,
-)
+# models/configs/my_model.py
+import dataclasses
+from .base import BaseModelConfig, ConfigRegistry
+
+@ConfigRegistry.register("my_preset")
+@dataclasses.dataclass
+class MyModelConfig(BaseModelConfig):
+    my_param: float = 1.0
+
+    @classmethod
+    def from_dict(cls, d, *, hidden_dim=128, spatial_dim=2, **kwargs):
+        return cls(
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            my_param=d.get("my_param", 1.0),
+        )
+
+    def build_model(self):
+        from unified_stpp.models.unified_model import UnifiedSTPP
+        return UnifiedSTPP(
+            state_model=MyStateModel(...),
+            event_model=MyEventModel(...),
+            hidden_dim=self.hidden_dim,
+        )
 ```
 
-Sampling strategies per decoder:
-
-| Decoder | Temporal sampling | Spatial sampling |
-|---------|------------------|-----------------|
-| **Log-normal mixture** (DeepSTPP) | Ancestral: sample component k ~ π, then τ ~ LogNormal(μ_k, σ_k²) | Ancestral: sample component, then s ~ N(μ_k, σ_k² I) |
-| **Cumulative hazard + CNF** (NeuralSTPP) | Inverse CDF via bisection: find τ s.t. Λ*(τ) = -log(U) | CNF forward pass: z₀ ~ N(0,I), solve ODE τ: 0→1 |
-| **Diffusion** (DSTPP) | Joint annealed Langevin dynamics | (joint with temporal) |
-
-For intensity-based decoders or validation, use the **thinning sampler**:
+**5. Import in `models/configs/__init__.py`**
 
 ```python
-from unified_stpp.models.sampling import thinning_sample, IntensityEvaluator
-
-# Wrap model for intensity queries
-evaluator = IntensityEvaluator(model, z=z_state, t_prev=t_last)
-
-# Thinning-based sampling (works with any model)
-times, locs, counts = thinning_sample(
-    intensity_fn=evaluator.intensity,
-    t_start=t_last,
-    t_max=20.0,
-    spatial_bounds=(s_min, s_max),
-)
-
-# Intensity heatmap for visualization
-grid_x, grid_y, lam_grid = evaluator.intensity_grid(
-    t=5.0, s_min=s_min, s_max=s_max, n_grid=50,
-)
+from .my_model import MyModelConfig
 ```
 
-## Adding a New Component
+Done. `python -m unified_stpp fit --preset my_preset ...` now trains the new model
+through the same pipeline as every other preset.
 
-1. Subclass the appropriate base in `models/base.py`
-2. Implement the required interface
-3. Register in `registry.py`
+---
 
-Example: adding a new encoder:
-
-```python
-# In models/encoders/my_encoder.py
-from ..base import Encoder
-
-class MyEncoder(Encoder):
-    def __init__(self, input_dim, hidden_dim, **kwargs):
-        super().__init__(input_dim, hidden_dim)
-        # ... your architecture ...
-    
-    def forward(self, events, lengths, x_event=None):
-        # ... your forward pass ...
-        return z_final, all_states
-
-# In registry.py, add:
-ENCODER_REGISTRY["my_encoder"] = MyEncoder
-```
-
-## Citation
-
-If you use this framework, please cite the methodology paper (in preparation).
+Benchmark comparison (`bench`) and hyperparameter search (`tune`) are available as
+separate CLI subcommands; native sampling and intensity-evaluation metrics are planned.

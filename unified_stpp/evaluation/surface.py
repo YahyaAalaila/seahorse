@@ -36,6 +36,7 @@ import numpy as np
 import torch
 
 if TYPE_CHECKING:
+    from unified_stpp.models.unified_model import UnifiedSTPP
     from unified_stpp.runner.runner import STPPRunner
 
 _LOG = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ class SurfaceResult:
     """Number of samples used for proxy_kde; None otherwise."""
 
     model_name: Optional[str] = None
-    """Model that produced this surface, set externally (e.g. by SurfaceBenchmark)."""
+    """Model that produced this surface, set externally by comparison tooling."""
 
     history_times: Optional[np.ndarray] = None
     """(T,) history event times in original space used for this frame (optional)."""
@@ -156,16 +157,17 @@ class SurfaceEvaluator:
 
     Parameters
     ----------
-    runner : STPPRunner
-        A fitted runner (``runner.fit()`` must have been called).
+    model      : UnifiedSTPP — fitted model.
+    norm_stats : dict with keys ``time_mean``, ``time_std``, ``loc_mean``,
+                 ``loc_std`` (as returned by ``runner.norm_stats``).
     """
 
-    def __init__(self, runner: "STPPRunner"):
-        if runner._data_module is None or runner._lightning_module is None:
-            raise RuntimeError(
-                "SurfaceEvaluator requires a fitted runner. Call runner.fit() first."
-            )
-        self._runner = runner
+    def __init__(self, model: "UnifiedSTPP", norm_stats: dict):
+        self._model = model
+        self._time_mean: float = float(norm_stats["time_mean"])
+        self._time_std:  float = float(norm_stats["time_std"])
+        self._loc_mean = np.asarray(norm_stats["loc_mean"], dtype=np.float64)
+        self._loc_std  = np.asarray(norm_stats["loc_std"],  dtype=np.float64)
 
     # ------------------------------------------------------------------
     # Primary API
@@ -196,9 +198,8 @@ class SurfaceEvaluator:
         -------
         SurfaceResult with all coordinates in original space.
         """
-        model = self._runner.model
+        model = self._model
         model.eval()
-        ds = self._ds
         device = next(model.parameters()).device
 
         # 1. Normalize history
@@ -253,10 +254,10 @@ class SurfaceEvaluator:
         values_flat = values_norm.cpu().detach().numpy()
 
         if surface_type == "intensity":
-            scale = float(max(ds.time_std, 1e-8) * np.prod(np.maximum(ds.loc_std, 1e-8)))
+            scale = float(max(self._time_std, 1e-8) * np.prod(np.maximum(self._loc_std, 1e-8)))
             values_out = (values_flat / scale).astype(np.float32)
         elif surface_type == "density":
-            s_scale = float(np.prod(np.maximum(ds.loc_std, 1e-8)))
+            s_scale = float(np.prod(np.maximum(self._loc_std, 1e-8)))
             values_out = (values_flat / s_scale).astype(np.float32)
         else:  # proxy_kde — no calibrated denormalization
             values_out = values_flat.astype(np.float32)
@@ -265,8 +266,8 @@ class SurfaceEvaluator:
             values_out = values_out.reshape(n_grid, n_grid)
 
         # 8. Denormalize grid axes
-        xs_orig = x_norm * ds.loc_std[0] + ds.loc_mean[0]
-        ys_orig = y_norm * ds.loc_std[1] + ds.loc_mean[1] if y_norm is not None else np.zeros(0)
+        xs_orig = x_norm * self._loc_std[0] + self._loc_mean[0]
+        ys_orig = y_norm * self._loc_std[1] + self._loc_mean[1] if y_norm is not None else np.zeros(0)
 
         label, unit = _SURFACE_LABELS[surface_type]
         comparable = (surface_type != "proxy_kde")
@@ -289,24 +290,22 @@ class SurfaceEvaluator:
     def evaluate_sequence(
         self,
         spec: SurfaceEvalSpec,
+        sequence: dict,
     ) -> list[SurfaceResult]:
         """Evaluate a sequence of surface frames according to ``spec``.
 
-        Handles data extraction from the runner's data module, history window
-        selection, t_query resolution, and optional rolling history.
-
         Parameters
         ----------
-        spec : SurfaceEvalSpec
+        spec     : SurfaceEvalSpec
+        sequence : dict with keys ``"times"`` and ``"locations"`` in original
+                   (un-normalized) space.
 
         Returns
         -------
         list[SurfaceResult], one per resolved t_query.
         """
-        dm = self._runner._data_module
-        seq = dm.get_original_sequence(spec.split, spec.seq_idx)
-        all_times = seq["times"]
-        all_locs  = seq["locations"]
+        all_times = sequence["times"]
+        all_locs  = sequence["locations"]
 
         hist_t, hist_s = self._select_history(all_times, all_locs, spec)
         t_queries      = self._resolve_t_queries(hist_t, all_times, spec)
@@ -342,23 +341,17 @@ class SurfaceEvaluator:
     # Internal helpers — normalization
     # ------------------------------------------------------------------
 
-    @property
-    def _ds(self):
-        return self._runner._data_module._train_dataset
-
     def _normalize_history(
         self,
         history_times: np.ndarray,
         history_locs: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        ds = self._ds
-        t = (np.asarray(history_times, dtype=np.float64) - ds.time_mean) / max(ds.time_std, 1e-8)
-        s = (np.asarray(history_locs, dtype=np.float64) - ds.loc_mean) / np.maximum(ds.loc_std, 1e-8)
+        t = (np.asarray(history_times, dtype=np.float64) - self._time_mean) / max(self._time_std, 1e-8)
+        s = (np.asarray(history_locs, dtype=np.float64) - self._loc_mean) / np.maximum(self._loc_std, 1e-8)
         return t.astype(np.float32), s.astype(np.float32)
 
     def _normalize_t(self, t: float) -> float:
-        ds = self._ds
-        return float((t - ds.time_mean) / max(ds.time_std, 1e-8))
+        return float((t - self._time_mean) / max(self._time_std, 1e-8))
 
     def _grid_bounds_norm(
         self,
@@ -370,7 +363,6 @@ class SurfaceEvaluator:
         ``spatial_domain`` is in original space as ((x_lo, x_hi), (y_lo, y_hi)).
         When None, auto-compute from history ± 0.5σ.
         """
-        ds = self._ds
         d = s_norm.shape[-1] if s_norm.ndim >= 2 else 1
         has_history = s_norm.shape[0] > 0
 
@@ -380,8 +372,8 @@ class SurfaceEvaluator:
         for i in range(d):
             if spatial_domain is not None and i < len(spatial_domain) and spatial_domain[i] is not None:
                 lo_orig, hi_orig = spatial_domain[i]
-                s_lo[i] = (lo_orig - ds.loc_mean[i]) / max(float(ds.loc_std[i]), 1e-8)
-                s_hi[i] = (hi_orig - ds.loc_mean[i]) / max(float(ds.loc_std[i]), 1e-8)
+                s_lo[i] = (lo_orig - self._loc_mean[i]) / max(float(self._loc_std[i]), 1e-8)
+                s_hi[i] = (hi_orig - self._loc_mean[i]) / max(float(self._loc_std[i]), 1e-8)
             else:
                 col = s_norm[:, i] if s_norm.ndim >= 2 else s_norm
                 s_lo[i] = float(col.min() - 0.5) if has_history else -3.0
@@ -462,54 +454,28 @@ class SurfaceEvaluator:
         return list(np.linspace(t_lo, t_hi, n))
 
 
-# ---------------------------------------------------------------------------
-# SurfaceQuery — backward-compatibility shim
-# ---------------------------------------------------------------------------
-
 class SurfaceQuery:
-    """Backward-compatibility shim.  New code should use ``SurfaceEvaluator``.
-
-    Wraps ``SurfaceEvaluator.evaluate_frame()`` behind the old ``query()`` API.
-    The runner must have been fitted before constructing a ``SurfaceQuery``.
-    """
+    """Backward-compatible wrapper around ``SurfaceEvaluator``."""
 
     def __init__(self, runner: "STPPRunner"):
-        self._evaluator = SurfaceEvaluator(runner)
+        self._runner = runner
+        self._evaluator = SurfaceEvaluator(runner.model, runner.norm_stats)
 
     def query(
         self,
+        *,
         history_times: np.ndarray,
         history_locs: np.ndarray,
         t_query: float,
-        x_range: Optional[Tuple[float, float]] = None,
-        y_range: Optional[Tuple[float, float]] = None,
+        spatial_domain: Optional[Tuple] = None,
         n_grid: int = 50,
         n_samples: int = 500,
     ) -> SurfaceResult:
-        """Query a spatial surface at fixed time ``t_query`` given history.
-
-        Parameters
-        ----------
-        history_times : (L,) array, original space
-        history_locs  : (L, d) array, original space
-        t_query       : query time in original space
-        x_range       : (lo, hi) for x-axis; None → auto
-        y_range       : (lo, hi) for y-axis; None → auto
-        n_grid        : grid resolution per axis
-        n_samples     : samples for proxy_kde path
-
-        Returns
-        -------
-        SurfaceResult
-        """
-        spatial_domain = None
-        if x_range is not None or y_range is not None:
-            spatial_domain = (x_range, y_range)
         return self._evaluator.evaluate_frame(
-            history_times=history_times,
-            history_locs=history_locs,
-            t_query=t_query,
+            history_times=np.asarray(history_times, dtype=np.float32),
+            history_locs=np.asarray(history_locs, dtype=np.float32),
+            t_query=float(t_query),
             spatial_domain=spatial_domain,
-            n_grid=n_grid,
-            n_samples=n_samples,
+            n_grid=int(n_grid),
+            n_samples=int(n_samples),
         )

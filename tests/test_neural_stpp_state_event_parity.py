@@ -59,13 +59,17 @@ class TestNeuralSTPPStateEventOutputs(unittest.TestCase):
         self.assertIn("regularization_total", out)
         self.assertTrue(torch.isfinite(out["nll"]))
 
-        # mean_nll = base_mean_nll + regularization_total contract
+        # nll = pure base NLL (no regularization); loss = nll + regularization
+        torch.testing.assert_close(out["nll"], out["base_mean_nll"], rtol=1e-6, atol=1e-6)
         torch.testing.assert_close(
-            out["nll"],
+            out["loss"],
             out["base_mean_nll"] + out["regularization_total"],
             rtol=1e-6,
             atol=1e-6,
         )
+        # Breakdown scalars are present
+        self.assertIn("temporal_nll", out)
+        self.assertIn("spatial_nll", out)
 
     def test_neural_stpp_jump_sc_outputs(self):
         self._assert_outputs("neural_stpp_jump_sc", forward_seed=11)

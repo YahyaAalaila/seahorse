@@ -13,31 +13,23 @@ Usage
     result = ev.evaluate(test_dataloader)
     print(result.nll_per_event, result.ll_per_event)
 
-    # Optional parity check (IdentityDynamics only)
-    report = ev.parity_check(one_batch)
-    assert report.passed
-
 API
 ---
     EvalResult   — dataclass holding scalar evaluation metrics
-    ParityReport — dataclass holding parity-check results
     LikelihoodEvaluator
         .evaluate(dataloader) → EvalResult
         .evaluate_batch(batch) → EvalResult
-        .parity_check(batch, tol=1e-4) → ParityReport
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader
-
-from unified_stpp.models.unified_model import UnifiedSTPP
 
 
 # ---------------------------------------------------------------------------
@@ -59,34 +51,6 @@ class EvalResult:
 
     ll_total: float
     """Sum of per-event log-likelihoods (= ll_per_event * n_events)."""
-
-
-@dataclass
-class ParityReport:
-    """
-    Result of a parity check between the model's own forward-pass NLL
-    and a manually reconstructed NLL (encoder + decoder calls).
-
-    Only meaningful for models with IdentityDynamics.
-    """
-
-    passed: bool
-    """True if |model_nll - manual_nll| <= tol."""
-
-    model_nll: float
-    """NLL returned by model.forward(batch)["nll"]."""
-
-    manual_nll: float
-    """NLL reconstructed by calling encoder + decoder directly."""
-
-    max_abs_diff: float
-    """Absolute difference |model_nll - manual_nll|."""
-
-    n_events: int
-    """Number of valid events in the batch."""
-
-    tol: float
-    """Tolerance used for the PASS/FAIL decision."""
 
 
 # ---------------------------------------------------------------------------
@@ -193,128 +157,6 @@ class LikelihoodEvaluator:
             ll_per_event=-nll,
             n_events=n_events,
             ll_total=-nll * n_events,
-        )
-
-    def parity_check(
-        self,
-        batch: Dict[str, Any],
-        tol: float = 1e-4,
-    ) -> ParityReport:
-        """
-        Verify that model.forward NLL matches a manually reconstructed NLL.
-
-        Manually replicates `_forward_batched` (the IdentityDynamics path):
-          1. Encode the full sequence  → all_states (B, N, h)
-          2. Gather conditioning states z_cond = all_states[:, :L, :]
-          3. Call decoder.nll on flattened (z, t, s, t_prev) tuples
-          4. Apply the same valid-event mask and compute mean NLL
-          5. Compare to model.forward(batch)["nll"]
-
-        Only meaningful for models using IdentityDynamics.  For other
-        dynamics a ParityReport with passed=False is returned and
-        max_abs_diff is set to float("inf").
-
-        Parameters
-        ----------
-        batch : dict
-            One canonical batch (validate_batch-compliant).
-        tol   : float
-            Absolute tolerance for PASS/FAIL.
-
-        Returns
-        -------
-        ParityReport
-        """
-        batch = self._to_device(batch)
-        self.model.to(self.device)
-        self.model.eval()
-
-        # Parity check is defined for UnifiedSTPP models
-        if not isinstance(self.model, UnifiedSTPP):
-            return ParityReport(
-                passed=False,
-                model_nll=float("nan"),
-                manual_nll=float("nan"),
-                max_abs_diff=float("inf"),
-                n_events=0,
-                tol=tol,
-            )
-
-        times     = batch["times"]      # (B, N)
-        locations = batch["locations"]  # (B, N, d)
-        lengths   = batch["lengths"]    # (B,)
-
-        with torch.no_grad():
-            # --- model forward path ---
-            out = self.model(
-                times=times,
-                locations=locations,
-                lengths=lengths,
-                marks=batch.get("marks"),
-                x_event=batch.get("event_covariates"),
-                x_field_at_events=batch.get("field_covariates"),
-            )
-            model_nll = float(out["nll"].item())
-
-            # --- manual reconstruction path ---
-            events = torch.cat([times.unsqueeze(-1), locations], dim=-1)  # (B, N, 1+d)
-            _, all_states = self.model.encode(
-                events, lengths, x_event=batch.get("event_covariates")
-            )  # (B, N, h)
-
-            B = times.shape[0]
-            max_len = int(lengths.max().item())
-
-            if max_len < 2:
-                return ParityReport(
-                    passed=(model_nll == 0.0 or abs(model_nll) < tol),
-                    model_nll=model_nll,
-                    manual_nll=0.0,
-                    max_abs_diff=abs(model_nll),
-                    n_events=0,
-                    tol=tol,
-                )
-
-            L = max_len - 1
-
-            z_cond   = all_states[:, :L, :]              # (B, L, h)
-            t_target = times[:, 1:1 + L].unsqueeze(-1)   # (B, L, 1)
-            s_target = locations[:, 1:1 + L, :]          # (B, L, d)
-            t_prev   = times[:, :L].unsqueeze(-1)        # (B, L, 1)
-
-            n_idx  = torch.arange(L, device=times.device)
-            mask   = (n_idx.unsqueeze(0) < (lengths.unsqueeze(1) - 1)).float()  # (B, L)
-
-            h = z_cond.shape[-1]
-            d = s_target.shape[-1]
-            z_flat      = z_cond.reshape(B * L, h)
-            t_flat      = t_target.reshape(B * L, 1)
-            s_flat      = s_target.reshape(B * L, d)
-            t_prev_flat = t_prev.reshape(B * L, 1)
-
-            x_field_flat: Optional[Tensor] = None
-            x_field = batch.get("field_covariates")
-            if x_field is not None:
-                x_field_flat = x_field[:, :L, :].reshape(B * L, -1)
-
-            nll_flat = self.model.decoder.nll(
-                z_flat, t_flat, s_flat, t_prev_flat, x_field=x_field_flat
-            )  # (B*L,)
-            nll_all    = nll_flat.reshape(B, L)      # (B, L)
-            nll_masked = nll_all * mask              # (B, L)
-            manual_nll = float(
-                (nll_masked.sum() / mask.sum().clamp(min=1)).item()
-            )
-
-        n_events  = int(mask.sum().item())
-        abs_diff  = abs(model_nll - manual_nll)
-        return ParityReport(
-            passed=abs_diff <= tol,
-            model_nll=model_nll,
-            manual_nll=manual_nll,
-            max_abs_diff=abs_diff,
-            n_events=n_events,
-            tol=tol,
         )
 
     # ------------------------------------------------------------------

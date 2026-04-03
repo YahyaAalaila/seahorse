@@ -35,6 +35,9 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
 
+import numpy as np
+
+from unified_stpp.data.transforms import ZScoreTransformArtifact
 from .base import BaseModelConfig, ConfigRegistry
 
 if TYPE_CHECKING:
@@ -52,6 +55,7 @@ class FactorizedConfig(BaseModelConfig):
     tau:          float = 1.0
     t0:           float = 0.0
     t1:           Optional[float] = None
+    input_transform: Dict[str, Any] = dataclasses.field(default_factory=dict, repr=False)
 
     @classmethod
     def from_dict(
@@ -72,6 +76,7 @@ class FactorizedConfig(BaseModelConfig):
             tau=d.get("tau", 1.0),
             t0=float(d.get("t0", 0.0)),
             t1=float(d["t1"]) if d.get("t1") is not None else None,
+            input_transform=dict(d.get("input_transform", {}) or {}),
         )
 
     def build_model(self) -> "UnifiedSTPP":
@@ -97,7 +102,7 @@ class FactorizedConfig(BaseModelConfig):
             sigma_kernel=self.sigma_kernel,
             tau=self.tau,
         )
-        state_model = FactorizedStateModel()
+        state_model = FactorizedStateModel(input_transform=self.input_transform)
         event_model = FactorizedEventModel(
             temporal_model=temporal_model,
             spatial_model=spatial_model,
@@ -108,6 +113,48 @@ class FactorizedConfig(BaseModelConfig):
             state_model=state_model,
             event_model=event_model,
             hidden_dim=self.hidden_dim,
+        )
+
+    @classmethod
+    def fit_transform_artifact(cls, dm):
+        ds = getattr(dm, "train_dataset", None)
+        if ds is None:
+            return None
+        if getattr(ds, "coordinate_space", None) != "raw":
+            return None
+        sequences = list(getattr(ds, "sequences", []))
+        first_seq = next(iter(sequences), None)
+        if first_seq is not None:
+            spatial_dim = int(np.asarray(first_seq["locations"]).shape[-1])
+            all_times = np.concatenate(
+                [np.asarray(seq["times"], dtype=np.float32).reshape(-1) for seq in sequences],
+                axis=0,
+            )
+            all_locs = np.concatenate(
+                [np.asarray(seq["locations"], dtype=np.float32).reshape(-1, spatial_dim) for seq in sequences],
+                axis=0,
+            )
+            time_mean = float(all_times.mean())
+            time_std = float(all_times.std() + 1e-8)
+            loc_mean_arr = all_locs.mean(axis=0).astype(np.float32)
+            loc_std_arr = (all_locs.std(axis=0) + 1e-8).astype(np.float32)
+        else:
+            spatial_dim = 2
+            time_mean = 0.0
+            time_std = 1.0
+            loc_mean_arr = np.zeros(spatial_dim, dtype=np.float32)
+            loc_std_arr = np.ones(spatial_dim, dtype=np.float32)
+        return ZScoreTransformArtifact(
+            normalize_time=True,
+            normalize_space=True,
+            time_mean=time_mean,
+            time_std=time_std,
+            loc_mean=tuple(
+                float(x) for x in loc_mean_arr.tolist()
+            ),
+            loc_std=tuple(
+                float(x) for x in loc_std_arr.tolist()
+            ),
         )
 
 
@@ -155,6 +202,7 @@ class FactorizedCNFConfig(BaseModelConfig):
     # Observation window (same semantics as FactorizedConfig)
     t0: float           = 0.0
     t1: Optional[float] = None
+    input_transform: Dict[str, Any] = dataclasses.field(default_factory=dict, repr=False)
 
     @classmethod
     def from_dict(
@@ -180,6 +228,7 @@ class FactorizedCNFConfig(BaseModelConfig):
             squash_time=bool(d.get("squash_time", cls._SQUASH_TIME)),
             t0=float(d.get("t0", 0.0)),
             t1=float(d["t1"]) if d.get("t1") is not None else None,
+            input_transform=dict(d.get("input_transform", {}) or {}),
         )
 
     def build_model(self) -> "UnifiedSTPP":
@@ -209,7 +258,7 @@ class FactorizedCNFConfig(BaseModelConfig):
             otreg_strength=self.otreg_strength,
             squash_time=self.squash_time,
         )
-        state_model = FactorizedStateModel()
+        state_model = FactorizedStateModel(input_transform=self.input_transform)
         event_model = FactorizedEventModel(
             temporal_model=temporal_model,
             spatial_model=spatial_model,
@@ -221,6 +270,10 @@ class FactorizedCNFConfig(BaseModelConfig):
             event_model=event_model,
             hidden_dim=self.hidden_dim,
         )
+
+    @classmethod
+    def fit_transform_artifact(cls, dm):
+        return FactorizedConfig.fit_transform_artifact(dm)
 
 
 @ConfigRegistry.register("poisson_cnf")

@@ -186,9 +186,9 @@ class SurfaceVisualizationWorkflow:
             )
 
         # ---- 1. Evaluate model surfaces via SurfaceEvaluator ---------------
-        evaluator = SurfaceEvaluator(runner)
+        evaluator = SurfaceEvaluator(runner.model, runner.norm_stats)
 
-        # reference_provider and empirical_kde need the full sequence locs
+        # Fetch the sequence — used for evaluation and reference provider
         dm = runner._data_module
         seq = dm.get_original_sequence(spec.split, spec.seq_idx)
         all_locs = seq["locations"]
@@ -198,7 +198,7 @@ class SurfaceVisualizationWorkflow:
             from unified_stpp.viz.reference import EmpiricalKDEProvider
             eff_reference_provider = EmpiricalKDEProvider(event_locs=all_locs)
 
-        surfaces = evaluator.evaluate_sequence(spec)
+        surfaces = evaluator.evaluate_sequence(spec, seq)
 
         # ---- 1b. Log per-frame diagnostic --------------------------------
         for i, s in enumerate(surfaces):
