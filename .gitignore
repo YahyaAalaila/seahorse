@@ -24,6 +24,9 @@ dist/
 # Project outputs
 runs/
 artifacts/
+bench_*/
+checkpoints/
+logs/
 wandb/
 ray_results/
 *.log
@@ -38,3 +41,11 @@ ray_results/
 
 # Local junk
 unnified_stpp/
+temp_*.py
+original_models_manifesto.md
+scripts/debug_neural_stpp_surface.py
+
+# Generated local data/reference artifacts
+data/sthp0/dataset_meta.json
+data/sthp0/intensity_surface.html
+data/sthp1/
