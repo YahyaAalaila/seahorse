@@ -38,11 +38,9 @@ all = [
   "unified-stpp[runner,hpo]",
 ]
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["unified_stpp", "unified_stpp.*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -57,4 +55,3 @@ extend-exclude = ["runs", "artifacts", ".venv", "unified_stpp/data_cache"]
 [tool.ruff.lint]
 select = ["E", "F"]
 ignore = ["E501"]
-

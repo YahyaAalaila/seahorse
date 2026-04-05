@@ -1,13 +1,12 @@
-"""
-Synthetic data generation and reference helpers.
+"""Synthetic data generation and reference helpers.
 
 The maintained live CLI in ``unified_stpp.__main__`` consumes prebuilt JSONL
 splits for ``fit``, ``evaluate``, ``bench``, and ``tune``. Those splits are
 currently produced offline by scripts such as ``scripts/gen_sthp_splits.py``,
 which depend on this module's STHP generator and plotting/reference helpers.
 
-A review snapshot is preserved at ``archive/data/synthetic.py`` so older and
-non-STHP paths can be archived incrementally.
+Older or non-STHP experimental paths are reference-only and may remain archived
+elsewhere in the repo; this module is the maintained live implementation.
 """
 
 import abc

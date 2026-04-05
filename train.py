@@ -1,10 +1,11 @@
-"""
-Legacy compatibility wrapper for the archived root training script.
+"""Legacy compatibility wrapper for the historical root training script.
 
 The maintained entrypoint is ``python -m unified_stpp`` with subcommands
 ``fit``, ``evaluate``, ``bench``, and ``tune``.
 
-The pre-cleanup implementation has been preserved at ``archive/train.py``.
+This file intentionally preserves the old ``python train.py ...`` workflow by
+routing it into the live package CLI. Any archived reference code remains under
+``archive/`` where retained; there is no maintained ``archive/train.py``.
 """
 
 from __future__ import annotations
