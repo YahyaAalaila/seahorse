@@ -1302,7 +1302,7 @@ class TestNeuralSTPPIntensity(unittest.TestCase):
     @staticmethod
     def _make_neural_stpp_model(spatial_type: str):
         """Return a tiny NeuralSTPP UnifiedSTPP (no training needed)."""
-        preset = "neural_stpp_jump_sc" if spatial_type == "jump_cnf" else "neural_stpp_attn_sc"
+        preset = "neural_jumpcnf" if spatial_type == "jump_cnf" else "neural_attncnf"
         from unified_stpp.registry import build_model
 
         return build_model(config={}, preset=preset, hidden_dim=8, spatial_dim=2)

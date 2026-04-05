@@ -361,10 +361,10 @@ def calc_lamb_from_runner(
 ) -> IntensityCubeResult:
     """Notebook-faithful ``calc_lamb`` wrapper for a loaded runner."""
     preset = runner.config.model.preset
-    if preset not in {"deep_stpp", "auto_stpp_faithful"}:
+    if preset not in {"deep_stpp", "auto_stpp"}:
         raise ValueError(
             "Notebook-faithful calc_lamb currently supports only "
-            f"'deep_stpp' and 'auto_stpp_faithful', got {preset!r}."
+            f"'deep_stpp' and 'auto_stpp', got {preset!r}."
         )
     if seq_idx < 0 or seq_idx >= len(sequences):
         raise IndexError(

@@ -1,4 +1,4 @@
-"""AutoSTPPConfig — construction config for the auto_stpp family."""
+"""AutoSTPPConfig — construction config for the legacy coarse AutoSTPP family."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _bbox_from_dm(dm: "STPPDataModule") -> dict:
     }
 
 
-@ConfigRegistry.register("auto_stpp")
+@ConfigRegistry.register("auto_stpp_legacy", status="legacy")
 @dataclasses.dataclass
 class AutoSTPPConfig(BaseModelConfig):
     _STATE_MODEL: ClassVar[str] = "auto_stpp"

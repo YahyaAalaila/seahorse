@@ -8,11 +8,34 @@ from unified_stpp.registry import PRESETS, build_model
 
 
 class TestRegistryCompat(unittest.TestCase):
-    def test_presets_expose_registered_names(self):
+    def test_presets_expose_canonical_public_names(self):
         from unified_stpp.models.configs import ConfigRegistry
 
-        self.assertEqual(set(PRESETS), set(ConfigRegistry.preset_names()))
+        self.assertEqual(set(PRESETS), set(ConfigRegistry.canonical_preset_names()))
         self.assertTrue(all(payload == {} for payload in PRESETS.values()))
+
+    def test_registry_exposes_canonical_and_status_metadata(self):
+        from unified_stpp.models.configs import ConfigRegistry
+
+        auto = ConfigRegistry.describe("auto_stpp")
+        self.assertEqual(auto.canonical_name, "auto_stpp")
+        self.assertEqual(auto.status, "canonical")
+        self.assertFalse(auto.is_alias)
+
+        alias = ConfigRegistry.describe("auto_stpp_faithful")
+        self.assertEqual(alias.canonical_name, "auto_stpp")
+        self.assertEqual(alias.status, "deprecated")
+        self.assertTrue(alias.is_alias)
+        self.assertIn("auto_stpp_faithful", ConfigRegistry.accepted_preset_names())
+        self.assertNotIn("auto_stpp_faithful", ConfigRegistry.canonical_preset_names())
+
+        legacy = ConfigRegistry.describe("auto_stpp_legacy")
+        self.assertEqual(legacy.canonical_name, "auto_stpp_legacy")
+        self.assertEqual(legacy.status, "legacy")
+        self.assertFalse(legacy.is_alias)
+
+        provisional = ConfigRegistry.describe("neural_cond_gmm")
+        self.assertEqual(provisional.status, "provisional")
 
     def test_build_model_supports_known_preset(self):
         from unified_stpp.models.unified_model import UnifiedSTPP
@@ -27,6 +50,26 @@ class TestRegistryCompat(unittest.TestCase):
         )
 
         self.assertIsInstance(model, UnifiedSTPP)
+
+    def test_build_model_accepts_deprecated_alias(self):
+        canonical = build_model(
+            config={},
+            preset="auto_stpp",
+            spatial_dim=2,
+            hidden_dim=16,
+            event_cov_dim=0,
+            field_cov_dim=0,
+        )
+        alias = build_model(
+            config={},
+            preset="auto_stpp_faithful",
+            spatial_dim=2,
+            hidden_dim=16,
+            event_cov_dim=0,
+            field_cov_dim=0,
+        )
+
+        self.assertEqual(type(canonical.event_model), type(alias.event_model))
 
     def test_build_model_rejects_unknown_preset(self):
         with self.assertRaisesRegex(ValueError, "Unknown preset"):

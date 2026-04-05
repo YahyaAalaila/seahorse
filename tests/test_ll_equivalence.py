@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from unified_stpp.evaluation.intensity import calc_lamb, eval_intensity
+from unified_stpp.models.configs import ConfigRegistry
 from unified_stpp.registry import build_model
 
 
@@ -47,12 +48,6 @@ class TestNLLFinite(unittest.TestCase):
             torch.isfinite(out["nll"]),
             f"{preset}: NLL is not finite — got {out['nll'].item():.4g}",
         )
-
-    def test_neural_stpp_attn_sc_nll_finite(self):
-        self._check_preset("neural_stpp_attn_sc")
-
-    def test_neural_stpp_jump_sc_nll_finite(self):
-        self._check_preset("neural_stpp_jump_sc")
 
     def test_auto_stpp_nll_finite(self):
         self._check_preset("auto_stpp")
@@ -109,36 +104,11 @@ class TestEvalIntensity(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(vals)), f"Non-finite values: {vals}")
 
 
-class TestUnsupportedEvalIntensity(unittest.TestCase):
-    _S_GRID = np.array([[0.0, 0.0], [0.3, -0.1]], dtype=np.float32)
-
-    def _call_neural(self, preset):
-        model = _build(preset)
-        model.eval()
-        history_times, history_locs = _history_arrays()
-        return eval_intensity(
-            model=model,
-            t_query=2.0,
-            s_grid=self._S_GRID,
-            history_times=history_times,
-            history_locs=history_locs,
-            t_bias=0.0,
-            t_scale=1.0,
-            s_bias=np.zeros(2, dtype=np.float32),
-            s_scale=np.ones(2, dtype=np.float32),
-            device=torch.device(_DEVICE),
-            correct_for_normalization=False,
-        )
-
-    def test_neural_stpp_attn_sc_intensity_supported(self):
-        result = self._call_neural("neural_stpp_attn_sc")
-        self.assertEqual(result.shape, self._S_GRID.shape[:1])
-        self.assertTrue(np.all(np.isfinite(result)), f"Non-finite: {result}")
-
-    def test_neural_stpp_jump_sc_intensity_supported(self):
-        result = self._call_neural("neural_stpp_jump_sc")
-        self.assertEqual(result.shape, self._S_GRID.shape[:1])
-        self.assertTrue(np.all(np.isfinite(result)), f"Non-finite: {result}")
+class TestProvisionalPresetStatus(unittest.TestCase):
+    def test_neural_presets_are_marked_provisional(self):
+        for preset in ("neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"):
+            with self.subTest(preset=preset):
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "provisional")
 
 
 class TestScaleCorrection(unittest.TestCase):

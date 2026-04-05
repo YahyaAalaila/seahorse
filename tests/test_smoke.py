@@ -2,11 +2,12 @@ import unittest
 
 import torch
 
+from unified_stpp.models.configs import ConfigRegistry
 from unified_stpp.registry import build_model
 
 
 class SmokeTest(unittest.TestCase):
-    def test_smoke_forward_nll_is_finite(self):
+    def test_non_provisional_forward_nll_is_finite(self):
         times = torch.tensor([[0.0, 0.2, 0.5, 0.9]], dtype=torch.float32)
         locations = torch.tensor(
             [[[0.0, 0.0], [0.3, -0.1], [0.1, 0.2], [-0.2, 0.1]]], dtype=torch.float32
@@ -14,14 +15,13 @@ class SmokeTest(unittest.TestCase):
         lengths = torch.tensor([4], dtype=torch.long)
 
         for preset in (
-            "neural_stpp_attn_sc",
-            "neural_stpp_jump_sc",
             "deep_stpp",
             "auto_stpp",
-            "auto_stpp_faithful",
+            "auto_stpp_legacy",
             "smash",
         ):
             with self.subTest(preset=preset):
+                self.assertNotEqual(ConfigRegistry.canonical_status(preset), "provisional")
                 torch.manual_seed(0)
                 model = build_model(
                     config={},

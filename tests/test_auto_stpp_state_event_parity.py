@@ -1,4 +1,4 @@
-"""Regression checks for auto_stpp coarse path outputs."""
+"""Regression checks for the legacy coarse AutoSTPP path."""
 
 from __future__ import annotations
 
@@ -29,11 +29,11 @@ def _tiny_batch():
 
 
 class TestAutoSTPPStateEventOutputs(unittest.TestCase):
-    def test_auto_stpp_outputs(self):
+    def test_auto_stpp_legacy_outputs(self):
         torch.manual_seed(7)
         model = build_model(
             config={},
-            preset="auto_stpp",
+            preset="auto_stpp_legacy",
             spatial_dim=2,
             hidden_dim=16,
         )

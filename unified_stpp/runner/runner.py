@@ -369,6 +369,7 @@ class STPPRunner:
             nll_description = caps.raw_nll_description or caps.nll_description
         result = RunResult(
             preset=cfg.model.preset,
+            preset_status=ConfigRegistry.canonical_status(cfg.model.preset),
             dataset_id=dataset_id,
             seed=cfg.data.seed,
             val_objective=val_objective,

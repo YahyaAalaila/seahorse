@@ -13,7 +13,7 @@ from temp_intensity_viz import (
 class TestNeuralSTPPVizProfiles(unittest.TestCase):
     def test_cond_gmm_keeps_dense_defaults(self):
         profile = _resolve_neural_stpp_viz_profile(
-            preset="neural_stpp_shared_cond_gmm",
+            preset="neural_cond_gmm",
             x_nstep=DEFAULT_X_NSTEP,
             y_nstep=DEFAULT_Y_NSTEP,
             t_nstep=DEFAULT_T_NSTEP,
@@ -28,7 +28,7 @@ class TestNeuralSTPPVizProfiles(unittest.TestCase):
 
     def test_jumpcnf_auto_coarsens_dense_defaults(self):
         profile = _resolve_neural_stpp_viz_profile(
-            preset="neural_stpp_shared_jumpcnf",
+            preset="neural_jumpcnf",
             x_nstep=DEFAULT_X_NSTEP,
             y_nstep=DEFAULT_Y_NSTEP,
             t_nstep=DEFAULT_T_NSTEP,
@@ -43,7 +43,7 @@ class TestNeuralSTPPVizProfiles(unittest.TestCase):
 
     def test_attncnf_preserves_explicit_grid_and_chunk_override(self):
         profile = _resolve_neural_stpp_viz_profile(
-            preset="neural_stpp_shared_attncnf",
+            preset="neural_attncnf",
             x_nstep=25,
             y_nstep=19,
             t_nstep=7,

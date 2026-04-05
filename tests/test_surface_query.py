@@ -14,6 +14,7 @@ import unittest
 import numpy as np
 import torch
 
+from unified_stpp.models.configs import ConfigRegistry
 from unified_stpp.registry import build_model
 
 # ---------------------------------------------------------------------------
@@ -631,14 +632,8 @@ class TestQuerySurfaceContract(unittest.TestCase):
     def test_auto_stpp(self):
         self._check("auto_stpp")
 
-    def test_auto_stpp_faithful(self):
-        self._check("auto_stpp_faithful")
-
-    def test_neural_stpp_jump_sc(self):
-        self._check("neural_stpp_jump_sc", config=_FAST_CNF_CONFIG)
-
-    def test_neural_stpp_attn_sc(self):
-        self._check("neural_stpp_attn_sc", config=_FAST_CNF_CONFIG)
+    def test_auto_stpp_legacy(self):
+        self._check("auto_stpp_legacy")
 
     def test_factorized_gmm(self):
         self._check("hawkes_gmm")
@@ -657,7 +652,7 @@ class TestQuerySurfaceContract(unittest.TestCase):
     # ---- surface_query_type declaration ------------------------------------
 
     def test_surface_query_type_intensity_families(self):
-        for preset in ("deep_stpp", "auto_stpp", "auto_stpp_faithful", "hawkes_gmm"):
+        for preset in ("deep_stpp", "auto_stpp", "auto_stpp_legacy", "hawkes_gmm"):
             with self.subTest(preset=preset):
                 model = build_model(
                     config={}, preset=preset, spatial_dim=2, hidden_dim=16,
@@ -679,6 +674,11 @@ class TestQuerySurfaceContract(unittest.TestCase):
                     model.event_model.surface_query_type, "proxy_kde",
                     f"{preset}: expected surface_query_type='proxy_kde'",
                 )
+
+    def test_provisional_neural_presets_are_not_in_benchmark_surface_gate(self):
+        for preset in ("neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"):
+            with self.subTest(preset=preset):
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "provisional")
 
     def test_base_event_model_raises(self):
         """Base EventModel.query_surface() must raise NotImplementedError."""

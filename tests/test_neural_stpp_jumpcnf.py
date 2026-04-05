@@ -285,8 +285,8 @@ class TestNeuralJumpCNFSpatial(unittest.TestCase):
 
 class TestNeuralJumpCNFPreset(unittest.TestCase):
     def test_preset_loads_builds_and_wires_solve_reverse(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_jumpcnf")
-        self.assertEqual(cfg.model.preset, "neural_stpp_shared_jumpcnf")
+        cfg = STPPConfig.from_source(preset="neural_jumpcnf")
+        self.assertEqual(cfg.model.preset, "neural_jumpcnf")
         self.assertEqual(cfg.data.adapter_kwargs.get("max_events"), 4000)
         model = cfg.model.build_model()
 
@@ -323,7 +323,7 @@ class TestNeuralJumpCNFPreset(unittest.TestCase):
         self.assertFalse(decoder.cnf.use_adjoint)
 
     def test_fixed_time_query_terms_match_joint_intensity_factorization(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_jumpcnf")
+        cfg = STPPConfig.from_source(preset="neural_jumpcnf")
         model = cfg.model.build_model()
         model.eval()
 
@@ -364,7 +364,7 @@ class TestNeuralJumpCNFPreset(unittest.TestCase):
         torch.testing.assert_close(joint, expected, rtol=1e-5, atol=1e-5)
 
     def test_conditional_logprob_fn_matches_last_sequence_term(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_jumpcnf")
+        cfg = STPPConfig.from_source(preset="neural_jumpcnf")
         model = cfg.model.build_model()
         model.eval()
 

@@ -106,12 +106,12 @@ class ModelConfig(BaseModel):
     def preset_must_exist(cls, v: str) -> str:
         from unified_stpp.models.configs import ConfigRegistry
 
-        known = ConfigRegistry.preset_names()
-        if v not in known:
+        if not ConfigRegistry.is_registered(v):
+            known = ConfigRegistry.preset_names()
             raise ValueError(
                 f"Unknown preset '{v}'. Available presets: {sorted(known)}"
             )
-        return v
+        return ConfigRegistry.resolve_name(v)
 
     @property
     def build_overrides(self) -> dict[str, Any]:
@@ -412,11 +412,18 @@ class STPPConfig(BaseModel):
             with open(config) as f:
                 return _yaml_load_compat(f)
         if preset:
-            yaml_path = Path(__file__).parent.parent / "configs" / f"{preset}.yaml"
+            from unified_stpp.models.configs import ConfigRegistry
+
+            source_preset = (
+                ConfigRegistry.resolve_name(preset)
+                if ConfigRegistry.is_registered(preset)
+                else preset
+            )
+            yaml_path = Path(__file__).parent.parent / "configs" / f"{source_preset}.yaml"
             if yaml_path.exists():
                 with open(yaml_path) as f:
                     return _yaml_load_compat(f)
-            return {"data": {}, "model": {"preset": preset}, "training": {}}
+            return {"data": {}, "model": {"preset": source_preset}, "training": {}}
         raise ValueError("Either 'preset' or 'config' must be provided.")
 
     @classmethod
@@ -512,7 +519,14 @@ class STPPConfig(BaseModel):
         """
         if config:
             return Path(config)
-        yaml_path = Path(__file__).parent.parent / "configs" / f"{preset}.yaml"
+        from unified_stpp.models.configs import ConfigRegistry
+
+        source_preset = (
+            ConfigRegistry.resolve_name(preset)
+            if preset is not None and ConfigRegistry.is_registered(preset)
+            else preset
+        )
+        yaml_path = Path(__file__).parent.parent / "configs" / f"{source_preset}.yaml"
         if not yaml_path.exists():
             raise FileNotFoundError(
                 f"No bundled YAML for preset '{preset}' at {yaml_path}"

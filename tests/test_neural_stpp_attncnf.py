@@ -129,8 +129,8 @@ class TestNeuralAttnCNFSpatial(unittest.TestCase):
 
 class TestNeuralAttnCNFPreset(unittest.TestCase):
     def test_preset_loads_builds_and_wires_faithful_decoder(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_attncnf")
-        self.assertEqual(cfg.model.preset, "neural_stpp_shared_attncnf")
+        cfg = STPPConfig.from_source(preset="neural_attncnf")
+        self.assertEqual(cfg.model.preset, "neural_attncnf")
         self.assertEqual(cfg.data.adapter_kwargs.get("max_events"), 4000)
         model = cfg.model.build_model()
 
@@ -161,7 +161,7 @@ class TestNeuralAttnCNFPreset(unittest.TestCase):
         self.assertTrue(torch.isfinite(out["nll"]))
 
     def test_fixed_time_query_terms_match_joint_intensity_factorization(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_attncnf")
+        cfg = STPPConfig.from_source(preset="neural_attncnf")
         model = cfg.model.build_model()
         model.eval()
 
@@ -202,7 +202,7 @@ class TestNeuralAttnCNFPreset(unittest.TestCase):
         torch.testing.assert_close(joint, expected, rtol=1e-5, atol=1e-5)
 
     def test_conditional_logprob_fn_matches_last_sequence_term(self):
-        cfg = STPPConfig.from_source(preset="neural_stpp_shared_attncnf")
+        cfg = STPPConfig.from_source(preset="neural_attncnf")
         model = cfg.model.build_model()
         model.eval()
 

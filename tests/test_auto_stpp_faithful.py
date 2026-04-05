@@ -1,4 +1,4 @@
-"""Regression checks for the upstream-faithful auto_stpp_faithful preset."""
+"""Regression checks for the canonical upstream-faithful AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ class TestAutoSTPPFaithfulForward(unittest.TestCase):
                 "paper_loc_min": [0.0, 0.0],
                 "paper_loc_range": [1.0, 1.0],
             },
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=8,
         )
@@ -135,7 +135,7 @@ class TestAutoSTPPFaithfulForward(unittest.TestCase):
                 "paper_loc_min": [0.0, 0.0],
                 "paper_loc_range": [1.0, 1.0],
             },
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=8,
         )
@@ -168,7 +168,7 @@ class TestAutoSTPPFaithfulForward(unittest.TestCase):
                 "paper_loc_min": [0.0, 0.0],
                 "paper_loc_range": [1.0, 1.0],
             },
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=8,
         )
@@ -226,7 +226,7 @@ class TestAutoSTPPFaithfulForward(unittest.TestCase):
                 "paper_loc_min": [0.0, 0.0],
                 "paper_loc_range": [1.0, 1.0],
             },
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=8,
         )
@@ -300,27 +300,32 @@ class TestAutoSTPPFaithfulKernel(unittest.TestCase):
 
 
 class TestAutoSTPPFaithfulSmoke(unittest.TestCase):
-    def test_default_preset_builds_without_mutating_old_auto(self):
+    def test_canonical_auto_stpp_replaces_old_coarse_variant(self):
         torch.manual_seed(1)
         old_model = build_model(
             config={},
-            preset="auto_stpp",
+            preset="auto_stpp_legacy",
             spatial_dim=2,
             hidden_dim=8,
         )
         new_model = build_model(
             config={},
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             spatial_dim=2,
             hidden_dim=8,
         )
         self.assertNotEqual(type(old_model.event_model), type(new_model.event_model))
 
-    def test_bundled_yaml_loads(self):
-        cfg = STPPConfig.from_preset("auto_stpp_faithful")
-        self.assertEqual(cfg.model.preset, "auto_stpp_faithful")
+    def test_bundled_yaml_loads_from_canonical_name(self):
+        cfg = STPPConfig.from_preset("auto_stpp")
+        self.assertEqual(cfg.model.preset, "auto_stpp")
         self.assertEqual(cfg.training.optimizer, "adam")
-        self.assertEqual(cfg.data.protocol, "standard")
+        self.assertEqual(cfg.data.protocol, "raw")
+
+    def test_deprecated_alias_loads_canonical_preset(self):
+        cfg = STPPConfig.from_preset("auto_stpp_faithful")
+        self.assertEqual(cfg.model.preset, "auto_stpp")
+        self.assertEqual(cfg.training.optimizer, "adam")
 
 
 if __name__ == "__main__":

@@ -8,10 +8,10 @@ static plots and optional interactive HTML output.
 
 Current support:
 - deep_stpp
-- auto_stpp_faithful
-- neural_stpp_shared_cond_gmm
-- neural_stpp_shared_jumpcnf
-- neural_stpp_shared_attncnf
+- auto_stpp
+- neural_cond_gmm
+- neural_jumpcnf
+- neural_attncnf
 
 Important:
 - The run directory alone is not enough for meaningful conditional intensity
@@ -139,7 +139,7 @@ def _resolve_neural_stpp_viz_profile(
         and int(t_nstep) == DEFAULT_T_NSTEP
     )
 
-    if preset == "neural_stpp_shared_cond_gmm":
+    if preset == "neural_cond_gmm":
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 4096
         profile["warnings"].append(
@@ -148,7 +148,7 @@ def _resolve_neural_stpp_viz_profile(
         )
         return profile
 
-    if preset == "neural_stpp_shared_jumpcnf":
+    if preset == "neural_jumpcnf":
         if defaults_unchanged:
             profile.update(
                 {
@@ -166,7 +166,7 @@ def _resolve_neural_stpp_viz_profile(
         )
         return profile
 
-    if preset == "neural_stpp_shared_attncnf":
+    if preset == "neural_attncnf":
         if defaults_unchanged:
             profile.update(
                 {
@@ -191,7 +191,7 @@ def _resolve_device(spec: str, *, preset: str | None = None) -> torch.device:
     if (
         spec == "auto"
         and preset is not None
-        and preset.startswith("neural_stpp_shared_")
+        and preset in {"neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"}
     ):
         try:
             import torch as _torch
@@ -896,16 +896,15 @@ def main() -> None:
     preset = runner.config.model.preset
     if preset not in {
         "deep_stpp",
-        "auto_stpp_faithful",
-        "neural_stpp_shared_cond_gmm",
-        "neural_stpp_shared_jumpcnf",
-        "neural_stpp_shared_attncnf",
+        "auto_stpp",
+        "neural_cond_gmm",
+        "neural_jumpcnf",
+        "neural_attncnf",
     }:
         raise SystemExit(
             f"Unsupported preset for this temporary script: {preset}. "
-            "Supported: deep_stpp, auto_stpp_faithful, "
-            "neural_stpp_shared_cond_gmm, neural_stpp_shared_jumpcnf, "
-            "neural_stpp_shared_attncnf."
+            "Supported: deep_stpp, auto_stpp, "
+            "neural_cond_gmm, neural_jumpcnf, neural_attncnf."
         )
 
     device = _resolve_device(args.device, preset=preset)
@@ -914,9 +913,9 @@ def main() -> None:
 
     seq = _load_sequence(history_path, args.seq_idx, args.history_length)
     if preset in {
-        "neural_stpp_shared_cond_gmm",
-        "neural_stpp_shared_jumpcnf",
-        "neural_stpp_shared_attncnf",
+        "neural_cond_gmm",
+        "neural_jumpcnf",
+        "neural_attncnf",
     }:
         _run_neural_stpp_factorized_viz(
             runner=runner,

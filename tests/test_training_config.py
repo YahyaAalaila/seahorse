@@ -179,7 +179,7 @@ extra_tuple: !!python/tuple [1, 2, 3]
             path = Path(td) / "legacy.yaml"
             path.write_text(raw)
             cfg = STPPConfig.from_yaml(path, sanitize=False)
-        self.assertEqual(cfg.model.preset, "auto_stpp_faithful")
+        self.assertEqual(cfg.model.preset, "auto_stpp")
 
 
 class _DummyEvalModel:

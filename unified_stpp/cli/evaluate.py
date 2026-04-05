@@ -104,7 +104,7 @@ def add_subparser(sub) -> None:
         action="store_true",
         help=(
             "Generate a notebook-faithful calc_lamb -> plot_lambst_interactive HTML "
-            "artifact for deep_stpp or auto_stpp_faithful."
+            "artifact for deep_stpp or auto_stpp."
         ),
     )
     p.add_argument(

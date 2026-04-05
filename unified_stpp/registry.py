@@ -42,6 +42,6 @@ def build_model(
     )
 
 
-PRESETS: Dict[str, Dict[str, Any]] = {name: {} for name in ConfigRegistry.preset_names()}
+PRESETS: Dict[str, Dict[str, Any]] = {name: {} for name in ConfigRegistry.canonical_preset_names()}
 
 __all__ = ["build_model", "PRESETS"]

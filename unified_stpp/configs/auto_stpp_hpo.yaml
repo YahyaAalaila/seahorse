@@ -1,0 +1,46 @@
+model:
+  preset: auto_stpp
+  hidden_dim: 128
+  spatial_dim: 2
+  decoder:
+    type: autoint_faithful
+    lookback: 20
+    lookahead: 1
+    n_prodnet: [2, 4, 6, 10]
+    hidden_size: [64, 128, 192, 256]
+    num_layers: [1, 2, 3]
+    activation: tanh
+    bias: true
+    trunc: false
+    max_history: 20
+    temporal_diag_mode: exact
+    temporal_mc_samples: 10
+    report_orig_space_metrics: true
+
+training:
+  optimizer: adam
+  adam_beta1: 0.9
+  lr: {min: 5.0e-4, max: 1.0e-2}
+  weight_decay: [0.0, 1.0e-6, 1.0e-5]
+  grad_clip: [0.0, 1.0, 5.0]
+  n_epochs: 50
+  batch_size: 128
+  lr_step_size: [10, 20, 30]
+  lr_step_gamma: [0.3, 0.5, 0.7]
+  test_nll_space: raw
+
+data:
+  protocol: raw
+  normalize: true
+
+tuning:
+  n_trials: 40
+  search_alg: random
+  scheduler: asha
+  metric: val_nll
+  mode: min
+  n_cpus_per_trial: 2
+  n_gpus_per_trial: 0
+  max_concurrent_trials: 4
+  fail_fast: false
+  verbose: 1

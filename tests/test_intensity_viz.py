@@ -92,9 +92,9 @@ class TestNotebookFaithfulCalcLamb(unittest.TestCase):
         np.testing.assert_allclose(result.history_times, _SEQ["times"])
         np.testing.assert_allclose(result.history_locs, _SEQ["locations"])
 
-    def test_auto_stpp_faithful_cube_shape_and_defaults(self):
+    def test_auto_stpp_cube_shape_and_defaults(self):
         runner = _mock_runner(
-            preset="auto_stpp_faithful",
+            preset="auto_stpp",
             config={
                 "decoder": {
                     "lookback": 3,

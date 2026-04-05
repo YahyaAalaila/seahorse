@@ -216,7 +216,7 @@ _NEURAL_STPP_BACKBONE_DEFAULTS: dict = {
 }
 
 
-@ConfigRegistry.register("neural_stpp_jump_sc")
+@ConfigRegistry.register("neural_stpp_jump_sc", status="legacy")
 @dataclasses.dataclass
 class NeuralSTPPJumpSCConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -227,7 +227,7 @@ class NeuralSTPPJumpSCConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_stpp_attn_sc")
+@ConfigRegistry.register("neural_stpp_attn_sc", status="legacy")
 @dataclasses.dataclass
 class NeuralSTPPAttnSCConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -246,7 +246,7 @@ class NeuralSTPPAttnSCConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_stpp_shared_cond_gmm")
+@ConfigRegistry.register("neural_cond_gmm", status="provisional")
 @dataclasses.dataclass
 class NeuralSTPPSharedCondGMMConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -262,7 +262,7 @@ class NeuralSTPPSharedCondGMMConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_stpp_shared_jumpcnf")
+@ConfigRegistry.register("neural_jumpcnf", status="provisional")
 @dataclasses.dataclass
 class NeuralSTPPSharedJumpCNFConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -284,7 +284,7 @@ class NeuralSTPPSharedJumpCNFConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_stpp_shared_attncnf")
+@ConfigRegistry.register("neural_attncnf", status="provisional")
 @dataclasses.dataclass
 class NeuralSTPPSharedAttnCNFConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -305,3 +305,8 @@ class NeuralSTPPSharedAttnCNFConfig(NeuralSTPPConfig):
     @classmethod
     def resolve_accelerator(cls, requested: str) -> str:
         return _neural_stpp_resolve_accelerator(requested)
+
+
+ConfigRegistry.register_alias("neural_stpp_shared_cond_gmm", "neural_cond_gmm", status="deprecated")
+ConfigRegistry.register_alias("neural_stpp_shared_jumpcnf", "neural_jumpcnf", status="deprecated")
+ConfigRegistry.register_alias("neural_stpp_shared_attncnf", "neural_attncnf", status="deprecated")

@@ -10,18 +10,25 @@ frozen, and what must be true before launching new benchmark experiments.
 - Raw-first benchmark path and transform-artifact infrastructure are in place.
 - One canonical package/import tree is now enforced: repo-root
   `unified_stpp/` is the live package tree, and `archive/` is reference-only.
+- Canonical preset IDs and explicit preset statuses are now registry-owned and
+  config-validated.
+- New configs and runs canonicalize deprecated aliases to final preset IDs, and
+  run artifacts persist preset status.
+- `auto_stpp` now names the faithful AutoSTPP variant; `auto_stpp_faithful` is
+  a deprecated alias, and the older coarse implementation is `auto_stpp_legacy`.
 - A package-side surface evaluation and visualization workflow exists.
 - Exact-vs-approx metric labeling exists in the benchmark/reporting stack.
 
 ### Not frozen
-- Canonical preset IDs and explicit preset statuses are not yet frozen.
 - One canonical predictive-comparison/evaluation path is not yet selected.
-- Tests and benchmark-facing docs are not yet aligned with the frozen contract.
+- README and benchmark-facing docs are not yet aligned with canonical preset
+  names, statuses, and benchmark eligibility.
 
 ### Provisional
-- Neural CNF presets remain provisional.
-- Exclude them from headline experiments until they pass finite and stable smoke
-  and surface checks.
+- Neural STPP presets remain provisional:
+  `neural_cond_gmm`, `neural_jumpcnf`, `neural_attncnf`.
+- Exclude them from headline experiments until they pass finite and stable
+  benchmark-style smoke and surface checks.
 
 ### Legacy
 - Benchmark artifacts from March 30, 2026 are legacy.
@@ -30,11 +37,10 @@ frozen, and what must be true before launching new benchmark experiments.
 
 ## Freeze priorities
 
-1. Freeze canonical preset IDs and statuses.
-2. Sync tests and docs to the frozen contract.
-3. Freeze one canonical evaluation/predictive-comparison path.
-4. Rerun the benchmark under the frozen contract.
-5. Add secondary metrics, broader data access, and wider synthetic coverage
+1. Sync README and benchmark docs to the frozen preset/status contract.
+2. Freeze one canonical evaluation/predictive-comparison path.
+3. Rerun the benchmark under the frozen contract.
+4. Add secondary metrics, broader data access, and wider synthetic coverage
    after first experiments.
 
 ## Must be true before experiments

@@ -1,4 +1,4 @@
-"""Construction config for the upstream-faithful AutoSTPP preset."""
+"""Construction config for the canonical upstream-faithful AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def _compute_paper_stats_from_dataset(dataset: Any, spatial_dim: int) -> dict[st
     }
 
 
-@ConfigRegistry.register("auto_stpp_faithful")
+@ConfigRegistry.register("auto_stpp", status="canonical")
 @dataclasses.dataclass
 class AutoSTPPFaithfulConfig(BaseModelConfig):
     _STATE_MODEL: ClassVar[str] = "auto_stpp_faithful"
@@ -303,3 +303,6 @@ class AutoSTPPFaithfulConfig(BaseModelConfig):
             paper_loc_min=tuple(paper_stats["paper_loc_min"]),
             paper_loc_range=tuple(paper_stats["paper_loc_range"]),
         )
+
+
+ConfigRegistry.register_alias("auto_stpp_faithful", "auto_stpp", status="deprecated")

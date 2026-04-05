@@ -64,6 +64,7 @@ class RunResult:
     train_time_sec: float
     n_params: int
     effective_config: dict[str, Any]
+    preset_status: str = "canonical"
     checkpoint_path: Optional[Path] = None
     norm_stats: dict[str, Any] = field(default_factory=dict)
     extra_metrics: dict[str, Any] = field(default_factory=dict)

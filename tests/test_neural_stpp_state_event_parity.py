@@ -1,4 +1,4 @@
-"""Regression checks for neural_stpp_*_sc coarse path outputs."""
+"""Regression checks for the canonical Neural STPP preset outputs."""
 
 from __future__ import annotations
 
@@ -71,11 +71,11 @@ class TestNeuralSTPPStateEventOutputs(unittest.TestCase):
         self.assertIn("temporal_nll", out)
         self.assertIn("spatial_nll", out)
 
-    def test_neural_stpp_jump_sc_outputs(self):
-        self._assert_outputs("neural_stpp_jump_sc", forward_seed=11)
+    def test_neural_jumpcnf_outputs(self):
+        self._assert_outputs("neural_jumpcnf", forward_seed=11)
 
-    def test_neural_stpp_attn_sc_outputs(self):
-        self._assert_outputs("neural_stpp_attn_sc", forward_seed=13)
+    def test_neural_attncnf_outputs(self):
+        self._assert_outputs("neural_attncnf", forward_seed=13)
 
 
 if __name__ == "__main__":
