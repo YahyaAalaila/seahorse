@@ -363,6 +363,74 @@ class TestNeuralJumpCNFPreset(unittest.TestCase):
         expected = torch.as_tensor(terms["lambda_t"]).to(logprob) * torch.exp(logprob)
         torch.testing.assert_close(joint, expected, rtol=1e-5, atol=1e-5)
 
+    def test_conditional_logprob_fn_matches_last_sequence_term(self):
+        cfg = STPPConfig.from_source(preset="neural_stpp_shared_jumpcnf")
+        model = cfg.model.build_model()
+        model.eval()
+
+        times = torch.tensor([[0.1, 0.4, 1.0], [0.2, 0.6, 0.6]], dtype=torch.float32)
+        locations = torch.tensor(
+            [
+                [[0.0, 0.0], [0.2, -0.1], [0.4, 0.3]],
+                [[-0.1, 0.2], [0.5, 0.1], [9.0, 9.0]],
+            ],
+            dtype=torch.float32,
+        )
+        lengths = torch.tensor([3, 2], dtype=torch.long)
+
+        state = model.state_model.encode_history(
+            times=times,
+            locations=locations,
+            lengths=lengths,
+        )
+        query_time = torch.tensor(1.3, dtype=torch.float32)
+        query_locations = torch.tensor(
+            [[0.0, 0.0], [0.5, -0.2], [-0.1, 0.4]],
+            dtype=torch.float32,
+        )
+
+        terms = model.event_model.fixed_time_query_terms(
+            state=state,
+            query_time=query_time,
+            device=torch.device("cpu"),
+        )
+        logprob = terms["logprob_fn"](query_locations)
+
+        t_hist = int(state.payload["lengths"][0].item())
+        event_times = state.payload["times_raw"][0, :t_hist]
+        event_locs = state.payload["locations_norm"][0, :t_hist]
+        z_seq = model.event_model._spatial_sequence_inputs(state)[0, :t_hist]
+        query_time_raw = float(terms["query_time_raw"])
+        h_query, _ = state.payload["_h_at_query_raw"](
+            torch.tensor([[query_time_raw]], dtype=torch.float32)
+        )
+        if bool(getattr(model.event_model.spatial_decoder, "USES_NEURAL_AUX_STATE", False)):
+            aux_dim = int(state.payload.get("spatial_aux_dim", 0))
+            h_query_for_spatial = h_query[:, -aux_dim:] if aux_dim > 0 else h_query[:, :0]
+        else:
+            h_query_for_spatial = h_query
+        z_aug = torch.cat([z_seq, h_query_for_spatial], dim=0)
+
+        bsz, dim = query_locations.shape
+        bsz_event_times = event_times.unsqueeze(0).expand(bsz, t_hist)
+        bsz_event_times = torch.cat(
+            [
+                bsz_event_times,
+                torch.full((bsz, 1), query_time_raw, dtype=bsz_event_times.dtype),
+            ],
+            dim=1,
+        )
+        bsz_event_locs = event_locs.unsqueeze(0).expand(bsz, t_hist, dim)
+        bsz_event_locs = torch.cat([bsz_event_locs, query_locations.reshape(bsz, 1, dim)], dim=1)
+        bsz_aux_state = z_aug.reshape(1, t_hist + 1, -1).expand(bsz, -1, -1)
+        full_logprob = model.event_model.spatial_decoder.sequence_logprob(
+            event_times=bsz_event_times,
+            spatial_locations=bsz_event_locs,
+            input_mask=None,
+            aux_state=bsz_aux_state,
+        )
+        torch.testing.assert_close(logprob, full_logprob[:, -1], rtol=1e-5, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

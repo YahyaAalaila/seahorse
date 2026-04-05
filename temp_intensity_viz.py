@@ -243,6 +243,24 @@ def _resolve_frame_index(n_frames: int, frame_index: int) -> int:
     return frame_index
 
 
+def _build_future_query_grid(
+    *,
+    last_t: float,
+    horizon: float,
+    n_steps: int,
+) -> np.ndarray:
+    """Build a strictly-future query grid for Neural-STPP visualization.
+
+    Neural-STPP surfaces are meant to visualize the future conditional object
+    given a history, so the first frame should sit *after* the last observed
+    event rather than exactly on it.
+    """
+    if n_steps <= 0:
+        raise ValueError("n_steps must be positive.")
+    t_end = float(last_t) + float(horizon)
+    return np.linspace(float(last_t), t_end, int(n_steps) + 1, dtype=np.float32)[1:]
+
+
 def _history_until_t(
     history_times: np.ndarray,
     history_locs: np.ndarray,
@@ -250,6 +268,23 @@ def _history_until_t(
 ) -> tuple[np.ndarray, np.ndarray]:
     mask = np.asarray(history_times, dtype=np.float32) <= float(t_query)
     return history_times[mask], history_locs[mask]
+
+
+def _history_overlay_z_level(frame_values: np.ndarray) -> float:
+    """Place the history overlay inside the actual surface range.
+
+    This avoids floating the path above an all-zero surface with an arbitrary
+    epsilon floor.
+    """
+    values = np.asarray(frame_values, dtype=np.float32)
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return 0.0
+    vmin = float(finite.min())
+    vmax = float(finite.max())
+    if vmax <= vmin:
+        return vmax
+    return vmin + 0.88 * (vmax - vmin)
 
 
 def _save_static_plots(
@@ -347,7 +382,8 @@ def _save_static_plots(
         alpha=0.82,
     )
     if hist_s.size > 0:
-        z_hist = np.full(hist_s.shape[0], max(float(frame_values.max()) * 0.88, 1e-6), dtype=np.float32)
+        z_hist_level = _history_overlay_z_level(frame_values)
+        z_hist = np.full(hist_s.shape[0], z_hist_level, dtype=np.float32)
         ax.plot(hist_s[:, 0], hist_s[:, 1], z_hist, "-o", color="black", lw=1.0, ms=3.0)
     ax.set_title(f"{title_prefix} {value_label} + history @ t={t_query:.3f}")
     ax.set_xlabel("x")
@@ -553,8 +589,11 @@ def _run_neural_stpp_factorized_viz(
         future_horizon_arg=args.future_horizon,
     )
     t_start = float(history_times[-1])
-    t_end = t_start + float(horizon)
-    t_grid = np.linspace(t_start, t_end, int(profile["t_nstep"]), dtype=np.float32)
+    t_grid = _build_future_query_grid(
+        last_t=t_start,
+        horizon=float(horizon),
+        n_steps=int(profile["t_nstep"]),
+    )
 
     x_lo, x_hi, y_lo, y_hi = _resolve_spatial_bounds(
         full_locs=full_locs,

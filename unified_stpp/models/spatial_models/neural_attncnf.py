@@ -799,7 +799,7 @@ class NeuralAttnCNFSpatial(Decoder):
                 spatial_locations=bsz_spatial_locations,
                 input_mask=None,
                 aux_state=bsz_aux_state,
-            ).sum(dim=1)
+            )[:, -1]
 
         return logprob_fn
 

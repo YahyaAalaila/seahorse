@@ -4,6 +4,8 @@ from temp_intensity_viz import (
     DEFAULT_T_NSTEP,
     DEFAULT_X_NSTEP,
     DEFAULT_Y_NSTEP,
+    _build_future_query_grid,
+    _history_overlay_z_level,
     _resolve_neural_stpp_viz_profile,
 )
 
@@ -53,6 +55,20 @@ class TestNeuralSTPPVizProfiles(unittest.TestCase):
         self.assertEqual(profile["spatial_chunk_size"], 128)
         self.assertFalse(profile["auto_coarsened_grid"])
         self.assertTrue(profile["warnings"])
+
+    def test_future_query_grid_excludes_last_history_time(self):
+        grid = _build_future_query_grid(last_t=10.0, horizon=2.0, n_steps=4)
+        self.assertEqual(grid.shape, (4,))
+        self.assertGreater(float(grid[0]), 10.0)
+        self.assertAlmostEqual(float(grid[-1]), 12.0, places=6)
+
+    def test_history_overlay_stays_on_zero_surface(self):
+        frame = [[0.0, 0.0], [0.0, 0.0]]
+        self.assertEqual(_history_overlay_z_level(frame), 0.0)
+
+    def test_history_overlay_uses_actual_surface_range(self):
+        frame = [[2.0, 4.0], [6.0, 10.0]]
+        self.assertAlmostEqual(_history_overlay_z_level(frame), 2.0 + 0.88 * (10.0 - 2.0), places=6)
 
 
 if __name__ == "__main__":
