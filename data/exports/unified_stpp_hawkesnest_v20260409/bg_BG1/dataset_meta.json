@@ -1,0 +1,102 @@
+{
+  "family": "bg",
+  "level": "BG1",
+  "comment": "1 switch at T/2, 3:1 contrast; single hotspot shift",
+  "horizon": 50.0,
+  "n_sequences": 60,
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        59
+      ]
+    }
+  },
+  "dgp": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "kernel": {
+      "type": "separable",
+      "temporal_decay": 0.3,
+      "spatial_sigma": 0.08
+    },
+    "background": {
+      "type": "regime_switching",
+      "lambda0": 2.2,
+      "regimes": [
+        {
+          "t_start": 0.0,
+          "t_end": 25.0,
+          "components": [
+            {
+              "cx": 0.2,
+              "cy": 0.2,
+              "sigma": 0.12,
+              "amplitude": 4.4
+            }
+          ]
+        },
+        {
+          "t_start": 25.0,
+          "t_end": 50.0,
+          "components": [
+            {
+              "cx": 0.8,
+              "cy": 0.2,
+              "sigma": 0.12,
+              "amplitude": 4.4
+            }
+          ]
+        }
+      ]
+    },
+    "adjacency": [
+      [
+        33.15727981081154
+      ]
+    ],
+    "lambda_max_used": 271.8582384864923
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "mean": 200.23333333333332,
+    "std": 21.44245529058855,
+    "min": 155,
+    "p25": 187.0,
+    "p50": 195.5,
+    "p75": 216.0,
+    "p95": 231.54999999999995,
+    "max": 258
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "mean": 197.525,
+    "std": 20.970202073418367,
+    "min": 155,
+    "p25": 186.0,
+    "p50": 194.0,
+    "p75": 208.5,
+    "p95": 227.74999999999994,
+    "max": 258
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "family": "bg",
+  "level": "BG4",
+  "comment": "2 switches + wave kernel (v=0.6): tests both BG + kernel non-separability",
+  "horizon": 50.0,
+  "n_sequences": 60,
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        59
+      ]
+    }
+  },
+  "dgp": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "kernel": {
+      "type": "traveling_wave",
+      "v": 0.6,
+      "theta_wave": 0.7853981633974483,
+      "sigma": 0.08,
+      "temporal_scale": 0.3
+    },
+    "background": {
+      "type": "regime_switching",
+      "lambda0": 2.1,
+      "regimes": [
+        {
+          "t_start": 0.0,
+          "t_end": 16.666666666666668,
+          "components": [
+            {
+              "cx": 0.2,
+              "cy": 0.2,
+              "sigma": 0.12,
+              "amplitude": 8.4
+            }
+          ]
+        },
+        {
+          "t_start": 16.666666666666668,
+          "t_end": 33.333333333333336,
+          "components": [
+            {
+              "cx": 0.8,
+              "cy": 0.2,
+              "sigma": 0.12,
+              "amplitude": 8.4
+            }
+          ]
+        },
+        {
+          "t_start": 33.333333333333336,
+          "t_end": 50.0,
+          "components": [
+            {
+              "cx": 0.5,
+              "cy": 0.8,
+              "sigma": 0.12,
+              "amplitude": 8.4
+            }
+          ]
+        }
+      ]
+    },
+    "adjacency": [
+      [
+        33.15727981081154
+      ]
+    ],
+    "lambda_max_used": 275.7582384864923
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "mean": 199.73333333333332,
+    "std": 22.493604029195104,
+    "min": 143,
+    "p25": 186.75,
+    "p50": 195.0,
+    "p75": 214.25,
+    "p95": 240.14999999999998,
+    "max": 250
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "mean": 193.85,
+    "std": 20.351351306485768,
+    "min": 143,
+    "p25": 181.0,
+    "p50": 190.0,
+    "p75": 204.0,
+    "p95": 236.14999999999998,
+    "max": 240
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "family": "echo",
+  "level": "E4",
+  "comment": "rho=100; very long memory; tau_max=T=50 (full obs. window); count lower due to finite-horizon transient",
+  "horizon": 50.0,
+  "n_sequences": 60,
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        59
+      ]
+    }
+  },
+  "dgp": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "kernel": {
+      "type": "two_scale",
+      "alpha_fast": 0.65,
+      "beta_fast": 0.3,
+      "beta_slow": 30.0,
+      "sigma": 0.08
+    },
+    "background": {
+      "type": "constant",
+      "rate": 2.4
+    },
+    "adjacency": [
+      [
+        1.1418050113721367
+      ]
+    ],
+    "lambda_max_used": 11.534440090977094
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "mean": 157.88333333333333,
+    "std": 15.965683685816764,
+    "min": 124,
+    "p25": 148.0,
+    "p50": 158.0,
+    "p75": 166.0,
+    "p95": 183.14999999999998,
+    "max": 197
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "mean": 154.075,
+    "std": 16.29323095644323,
+    "min": 124,
+    "p25": 147.25,
+    "p50": 151.5,
+    "p75": 164.25,
+    "p95": 180.29999999999998,
+    "max": 194
+  }
+}

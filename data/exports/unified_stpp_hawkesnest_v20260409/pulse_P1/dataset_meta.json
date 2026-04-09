@@ -1,0 +1,78 @@
+{
+  "family": "pulse",
+  "level": "P1",
+  "comment": "very mild wave; slight NLL degradation expected for separable models",
+  "horizon": 50.0,
+  "n_sequences": 60,
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        59
+      ]
+    }
+  },
+  "dgp": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "kernel": {
+      "type": "traveling_wave",
+      "v": 0.15,
+      "theta_wave": 0.7853981633974483,
+      "sigma": 0.08,
+      "temporal_scale": 0.3
+    },
+    "background": {
+      "type": "constant",
+      "rate": 2.4
+    },
+    "adjacency": [
+      [
+        33.15727981081154
+      ]
+    ],
+    "lambda_max_used": 267.6582384864923
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "mean": 186.81666666666666,
+    "std": 23.039452877377293,
+    "min": 135,
+    "p25": 169.5,
+    "p50": 184.5,
+    "p75": 200.25,
+    "p95": 227.34999999999997,
+    "max": 244
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "mean": 182.65,
+    "std": 20.36976926722539,
+    "min": 135,
+    "p25": 168.0,
+    "p50": 181.5,
+    "p75": 193.75,
+    "p95": 219.25,
+    "max": 234
+  }
+}
