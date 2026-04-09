@@ -1,0 +1,212 @@
+{
+  "family": "ent_rt",
+  "level": "E4",
+  "theta": 0.8,
+  "output_dir": "entrt_E4",
+  "description": "Kernel entanglement family with constant background and ent_option='rt'.",
+  "coordinates_normalized": false,
+  "jsonl_schema": {
+    "times": "float[]",
+    "locations": "[x, y][]"
+  },
+  "shared_settings": {
+    "horizon": 50.0,
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "adjacency": [
+      [
+        0.6
+      ]
+    ],
+    "lambda0": 4.0,
+    "tau_max": 5.0,
+    "lambda_max": 8.732052222437813
+  },
+  "prototype": {
+    "background": {
+      "type": "constant",
+      "rate": 4.0
+    },
+    "kernel": {
+      "type": "entangled_exp_gaussian",
+      "temporal_scale": 1.0,
+      "spatial_scale": 0.1,
+      "theta_ent": 0.8,
+      "r_max": 1,
+      "tau_max": 5.0,
+      "n_r": 64,
+      "n_tau": 64,
+      "ent_option": "rt"
+    }
+  },
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ]
+    }
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "total_events": 12536,
+    "event_count": {
+      "mean": 208.93333333333334,
+      "std": 15.426024187139804,
+      "min": 178,
+      "median": 209.0,
+      "p95": 230.0,
+      "max": 261
+    },
+    "time_span": {
+      "min": 0.005152921268826902,
+      "max": 49.9966142895585
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9999930356461354,
+      "y_min": 5.257378941270208e-05,
+      "y_max": 0.9999580864780446
+    }
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "total_events": 8285,
+    "event_count": {
+      "mean": 207.125,
+      "std": 14.926800561406319,
+      "min": 178,
+      "median": 205.5,
+      "p95": 230.0,
+      "max": 241
+    },
+    "time_span": {
+      "min": 0.005152921268826902,
+      "max": 49.985483454087316
+    },
+    "spatial_bounds": {
+      "x_min": 9.60405599956804e-05,
+      "x_max": 0.999832967885588,
+      "y_min": 0.000665586226142989,
+      "y_max": 0.9999580864780446
+    }
+  },
+  "stats_val": {
+    "n_sequences": 10,
+    "total_events": 2144,
+    "event_count": {
+      "mean": 214.4,
+      "std": 18.14497175528251,
+      "min": 195,
+      "median": 216.0,
+      "p95": 242.54999999999995,
+      "max": 261
+    },
+    "time_span": {
+      "min": 0.034204207372981146,
+      "max": 49.94623759045291
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9998191731745515,
+      "y_min": 5.257378941270208e-05,
+      "y_max": 0.9999282631809397
+    }
+  },
+  "stats_test": {
+    "n_sequences": 10,
+    "total_events": 2107,
+    "event_count": {
+      "mean": 210.7,
+      "std": 12.696850003051937,
+      "min": 179,
+      "median": 215.5,
+      "p95": 222.1,
+      "max": 223
+    },
+    "time_span": {
+      "min": 0.006788982855493776,
+      "max": 49.9966142895585
+    },
+    "spatial_bounds": {
+      "x_min": 0.000350279711985535,
+      "x_max": 0.9999930356461354,
+      "y_min": 0.0014644938617591752,
+      "y_max": 0.9998764677514556
+    }
+  }
+}

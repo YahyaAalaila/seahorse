@@ -1,0 +1,211 @@
+{
+  "family": "moving",
+  "level": "M5",
+  "theta": 0.99,
+  "output_dir": "moving_M5",
+  "description": "Moving-hotspot background family with fixed field_name='moving_gauss_slow' and separable kernel.",
+  "coordinates_normalized": false,
+  "jsonl_schema": {
+    "times": "float[]",
+    "locations": "[x, y][]"
+  },
+  "shared_settings": {
+    "horizon": 50.0,
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "adjacency": [
+      [
+        0.6
+      ]
+    ],
+    "lambda0": 4.0,
+    "tau_max": 5.0,
+    "lambda_max": 253.57486341808928
+  },
+  "prototype": {
+    "background": {
+      "type": "hetero_ladder",
+      "lambda0": 4.0,
+      "theta_het": 0.99,
+      "T": 50.0,
+      "n_grid_space": 64,
+      "n_grid_time": 64,
+      "field_name": "moving_gauss_slow"
+    },
+    "kernel": {
+      "type": "separable",
+      "temporal_decay": 1.0,
+      "spatial_sigma": 0.1
+    }
+  },
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ]
+    }
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "total_events": 12702,
+    "event_count": {
+      "mean": 211.7,
+      "std": 14.651848575066106,
+      "min": 180,
+      "median": 210.5,
+      "p95": 238.05,
+      "max": 249
+    },
+    "time_span": {
+      "min": 0.0011778491013737344,
+      "max": 49.98946509771658
+    },
+    "spatial_bounds": {
+      "x_min": 0.00017877966935442302,
+      "x_max": 0.9999803447255442,
+      "y_min": 8.328641737642695e-05,
+      "y_max": 0.999942022235539
+    }
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "total_events": 8420,
+    "event_count": {
+      "mean": 210.5,
+      "std": 15.034959261667456,
+      "min": 180,
+      "median": 210.0,
+      "p95": 238.05,
+      "max": 246
+    },
+    "time_span": {
+      "min": 0.004997471770343327,
+      "max": 49.98946509771658
+    },
+    "spatial_bounds": {
+      "x_min": 0.00017877966935442302,
+      "x_max": 0.9999053640103516,
+      "y_min": 8.328641737642695e-05,
+      "y_max": 0.999942022235539
+    }
+  },
+  "stats_val": {
+    "n_sequences": 10,
+    "total_events": 2160,
+    "event_count": {
+      "mean": 216.0,
+      "std": 14.177446878757825,
+      "min": 201,
+      "median": 211.5,
+      "p95": 239.54999999999998,
+      "max": 249
+    },
+    "time_span": {
+      "min": 0.0011778491013737344,
+      "max": 49.98832451688014
+    },
+    "spatial_bounds": {
+      "x_min": 0.0036996422562239895,
+      "x_max": 0.9994894042945859,
+      "y_min": 0.00711711652449476,
+      "y_max": 0.9980234326890258
+    }
+  },
+  "stats_test": {
+    "n_sequences": 10,
+    "total_events": 2122,
+    "event_count": {
+      "mean": 212.2,
+      "std": 12.584116973391497,
+      "min": 193,
+      "median": 210.0,
+      "p95": 230.2,
+      "max": 232
+    },
+    "time_span": {
+      "min": 0.0350239286561937,
+      "max": 49.986820591043575
+    },
+    "spatial_bounds": {
+      "x_min": 0.0005324926214759218,
+      "x_max": 0.9999803447255442,
+      "y_min": 0.0004515665125118806,
+      "y_max": 0.9990406079479576
+    }
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "family": "ent_rt",
+  "level": "E1",
+  "theta": 0.2,
+  "output_dir": "entrt_E1",
+  "description": "Kernel entanglement family with constant background and ent_option='rt'.",
+  "coordinates_normalized": false,
+  "jsonl_schema": {
+    "times": "float[]",
+    "locations": "[x, y][]"
+  },
+  "shared_settings": {
+    "horizon": 50.0,
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "adjacency": [
+      [
+        0.6
+      ]
+    ],
+    "lambda0": 4.0,
+    "tau_max": 5.0,
+    "lambda_max": 12.85125798907704
+  },
+  "prototype": {
+    "background": {
+      "type": "constant",
+      "rate": 4.0
+    },
+    "kernel": {
+      "type": "entangled_exp_gaussian",
+      "temporal_scale": 1.0,
+      "spatial_scale": 0.1,
+      "theta_ent": 0.2,
+      "r_max": 1,
+      "tau_max": 5.0,
+      "n_r": 64,
+      "n_tau": 64,
+      "ent_option": "rt"
+    }
+  },
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ]
+    }
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "total_events": 12592,
+    "event_count": {
+      "mean": 209.86666666666667,
+      "std": 15.546132066280096,
+      "min": 167,
+      "median": 210.5,
+      "p95": 230.29999999999998,
+      "max": 249
+    },
+    "time_span": {
+      "min": 0.003501258604858072,
+      "max": 49.998500048925614
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9999938115969246,
+      "y_min": 5.5261197005163076e-05,
+      "y_max": 0.9999580864780446
+    }
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "total_events": 8280,
+    "event_count": {
+      "mean": 207.0,
+      "std": 15.45639026422405,
+      "min": 167,
+      "median": 206.5,
+      "p95": 230.29999999999998,
+      "max": 239
+    },
+    "time_span": {
+      "min": 0.003501258604858072,
+      "max": 49.998500048925614
+    },
+    "spatial_bounds": {
+      "x_min": 9.60405599956804e-05,
+      "x_max": 0.9999938115969246,
+      "y_min": 5.5261197005163076e-05,
+      "y_max": 0.9999580864780446
+    }
+  },
+  "stats_val": {
+    "n_sequences": 10,
+    "total_events": 2170,
+    "event_count": {
+      "mean": 217.0,
+      "std": 13.949910393977447,
+      "min": 200,
+      "median": 214.5,
+      "p95": 239.54999999999998,
+      "max": 249
+    },
+    "time_span": {
+      "min": 0.023240753960571153,
+      "max": 49.973770849551265
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9997144395939054,
+      "y_min": 0.00043265054608254694,
+      "y_max": 0.9992700216334249
+    }
+  },
+  "stats_test": {
+    "n_sequences": 10,
+    "total_events": 2142,
+    "event_count": {
+      "mean": 214.2,
+      "std": 14.048487463068755,
+      "min": 188,
+      "median": 218.5,
+      "p95": 227.55,
+      "max": 228
+    },
+    "time_span": {
+      "min": 0.004612914384085459,
+      "max": 49.878408520249266
+    },
+    "spatial_bounds": {
+      "x_min": 0.00021142814557761902,
+      "x_max": 0.9999930356461354,
+      "y_min": 0.0005208345952240068,
+      "y_max": 0.9998764677514556
+    }
+  }
+}
