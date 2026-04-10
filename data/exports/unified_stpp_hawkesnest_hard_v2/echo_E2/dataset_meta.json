@@ -1,0 +1,210 @@
+{
+  "family": "echo",
+  "level": "E2",
+  "knob_name": "echo_ratio_rho",
+  "knob_value": 10.0,
+  "output_dir": "echo_E2",
+  "description": "Two-scale temporal kernel family with constant background and only the fast/slow ratio varying.",
+  "failure_mode": "Targets models that effectively assume one temporal scale and cannot fit both burst and echo.",
+  "coordinates_normalized": false,
+  "jsonl_schema": {
+    "times": "float[]",
+    "locations": "[x, y][]"
+  },
+  "shared_settings": {
+    "horizon": 50.0,
+    "adjacency": [
+      [
+        0.75
+      ]
+    ],
+    "tau_max": 20.0,
+    "lambda_max": 15.400000000000002
+  },
+  "prototype": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "background": {
+      "type": "constant",
+      "rate": 2.0
+    },
+    "kernel": {
+      "type": "two_scale",
+      "alpha_fast": 0.5,
+      "beta_fast": 0.2,
+      "beta_slow": 2.0,
+      "sigma": 0.08
+    }
+  },
+  "caveats": [],
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ]
+    }
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "total_events": 6285,
+    "event_count": {
+      "mean": 104.75,
+      "std": 11.440607501352364,
+      "min": 76,
+      "median": 106.0,
+      "p95": 126.0,
+      "max": 128
+    },
+    "time_span": {
+      "min": 0.0038071104690353165,
+      "max": 49.988433161910564
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9999938115969246,
+      "y_min": 0.00037808488215040903,
+      "y_max": 0.9998764677514556
+    }
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "total_events": 4122,
+    "event_count": {
+      "mean": 103.05,
+      "std": 10.800347216640768,
+      "min": 76,
+      "median": 104.5,
+      "p95": 118.05,
+      "max": 126
+    },
+    "time_span": {
+      "min": 0.0038071104690353165,
+      "max": 49.988433161910564
+    },
+    "spatial_bounds": {
+      "x_min": 0.0003078888239722577,
+      "x_max": 0.9999938115969246,
+      "y_min": 0.00037808488215040903,
+      "y_max": 0.9994427183309668
+    }
+  },
+  "stats_val": {
+    "n_sequences": 10,
+    "total_events": 1097,
+    "event_count": {
+      "mean": 109.7,
+      "std": 10.208329931972223,
+      "min": 91,
+      "median": 111.0,
+      "p95": 122.85,
+      "max": 126
+    },
+    "time_span": {
+      "min": 0.019394345779737913,
+      "max": 49.915524658699894
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9997144395939054,
+      "y_min": 0.00043265054608254694,
+      "y_max": 0.9977716337366332
+    }
+  },
+  "stats_test": {
+    "n_sequences": 10,
+    "total_events": 1066,
+    "event_count": {
+      "mean": 106.6,
+      "std": 13.230268326832983,
+      "min": 92,
+      "median": 102.5,
+      "p95": 127.1,
+      "max": 128
+    },
+    "time_span": {
+      "min": 0.03148657163251931,
+      "max": 49.87492712243427
+    },
+    "spatial_bounds": {
+      "x_min": 0.00021142814557761902,
+      "x_max": 0.9997117904511085,
+      "y_min": 0.0019258203817805741,
+      "y_max": 0.9998764677514556
+    }
+  }
+}

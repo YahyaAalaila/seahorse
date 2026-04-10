@@ -1,0 +1,275 @@
+{
+  "family": "regime",
+  "level": "R0",
+  "knob_name": "regime_amplitude",
+  "knob_value": 0.0,
+  "output_dir": "regime_R0",
+  "description": "Piecewise nonstationary background family with a fixed separable kernel and only hotspot amplitude varying.",
+  "failure_mode": "Targets stationary-background models by forcing abrupt spatial regime shifts over time.",
+  "coordinates_normalized": false,
+  "jsonl_schema": {
+    "times": "float[]",
+    "locations": "[x, y][]"
+  },
+  "shared_settings": {
+    "horizon": 50.0,
+    "adjacency": [
+      [
+        0.25
+      ]
+    ],
+    "tau_max": 5.0,
+    "lambda_max": 6.6000000000000005
+  },
+  "prototype": {
+    "domain": {
+      "type": "rectangle",
+      "x_min": 0.0,
+      "x_max": 1.0,
+      "y_min": 0.0,
+      "y_max": 1.0
+    },
+    "background": {
+      "type": "regime_switching",
+      "lambda0": 2.0,
+      "regimes": [
+        {
+          "t_start": 0.0,
+          "t_end": 10.0,
+          "components": [
+            {
+              "cx": 0.15,
+              "cy": 0.15,
+              "sigma": 0.06,
+              "amplitude": 0.0
+            }
+          ],
+          "base_rate": 0.0
+        },
+        {
+          "t_start": 10.0,
+          "t_end": 20.0,
+          "components": [
+            {
+              "cx": 0.85,
+              "cy": 0.2,
+              "sigma": 0.06,
+              "amplitude": 0.0
+            }
+          ],
+          "base_rate": 0.0
+        },
+        {
+          "t_start": 20.0,
+          "t_end": 30.0,
+          "components": [
+            {
+              "cx": 0.8,
+              "cy": 0.8,
+              "sigma": 0.06,
+              "amplitude": 0.0
+            }
+          ],
+          "base_rate": 0.0
+        },
+        {
+          "t_start": 30.0,
+          "t_end": 40.0,
+          "components": [
+            {
+              "cx": 0.2,
+              "cy": 0.75,
+              "sigma": 0.06,
+              "amplitude": 0.0
+            }
+          ],
+          "base_rate": 0.0
+        },
+        {
+          "t_start": 40.0,
+          "t_end": 50.0,
+          "components": [
+            {
+              "cx": 0.5,
+              "cy": 0.5,
+              "sigma": 0.06,
+              "amplitude": 0.0
+            }
+          ],
+          "base_rate": 0.0
+        }
+      ]
+    },
+    "kernel": {
+      "type": "separable",
+      "temporal_decay": 1.0,
+      "spatial_sigma": 0.08
+    }
+  },
+  "caveats": [],
+  "split": {
+    "train": {
+      "n": 40,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "val": {
+      "n": 10,
+      "seeds": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ]
+    },
+    "test": {
+      "n": 10,
+      "seeds": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ]
+    }
+  },
+  "stats_all": {
+    "n_sequences": 60,
+    "total_events": 6160,
+    "event_count": {
+      "mean": 102.66666666666667,
+      "std": 10.205662916026354,
+      "min": 83,
+      "median": 102.5,
+      "p95": 116.05,
+      "max": 131
+    },
+    "time_span": {
+      "min": 0.006817511760228337,
+      "max": 49.979247087401575
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9999930356461354,
+      "y_min": 0.00043265054608254694,
+      "y_max": 0.9998764677514556
+    }
+  },
+  "stats_train": {
+    "n_sequences": 40,
+    "total_events": 4036,
+    "event_count": {
+      "mean": 100.9,
+      "std": 9.794896630388704,
+      "min": 83,
+      "median": 102.0,
+      "p95": 115.0,
+      "max": 131
+    },
+    "time_span": {
+      "min": 0.006817511760228337,
+      "max": 49.979247087401575
+    },
+    "spatial_bounds": {
+      "x_min": 9.60405599956804e-05,
+      "x_max": 0.9997960801661139,
+      "y_min": 0.0008319396825711145,
+      "y_max": 0.9994979061106071
+    }
+  },
+  "stats_val": {
+    "n_sequences": 10,
+    "total_events": 1068,
+    "event_count": {
+      "mean": 106.8,
+      "std": 10.322790320451151,
+      "min": 92,
+      "median": 107.5,
+      "p95": 123.6,
+      "max": 129
+    },
+    "time_span": {
+      "min": 0.04525347348605513,
+      "max": 49.89134110922232
+    },
+    "spatial_bounds": {
+      "x_min": 6.693515352629298e-05,
+      "x_max": 0.9980063878968214,
+      "y_min": 0.00043265054608254694,
+      "y_max": 0.9974302913272194
+    }
+  },
+  "stats_test": {
+    "n_sequences": 10,
+    "total_events": 1056,
+    "event_count": {
+      "mean": 105.6,
+      "std": 9.820386957752735,
+      "min": 84,
+      "median": 110.0,
+      "p95": 115.55,
+      "max": 116
+    },
+    "time_span": {
+      "min": 0.00898208376233434,
+      "max": 49.96673491849157
+    },
+    "spatial_bounds": {
+      "x_min": 0.000350279711985535,
+      "x_max": 0.9999930356461354,
+      "y_min": 0.0014644938617591752,
+      "y_max": 0.9998764677514556
+    }
+  }
+}
