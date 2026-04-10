@@ -46,6 +46,11 @@ training:
   grad_clip: 0.0
   n_epochs: 200
   patience: 30
+  device: auto
+  devices: 1
+  strategy: ddp
+  precision: 16-mixed
+  num_nodes: 1
 
 data:
   normalize: true

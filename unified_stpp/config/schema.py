@@ -188,6 +188,14 @@ class TrainingConfig(BaseModel):
     adam_beta1: float = 0.9
     adam_beta2: float = 0.999
     device: str = "auto"
+    devices: int | str | list[int] | None = None
+    """Lightning device selection override, e.g. ``1``, ``"auto"``, or ``[0, 1]``."""
+    strategy: Optional[str] = None
+    """Distributed strategy passed through to Lightning, e.g. ``"ddp"``."""
+    precision: int | str | None = None
+    """Numeric precision passed through to Lightning, e.g. ``"16-mixed"`` or ``64``."""
+    num_nodes: int = 1
+    """Number of cluster nodes for distributed Lightning strategies."""
     lr_schedule: str = "constant"
     """LR schedule: ``"constant"``, ``"cosine"``, ``"linear_decay"``, ``"step"``, or ``"reduce_on_plateau"``."""
     lr_warmup_epochs: int = 0
@@ -226,18 +234,29 @@ class TrainingConfig(BaseModel):
     def build_optimizer(self, parameters):
         """Construct and return the configured optimizer for *parameters*."""
         import torch
-        kwargs = {
-            "lr": self.lr,
-            "weight_decay": self.weight_decay,
-            "betas": (self.adam_beta1, self.adam_beta2),
-        }
         opt_name = self.optimizer.strip().lower()
         if opt_name == "adamw":
-            return torch.optim.AdamW(parameters, **kwargs)
+            return torch.optim.AdamW(
+                parameters,
+                lr=self.lr,
+                weight_decay=self.weight_decay,
+                betas=(self.adam_beta1, self.adam_beta2),
+            )
         if opt_name == "adam":
-            return torch.optim.Adam(parameters, **kwargs)
+            return torch.optim.Adam(
+                parameters,
+                lr=self.lr,
+                weight_decay=self.weight_decay,
+                betas=(self.adam_beta1, self.adam_beta2),
+            )
+        if opt_name == "adadelta":
+            return torch.optim.Adadelta(
+                parameters,
+                lr=self.lr,
+                weight_decay=self.weight_decay,
+            )
         raise ValueError(
-            f"Unknown optimizer '{self.optimizer}'. Expected 'adam' or 'adamw'."
+            f"Unknown optimizer '{self.optimizer}'. Expected 'adam', 'adamw', or 'adadelta'."
         )
 
     def build_lr_scheduler(self, optimizer, trainer=None, monitor_key: str = "val/nll") -> "dict":
@@ -313,7 +332,7 @@ class TrainingConfig(BaseModel):
         ``enable_grad()`` during validation/test.
         """
         import pytorch_lightning as pl
-        return pl.Trainer(
+        trainer_kwargs = dict(
             max_epochs=self.n_epochs,
             accelerator=accelerator,
             callbacks=self.build_callbacks(run_dir, monitor_key=monitor_key),
@@ -324,6 +343,15 @@ class TrainingConfig(BaseModel):
             log_every_n_steps=1,
             inference_mode=False,
         )
+        if self.devices is not None:
+            trainer_kwargs["devices"] = self.devices
+        if self.strategy is not None:
+            trainer_kwargs["strategy"] = self.strategy
+        if self.precision is not None:
+            trainer_kwargs["precision"] = self.precision
+        if self.num_nodes != 1:
+            trainer_kwargs["num_nodes"] = self.num_nodes
+        return pl.Trainer(**trainer_kwargs)
 
 class LoggingConfig(BaseModel):
     """Output and logging configuration."""

@@ -10,6 +10,7 @@ import warnings
 from types import SimpleNamespace
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
 
 import torch
 import torch.nn as nn
@@ -70,6 +71,24 @@ class TestSchedulerSelection(unittest.TestCase):
         tc = TrainingConfig(checkpoint_select="last")
         self.assertEqual(tc.checkpoint_select, "last")
 
+    def test_lightning_runtime_fields_forward_to_trainer(self):
+        tc = TrainingConfig(
+            devices=2,
+            strategy="ddp",
+            precision="16-mixed",
+            num_nodes=3,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            with patch("pytorch_lightning.Trainer") as trainer_cls:
+                tc.build_trainer(run_dir, accelerator="gpu", loggers=[], monitor_key="val/nll")
+        kwargs = trainer_cls.call_args.kwargs
+        self.assertEqual(kwargs["accelerator"], "gpu")
+        self.assertEqual(kwargs["devices"], 2)
+        self.assertEqual(kwargs["strategy"], "ddp")
+        self.assertEqual(kwargs["precision"], "16-mixed")
+        self.assertEqual(kwargs["num_nodes"], 3)
+
     def test_constant_uses_lambda_lr(self):
         sched = _scheduler_from(_make_lm("constant"))
         self.assertIsInstance(sched, torch.optim.lr_scheduler.LambdaLR)
@@ -95,6 +114,11 @@ class TestSchedulerSelection(unittest.TestCase):
         lm = _make_lm("constant", optimizer="adamw")
         opt = lm.configure_optimizers()["optimizer"]
         self.assertIsInstance(opt, torch.optim.AdamW)
+
+    def test_optimizer_adadelta_builds_adadelta(self):
+        lm = _make_lm("constant", optimizer="adadelta")
+        opt = lm.configure_optimizers()["optimizer"]
+        self.assertIsInstance(opt, torch.optim.Adadelta)
 
     def test_unknown_optimizer_raises(self):
         lm = _make_lm("constant", optimizer="banana")
