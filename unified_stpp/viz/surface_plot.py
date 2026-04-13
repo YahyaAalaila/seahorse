@@ -17,7 +17,7 @@ from typing import Optional
 
 import numpy as np
 
-from unified_stpp.evaluation.surface import SurfaceResult
+from unified_stpp.evaluation.surface_query import SurfaceResult
 
 
 def plot_surface(

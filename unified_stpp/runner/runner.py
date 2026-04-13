@@ -6,11 +6,13 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import random
 import time
 import warnings
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 
@@ -20,7 +22,7 @@ from unified_stpp.training.lightning_module import STPPLightningModule
 from unified_stpp.training.data_module import STPPDataModule
 from unified_stpp.utils import deep_update
 from .artifacts import (
-    make_run_id, update_latest_symlink, save_run_artifacts, _extend_viz_manifest,
+    make_run_id, update_latest_symlink, save_run_artifacts,
     checkpoint_file, load_state_dict, load_norm_stats,
 )
 from .results import RunResult
@@ -36,6 +38,18 @@ def _require(value, msg: str):
     if value is None:
         raise ValueError(msg)
     return value
+
+
+def _seed_fit(seed: int) -> None:
+    """Seed Python, NumPy, and PyTorch before model construction."""
+    seed = int(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # Also seed Lightning worker processes when num_workers > 0.
+    pl.seed_everything(seed, workers=True, verbose=False)
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +199,7 @@ class STPPRunner:
         data_module:  Override the auto-built data module (researcher escape hatch).
         dataset_id:   Human-readable name stored in the returned ``RunResult``.
         """
+        _seed_fit(self.config.data.seed)
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
         run_dir = self._prepare_run_dir(self.config.model.preset)
         with _quiet_lightning():
@@ -403,90 +418,18 @@ class STPPRunner:
         return raw
 
     # ------------------------------------------------------------------
-    # Post-fit evaluation (primary analysis path)
+    # Post-fit evaluation
     # ------------------------------------------------------------------
 
-    def evaluate(
-        self,
-        val_seqs: Optional[list[dict]] = None,
-        *,
-        surface_viz=None,
-        run_dir: Optional[Path] = None,
-    ) -> dict[str, Path]:
-        """Post-fit evaluation: run analysis workflows on a fitted runner.
-
-        Works both after ``fit()`` (data module is in memory) and after
-        ``load()`` (pass ``val_seqs`` to rebuild the data module).
-
-        Parameters
-        ----------
-        val_seqs    : event sequences for history queries. Required after
-                      ``load()`` when ``_data_module`` is not held in memory.
-                      Ignored if ``_data_module`` is already set.
-        surface_viz : :class:`~unified_stpp.viz.workflow.SurfaceVizConfig`.
-                      When ``enabled=True``, queries intensity/density surfaces
-                      and saves artifacts.
-        run_dir     : artifact output directory.  Defaults to ``self._run_dir``
-                      (set by ``fit()`` or ``load()``).
-
-        Returns
-        -------
-        dict[str, Path]
-            Mapping from artifact name to path.  Empty if no workflows are enabled.
-        """
-        run_dir = self._resolve_run_dir(run_dir)
-        self._ensure_data_module(val_seqs)
-
-        artifacts: dict[str, Path] = {}
-        for wf_cfg in [surface_viz]:   # extend this list as new workflows are added
-            if wf_cfg is not None and getattr(wf_cfg, "enabled", False):
-                from unified_stpp.viz.workflow import SurfaceVisualizationWorkflow
-                wf = SurfaceVisualizationWorkflow(wf_cfg)
-                wf_artifacts = wf.run(self, run_dir)
-                _extend_viz_manifest(run_dir, wf_artifacts)
-                artifacts.update(wf_artifacts)
-        return artifacts
-
-    def _resolve_run_dir(self, run_dir: Optional[Path]) -> Path:
-        """Return a resolved run directory, raising if none is available."""
-        if run_dir is not None:
-            return Path(run_dir)
-        return _require(
-            self._run_dir,
-            "run_dir is required when the runner has no associated run "
-            "directory.  Pass run_dir= explicitly, or call fit() / "
-            "load() before evaluate().",
+    def evaluate(self, *args, **kwargs) -> dict[str, Path]:
+        """Deprecated compatibility shim for the retired runner-owned eval path."""
+        raise RuntimeError(
+            "STPPRunner.evaluate() has been retired. Use "
+            "'python -m unified_stpp evaluate metrics ...', "
+            "'python -m unified_stpp evaluate predictive-compare ...', or "
+            "'python -m unified_stpp evaluate surface ...', or call "
+            "PredictiveComparator / SurfaceDiagnosticEvaluator directly."
         )
-
-    def _ensure_data_module(self, val_seqs: Optional[list[dict]]) -> None:
-        """Ensure ``_data_module`` is set, building from val_seqs if needed."""
-        if self._data_module is not None:
-            return
-        self._data_module = self._build_eval_data_module(
-            _require(
-                val_seqs,
-                "val_seqs is required when calling evaluate() after load() "
-                "(the data module is not held in memory).",
-            )
-        )
-
-    def _build_eval_data_module(self, val_seqs: list[dict]) -> STPPDataModule:
-        """Build a minimal eval-only data module from val_seqs.
-
-        Used only to support ``get_original_sequence()`` access in the
-        visualization workflow.  No DataLoader is iterated in the evaluate path.
-        Normalization stats are held by the evaluator (via ``runner.norm_stats``),
-        not by this data module.
-        """
-        from unified_stpp.data import STPPDataset, collate_fn as _canonical_collate
-        from unified_stpp.data.registry import DataBundle
-
-        ds = STPPDataset(val_seqs, normalize_time=False, normalize_space=False)
-        bundle = DataBundle(
-            train_dataset=ds, val_dataset=ds, test_dataset=None,
-            collate_fn=_canonical_collate, train_batch_sampler=None,
-        )
-        return STPPDataModule(bundle, batch_size=1)
 
     # ------------------------------------------------------------------
     # Persistence

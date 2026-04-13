@@ -27,7 +27,7 @@ from typing import Optional, Union
 
 import numpy as np
 
-from unified_stpp.evaluation.surface import SurfaceResult
+from unified_stpp.evaluation.surface_query import SurfaceResult
 from unified_stpp.viz.surface_plot import plot_surface
 
 
