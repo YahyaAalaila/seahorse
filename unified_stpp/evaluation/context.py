@@ -143,6 +143,8 @@ class EvalContext:
         train_data: list[dict[str, np.ndarray]] | None = None,
         k_pred: int = _K_PRED_DEFAULT,
         k_gen: int = _K_GEN_DEFAULT,
+        exact_time_bins: int = 12,
+        exact_spatial_bins: int = 12,
         grid_spec: dict[str, Any] | None = None,
         seed: int = 0,
         planned_artifact_families: set[str] | frozenset[str] | None = None,
@@ -156,6 +158,8 @@ class EvalContext:
         self.train_data = train_data
         self.k_pred = k_pred
         self.k_gen = k_gen
+        self.exact_time_bins = int(exact_time_bins)
+        self.exact_spatial_bins = int(exact_spatial_bins)
         self.grid_spec = grid_spec or {}
         self.seed = seed
         self.planned_artifact_families = frozenset(planned_artifact_families or ())
@@ -277,6 +281,8 @@ class EvalContext:
             k=self.k_pred,
             seed=self.seed,
             device=str(self.device),
+            exact_time_bins=self.exact_time_bins,
+            exact_spatial_bins=self.exact_spatial_bins,
         )
         loaded = load_predictive_samples_artifact(self.artifact_dir, key)
         if loaded is not None:
@@ -301,6 +307,8 @@ class EvalContext:
             k=self.k_pred,
             device=self.device,
             seed=self.seed,
+            exact_time_bins=self.exact_time_bins,
+            exact_spatial_bins=self.exact_spatial_bins,
         )
         if memory_only:
             self.artifact_events[PREDICTIVE_SAMPLES] = "computed_memory"

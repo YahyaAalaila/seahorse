@@ -72,6 +72,18 @@ def _add_metrics_subparser(sub) -> None:
     p.add_argument("--max-events", type=int, default=None, help="Limit events per sequence.")
     p.add_argument("--k-pred", type=int, default=200, help="Next-event samples per context.")
     p.add_argument("--k-gen", type=int, default=20, help="Full-rollout samples per sequence.")
+    p.add_argument(
+        "--exact-time-bins",
+        type=int,
+        default=12,
+        help="Number of proposal time bins for thinning-based next-event sampling.",
+    )
+    p.add_argument(
+        "--exact-spatial-bins",
+        type=int,
+        default=12,
+        help="Number of proposal bins per spatial axis for thinning-based next-event sampling.",
+    )
     p.add_argument("--seed", type=int, default=0, help="Evaluation sampling seed.")
     p.add_argument(
         "--device",
@@ -394,7 +406,7 @@ def execute(args) -> None:
 
 
 def _execute_metrics(args) -> None:
-    from unified_stpp.evaluation import evaluate
+    from unified_stpp.evaluation.evaluator import evaluate
     from unified_stpp.evaluation.profiles import (
         MetricPlanError,
         metric_profile as resolve_metric_profile,
@@ -460,6 +472,8 @@ def _execute_metrics(args) -> None:
             train_data=train_seqs,
             k_pred=int(args.k_pred),
             k_gen=int(args.k_gen),
+            exact_time_bins=int(args.exact_time_bins),
+            exact_spatial_bins=int(args.exact_spatial_bins),
             seed=int(args.seed),
             device=device,
             metric_profile=canonical_profile,
@@ -634,6 +648,8 @@ def _metrics_evaluation_manifest(
             "seed": int(args.seed),
             "k_pred": int(args.k_pred),
             "k_gen": int(args.k_gen),
+            "exact_time_bins": int(args.exact_time_bins),
+            "exact_spatial_bins": int(args.exact_spatial_bins),
             "out_dir": str(out_dir),
         },
     }
@@ -685,15 +701,13 @@ def _artifact_links(artifact_dir: Path, events: dict[str, str]) -> dict[str, dic
 
 
 def _execute_predictive_compare(args) -> None:
-    from unified_stpp.evaluation import (
-        ExactProposalConfig,
-        HistoryQuery,
+    from unified_stpp.evaluation.common import HistoryQuery, RunTarget
+    from unified_stpp.evaluation.io import load_predictive_bundle, write_predictive_bundle
+    from unified_stpp.evaluation.predictive_compare import (
         PredictiveComparator,
         PredictiveCompareSpec,
-        RunTarget,
-        load_predictive_bundle,
-        write_predictive_bundle,
     )
+    from unified_stpp.evaluation.predictive_sampling import ExactProposalConfig
     from unified_stpp.viz import PredictiveRenderConfig, render_predictive_bundle
 
     labels = list(args.label or [])
@@ -760,13 +774,11 @@ def _execute_predictive_compare(args) -> None:
 
 
 def _execute_surface(args) -> None:
-    from unified_stpp.evaluation import (
-        HistoryQuery,
-        RunTarget,
+    from unified_stpp.evaluation.common import HistoryQuery, RunTarget
+    from unified_stpp.evaluation.io import load_surface_bundle, write_surface_bundle
+    from unified_stpp.evaluation.surface import (
         SurfaceDiagnosticEvaluator,
         SurfaceDiagnosticSpec,
-        load_surface_bundle,
-        write_surface_bundle,
     )
     from unified_stpp.viz import SurfaceRenderConfig, render_surface_bundle
 

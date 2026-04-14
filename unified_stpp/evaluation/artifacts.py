@@ -115,6 +115,8 @@ def build_predictive_samples_key(
     k: int,
     seed: int,
     device: str,
+    exact_time_bins: int = 12,
+    exact_spatial_bins: int = 12,
 ) -> ArtifactKey:
     run_dir = getattr(runner, "_run_dir", None)
     run_dir = None if run_dir is None else Path(run_dir).resolve()
@@ -135,7 +137,11 @@ def build_predictive_samples_key(
         "has_intensity": bool(getattr(caps, "has_intensity", False)),
         "has_native_sampler": bool(getattr(caps, "has_native_sampler", False)),
         "sampling_backend": "native" if getattr(caps, "has_native_sampler", False) else "thinning",
-        "exact_proposal": {"mode": "coarse"},
+        "exact_proposal": {
+            "mode": "coarse",
+            "time_bins": int(exact_time_bins),
+            "spatial_bins": int(exact_spatial_bins),
+        },
         "k_pred": int(k),
         "seed": int(seed),
         "device": str(device),

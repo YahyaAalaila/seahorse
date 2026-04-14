@@ -60,6 +60,8 @@ def _thinning_next_events_batch(
     ymin: float,
     ymax: float,
     device: torch.device,
+    exact_time_bins: int = 12,
+    exact_spatial_bins: int = 12,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Draw K next-event samples via serial thinning.  Returns (times, locs).
 
@@ -71,7 +73,11 @@ def _thinning_next_events_batch(
 
     t_start = float(history["times"][-1]) if history["times"].size > 0 else 0.0
     t_end = t_start + float(horizon)
-    exact_proposal = ExactProposalConfig(mode="coarse")
+    exact_proposal = ExactProposalConfig(
+        mode="coarse",
+        time_bins=int(exact_time_bins),
+        spatial_bins=int(exact_spatial_bins),
+    )
 
     # --- Build state and proposal cache once ---
     state_ctx = build_state_from_history(runner, history, device)
@@ -135,6 +141,8 @@ def compute_predictive_samples(
     k: int,
     device: torch.device,
     seed: int = 0,
+    exact_time_bins: int = 12,
+    exact_spatial_bins: int = 12,
 ) -> PredictiveSamples:
     """Compute K next-event samples for every test event (teacher-forced history).
 
@@ -201,6 +209,8 @@ def compute_predictive_samples(
                         ymin=ymin,
                         ymax=ymax,
                         device=device,
+                        exact_time_bins=exact_time_bins,
+                        exact_spatial_bins=exact_spatial_bins,
                     )
 
                 all_next_times.append(s_t)
