@@ -103,7 +103,7 @@ _CAPABILITY_VOCAB = frozenset(
 )
 
 # Default K budgets (can be overridden on EvalContext)
-_K_PRED_DEFAULT = 200
+_K_PRED_DEFAULT = 32
 _K_GEN_DEFAULT = 20
 _ARTIFACT_MODES = frozenset({"load_or_compute", "load_only"})
 
@@ -143,8 +143,8 @@ class EvalContext:
         train_data: list[dict[str, np.ndarray]] | None = None,
         k_pred: int = _K_PRED_DEFAULT,
         k_gen: int = _K_GEN_DEFAULT,
-        exact_time_bins: int = 12,
-        exact_spatial_bins: int = 12,
+        exact_time_bins: int = 8,
+        exact_spatial_bins: int = 8,
         grid_spec: dict[str, Any] | None = None,
         seed: int = 0,
         planned_artifact_families: set[str] | frozenset[str] | None = None,

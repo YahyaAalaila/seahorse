@@ -115,8 +115,8 @@ def build_predictive_samples_key(
     k: int,
     seed: int,
     device: str,
-    exact_time_bins: int = 12,
-    exact_spatial_bins: int = 12,
+    exact_time_bins: int = 8,
+    exact_spatial_bins: int = 8,
 ) -> ArtifactKey:
     run_dir = getattr(runner, "_run_dir", None)
     run_dir = None if run_dir is None else Path(run_dir).resolve()
@@ -206,3 +206,47 @@ def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
 
 def _canonical_json(data: dict[str, Any]) -> str:
     return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def merge_predictive_samples(parts: list[PredictiveSamples]) -> PredictiveSamples:
+    """Merge shard PredictiveSamples into one artifact.
+
+    Each shard's ``seq_indices`` are assumed to be 0-based (relative to the
+    shard's own sequence list).  This function remaps them so that shard i's
+    indices are offset by the total number of distinct sequences in shards 0..i-1.
+
+    Parameters
+    ----------
+    parts:  Non-empty list of per-shard PredictiveSamples in shard order.
+
+    Returns
+    -------
+    Merged PredictiveSamples with contiguous seq_indices across all shards.
+    """
+    if not parts:
+        raise ValueError("merge_predictive_samples requires at least one part.")
+
+    methods = {p.method for p in parts}
+    if len(methods) > 1:
+        raise ValueError(
+            f"Cannot merge PredictiveSamples with different methods: {sorted(methods)}"
+        )
+    method = parts[0].method
+
+    remapped_seq_indices: list[np.ndarray] = []
+    offset = 0
+    for part in parts:
+        si = np.asarray(part.seq_indices, dtype=np.int64)
+        remapped_seq_indices.append(si + offset)
+        # next shard's offset = one past the highest seq index in this shard
+        offset += int(si.max()) + 1 if si.size > 0 else 0
+
+    return PredictiveSamples(
+        next_times=np.concatenate([p.next_times for p in parts], axis=0),
+        next_locs=np.concatenate([p.next_locs for p in parts], axis=0),
+        true_next_times=np.concatenate([p.true_next_times for p in parts], axis=0),
+        true_next_locs=np.concatenate([p.true_next_locs for p in parts], axis=0),
+        history_end_times=np.concatenate([p.history_end_times for p in parts], axis=0),
+        seq_indices=np.concatenate(remapped_seq_indices, axis=0),
+        method=method,
+    )

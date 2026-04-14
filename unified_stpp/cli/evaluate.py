@@ -21,6 +21,7 @@ def add_subparser(sub) -> None:
     _add_metrics_subparser(modes)
     _add_predictive_compare_subparser(modes)
     _add_surface_subparser(modes)
+    _add_merge_artifacts_subparser(modes)
 
 
 def _add_metrics_subparser(sub) -> None:
@@ -70,18 +71,29 @@ def _add_metrics_subparser(sub) -> None:
     )
     p.add_argument("--max-seqs", type=int, default=None, help="Limit evaluation sequences.")
     p.add_argument("--max-events", type=int, default=None, help="Limit events per sequence.")
-    p.add_argument("--k-pred", type=int, default=200, help="Next-event samples per context.")
+    p.add_argument(
+        "--seq-shard",
+        default=None,
+        metavar="START:END",
+        help=(
+            "Evaluate only sequences [START:END] from the test file. "
+            "Enables splitting evaluation across cluster jobs. "
+            "Example: --seq-shard 0:50. "
+            "Merge shard artifacts afterwards with: evaluate merge-artifacts."
+        ),
+    )
+    p.add_argument("--k-pred", type=int, default=32, help="Next-event samples per context.")
     p.add_argument("--k-gen", type=int, default=20, help="Full-rollout samples per sequence.")
     p.add_argument(
         "--exact-time-bins",
         type=int,
-        default=12,
+        default=8,
         help="Number of proposal time bins for thinning-based next-event sampling.",
     )
     p.add_argument(
         "--exact-spatial-bins",
         type=int,
-        default=12,
+        default=8,
         help="Number of proposal bins per spatial axis for thinning-based next-event sampling.",
     )
     p.add_argument("--seed", type=int, default=0, help="Evaluation sampling seed.")
@@ -402,7 +414,10 @@ def execute(args) -> None:
     if mode == "surface":
         _execute_surface(args)
         return
-    raise SystemExit("evaluate requires one of: metrics, predictive-compare, surface")
+    if mode == "merge-artifacts":
+        _execute_merge_artifacts(args)
+        return
+    raise SystemExit("evaluate requires one of: metrics, predictive-compare, surface, merge-artifacts")
 
 
 def _execute_metrics(args) -> None:
@@ -435,10 +450,12 @@ def _execute_metrics(args) -> None:
         if args.artifact_dir is not None
         else out_dir / "artifacts"
     )
+    seq_shard = _parse_seq_shard(getattr(args, "seq_shard", None))
     test_seqs = _load_metric_sequences(
         data_path,
         max_seqs=args.max_seqs,
         max_events=args.max_events,
+        seq_shard=seq_shard,
         load_jsonl=load_jsonl,
     )
     train_seqs = (
@@ -525,11 +542,34 @@ def _execute_metrics(args) -> None:
     _print_artifacts(artifacts)
 
 
+def _parse_seq_shard(shard: str | None) -> tuple[int, int] | None:
+    """Parse a 'START:END' shard string into a (start, end) integer tuple."""
+    if shard is None:
+        return None
+    parts = str(shard).split(":")
+    if len(parts) != 2:
+        raise SystemExit(
+            f"--seq-shard must be in START:END format (e.g. '0:50'), got: {shard!r}"
+        )
+    try:
+        start, end = int(parts[0]), int(parts[1])
+    except ValueError:
+        raise SystemExit(
+            f"--seq-shard values must be integers, got: {shard!r}"
+        )
+    if start < 0 or end <= start:
+        raise SystemExit(
+            f"--seq-shard requires 0 ≤ START < END, got: {shard!r}"
+        )
+    return start, end
+
+
 def _load_metric_sequences(
     path: Path,
     *,
     max_seqs: int | None,
     max_events: int | None,
+    seq_shard: tuple[int, int] | None = None,
     load_jsonl,
 ) -> list[dict[str, np.ndarray]]:
     if not path.exists():
@@ -537,6 +577,14 @@ def _load_metric_sequences(
     seqs = load_jsonl(path)
     if max_seqs is not None:
         seqs = seqs[: int(max_seqs)]
+    if seq_shard is not None:
+        start, end = seq_shard
+        seqs = seqs[start:end]
+        if not seqs:
+            raise SystemExit(
+                f"--seq-shard {start}:{end} produced an empty sequence list "
+                f"(file has {len(load_jsonl(path))} sequences after max_seqs cap)."
+            )
     out: list[dict[str, np.ndarray]] = []
     for seq in seqs:
         times = np.asarray(seq["times"], dtype=np.float32)
@@ -878,3 +926,88 @@ def _write_manifest(out_dir: Path, artifacts: dict[str, Path]) -> Path:
 def _print_artifacts(artifacts: dict[str, Path]) -> None:
     for name, path in sorted(artifacts.items()):
         print(f"  {name}: {path}")
+
+
+def _add_merge_artifacts_subparser(sub) -> None:
+    p = sub.add_parser(
+        "merge-artifacts",
+        help=(
+            "Merge predictive_samples artifacts from multiple --seq-shard runs "
+            "into a single combined artifact directory."
+        ),
+    )
+    p.add_argument(
+        "--artifact-dir",
+        action="append",
+        required=True,
+        dest="artifact_dirs",
+        metavar="DIR",
+        help=(
+            "Root artifact directory from one shard run (contains predictive_samples/ subdir). "
+            "Repeat in shard order (shard 0, shard 1, ...) to merge correctly."
+        ),
+    )
+    p.add_argument(
+        "--out",
+        required=True,
+        help="Output directory for the merged artifact.",
+    )
+
+
+def _execute_merge_artifacts(args) -> None:
+    from unified_stpp.evaluation.artifacts import merge_predictive_samples
+    from unified_stpp.evaluation.io import (
+        scan_and_load_predictive_samples,
+        write_predictive_samples_artifact,
+    )
+    from unified_stpp.evaluation.artifacts import (
+        ArtifactKey,
+        PREDICTIVE_SAMPLES,
+        PREDICTIVE_SAMPLES_SCHEMA_VERSION,
+        _canonical_json,
+    )
+    import hashlib
+
+    artifact_dirs = [Path(d).resolve() for d in args.artifact_dirs]
+    out_dir = Path(args.out).resolve()
+
+    parts = []
+    for d in artifact_dirs:
+        samples = scan_and_load_predictive_samples(d)
+        if samples is None:
+            raise SystemExit(
+                f"No predictive_samples artifact found in {d}. "
+                "Ensure each --artifact-dir is an artifact root containing a "
+                "predictive_samples/ subdirectory."
+            )
+        parts.append(samples)
+        print(f"  loaded: {d} ({samples.next_times.shape[0]} contexts)")
+
+    merged = merge_predictive_samples(parts)
+    print(f"  merged: {merged.next_times.shape[0]} total contexts, method={merged.method!r}")
+
+    # Build a synthetic key for the merged artifact so it can be loaded by downstream code
+    digest_payload = {
+        "merged_from": [str(d) for d in artifact_dirs],
+        "n_parts": len(parts),
+        "n_contexts": int(merged.next_times.shape[0]),
+        "k_pred": int(merged.next_times.shape[1]) if merged.next_times.ndim == 2 else 0,
+        "method": merged.method,
+    }
+    digest = hashlib.sha256(
+        _canonical_json(digest_payload).encode("utf-8")
+    ).hexdigest()[:24]
+    merged_key = ArtifactKey(
+        family=PREDICTIVE_SAMPLES,
+        schema_version=PREDICTIVE_SAMPLES_SCHEMA_VERSION,
+        digest=digest,
+        metadata=digest_payload,
+    )
+
+    written = write_predictive_samples_artifact(out_dir, merged_key, merged)
+    artifacts = {
+        "manifest": written["manifest"],
+        "payload": written["payload"],
+    }
+    artifacts["artifacts_json"] = _write_manifest(out_dir, artifacts)
+    _print_artifacts(artifacts)

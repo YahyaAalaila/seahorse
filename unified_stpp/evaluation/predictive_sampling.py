@@ -34,8 +34,8 @@ def is_exact_preset(preset: str) -> bool:
 @dataclass(frozen=True)
 class ExactProposalConfig:
     mode: str = "coarse"
-    time_bins: int = 12
-    spatial_bins: int = 12
+    time_bins: int = 8
+    spatial_bins: int = 8
     safety: float = 2.0
 
 
@@ -346,26 +346,45 @@ def _build_exact_proposal_cache(
         (int(config.time_bins), int(config.spatial_bins), int(config.spatial_bins)),
         dtype=np.float32,
     )
-    point_count = 0
-    batch_count = 0
-    query_locs = torch.as_tensor(centers, dtype=torch.float32, device=device)
+    n_spatial = centers.shape[0]
     eps = max(float(t_max - t_start) * 1e-6, 1e-6)
+
+    # Collect all (time_bins * 3) time samples in one list, then issue a single
+    # batched intensity call for all (time_bins * 3 * n_spatial) query points.
+    all_t_vals: list[float] = []
     for t_idx in range(int(config.time_bins)):
         lo = float(time_edges[t_idx])
         hi = float(time_edges[t_idx + 1])
         mid = 0.5 * (lo + hi)
-        max_vals = np.zeros((centers.shape[0],), dtype=np.float32)
-        for t_sample in (lo, mid, max(lo, hi - eps)):
-            query_times = torch.full((centers.shape[0],), float(t_sample), dtype=torch.float32, device=device)
-            with torch.no_grad():
-                vals = intensity_fn(query_times, query_locs).detach().cpu().numpy()
-            max_vals = np.maximum(max_vals, np.asarray(vals, dtype=np.float32).reshape(-1))
-            point_count += int(centers.shape[0])
-            batch_count += 1
+        all_t_vals.extend([lo, mid, max(lo, hi - eps)])
+
+    n_t_samples = len(all_t_vals)  # time_bins * 3
+
+    # Build query tensors: repeat each t_val for every spatial center
+    all_qt = torch.tensor(
+        [t for t in all_t_vals for _ in range(n_spatial)],
+        dtype=torch.float32,
+        device=device,
+    )  # shape (n_t_samples * n_spatial,)
+
+    query_locs = torch.as_tensor(centers, dtype=torch.float32, device=device)
+    all_qs = query_locs.repeat(n_t_samples, 1)  # (n_t_samples * n_spatial, 2)
+
+    with torch.no_grad():
+        all_vals = intensity_fn(all_qt, all_qs).detach().cpu().numpy().astype(np.float32).reshape(-1)
+
+    # Reshape to (time_bins, 3, n_spatial) and take per-cell max over the 3 time samples
+    vals_by_bin = all_vals.reshape(int(config.time_bins), 3, n_spatial)
+    max_vals_by_bin = vals_by_bin.max(axis=1)  # (time_bins, n_spatial)
+
+    for t_idx in range(int(config.time_bins)):
         cell_bounds[t_idx] = np.maximum(
-            max_vals.reshape(int(config.spatial_bins), int(config.spatial_bins)) * float(config.safety),
+            max_vals_by_bin[t_idx].reshape(int(config.spatial_bins), int(config.spatial_bins)) * float(config.safety),
             1e-8,
         )
+
+    point_count = n_t_samples * n_spatial
+    batch_count = 1
     cell_area = (
         max(float(xmax) - float(xmin), 1e-8)
         / max(int(config.spatial_bins), 1)
@@ -389,6 +408,149 @@ def _build_exact_proposal_cache(
         "proposal_cache_query_batches": int(batch_count),
         "proposal_cache_query_points": int(point_count),
     }
+
+
+def _thinning_k_chains_batched(
+    intensity_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+    *,
+    k: int,
+    t_start: float,
+    t_max: float,
+    proposal_cache: ExactProposalCache,
+    device: torch.device,
+    max_rounds: int = 500,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Draw K independent next-event samples via batched thinning.
+
+    All K chains share the same conditioning state and proposal_cache — they are
+    fully independent samples of the next event after t_start.  Instead of running
+    K sequential single-point intensity calls, this function evaluates all active
+    chains in one batched intensity call per round.  Expected rounds ≈ 2 at
+    safety=2.0, so cost is O(rounds × batch) instead of O(K × proposals_per_sample).
+
+    Returns
+    -------
+    result_t : (K,) float32 — sampled event times; t_max means no event in window.
+    result_s : (K, 2) float32 — sampled event locations (random within domain when no event).
+    """
+    k = int(k)
+    chain_t = np.full(k, float(t_start), dtype=np.float64)
+    active = np.ones(k, dtype=bool)
+    result_t = np.full(k, float(t_max), dtype=np.float32)
+    result_s = np.zeros((k, 2), dtype=np.float32)
+    n_x = int(proposal_cache.x_edges.shape[0] - 1)
+
+    for _ in range(max_rounds):
+        # Deactivate chains that have reached or passed the window end
+        active &= chain_t < float(t_max)
+        n_active = int(active.sum())
+        if n_active == 0:
+            break
+
+        active_idx = np.where(active)[0]
+        t_curr = chain_t[active_idx].astype(np.float32)
+
+        # Determine time bin for each active chain
+        t_bin = np.clip(
+            np.searchsorted(proposal_cache.time_edges, t_curr, side="right") - 1,
+            0,
+            proposal_cache.time_edges.shape[0] - 2,
+        ).astype(np.int32)
+        interval_ends = proposal_cache.time_edges[t_bin + 1]   # (n_active,) float32
+        total_rates = proposal_cache.total_rates[t_bin]         # (n_active,) float32
+
+        # Zero-rate bins: advance chain to interval end, no intensity call needed
+        zero_rate = total_rates <= 1e-12
+        if zero_rate.any():
+            chain_t[active_idx[zero_rate]] = interval_ends[zero_rate].astype(np.float64)
+
+        has_rate = ~zero_rate
+        if not has_rate.any():
+            continue
+
+        hr_idx = active_idx[has_rate]
+        hr_rates = total_rates[has_rate].astype(np.float64)
+        hr_t_curr = chain_t[hr_idx]
+        hr_interval_ends = interval_ends[has_rate].astype(np.float64)
+
+        # Sample next proposal time from Exp(total_rate)
+        dt = np.random.exponential(1.0 / hr_rates)
+        t_prop = (hr_t_curr + dt).astype(np.float32)
+
+        # Proposals that overshoot the interval: advance chain_t, try next interval
+        past = t_prop >= hr_interval_ends.astype(np.float32)
+        if past.any():
+            chain_t[hr_idx[past]] = hr_interval_ends[past]
+
+        in_interval = ~past
+        if not in_interval.any():
+            continue
+
+        vi_idx = hr_idx[in_interval]
+        vi_t_prop = t_prop[in_interval]                           # (n_valid,) float32
+        vi_t_bin = t_bin[has_rate][in_interval].astype(np.int32)  # (n_valid,)
+        n_valid = int(in_interval.sum())
+
+        # Sample spatial cells proportionally to cell probability mass
+        flat_cell = np.array([
+            int(np.random.choice(
+                proposal_cache.cell_probs.shape[1],
+                p=proposal_cache.cell_probs[ti],
+            ))
+            for ti in vi_t_bin
+        ], dtype=np.int32)
+        y_cell = flat_cell // n_x
+        x_cell = flat_cell % n_x
+
+        x_lo = proposal_cache.x_edges[x_cell]
+        x_hi = proposal_cache.x_edges[x_cell + 1]
+        y_lo = proposal_cache.y_edges[y_cell]
+        y_hi = proposal_cache.y_edges[y_cell + 1]
+        s_prop = np.column_stack([
+            np.random.uniform(x_lo, x_hi),
+            np.random.uniform(y_lo, y_hi),
+        ]).astype(np.float32)
+
+        # One batched intensity evaluation for all n_valid proposals
+        qt = torch.as_tensor(vi_t_prop, dtype=torch.float32, device=device)
+        qs = torch.as_tensor(s_prop, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            lams = (
+                intensity_fn(qt, qs).detach().cpu().numpy()
+                .astype(np.float32).reshape(-1)
+            )
+        lams = np.maximum(lams, 0.0)
+
+        # Adaptive bound updates for exceeded cells
+        local_bounds = proposal_cache.cell_bounds[vi_t_bin, y_cell, x_cell].copy()
+        exceeded = lams > local_bounds
+        if exceeded.any():
+            for ei in np.where(exceeded)[0]:
+                tb, yc, xc = int(vi_t_bin[ei]), int(y_cell[ei]), int(x_cell[ei])
+                new_bound = max(
+                    float(lams[ei]) * max(float(proposal_cache.safety), 1.1),
+                    float(proposal_cache.cell_bounds[tb, yc, xc]) * 2.0,
+                    1e-8,
+                )
+                proposal_cache.cell_bounds[tb, yc, xc] = new_bound
+                _refresh_exact_proposal_interval(proposal_cache, tb)
+            local_bounds = proposal_cache.cell_bounds[vi_t_bin, y_cell, x_cell]
+
+        # Vectorised accept/reject
+        accept_p = lams / np.maximum(local_bounds, 1e-8)
+        accepted = np.random.uniform(size=n_valid) < accept_p
+
+        # Record accepted samples and deactivate those chains
+        acc_idx = vi_idx[accepted]
+        result_t[acc_idx] = vi_t_prop[accepted]
+        result_s[acc_idx] = s_prop[accepted]
+        active[acc_idx] = False
+
+        # Rejected chains advance their current time to the rejection point
+        rej_idx = vi_idx[~accepted]
+        chain_t[rej_idx] = vi_t_prop[~accepted].astype(np.float64)
+
+    return result_t, result_s
 
 
 def rollout_window_native_sampler(

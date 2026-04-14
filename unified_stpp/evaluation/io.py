@@ -8,7 +8,9 @@ from pathlib import Path
 import numpy as np
 
 from unified_stpp.evaluation.artifacts import (
+    ARTIFACT_MANIFEST_FILENAME,
     PREDICTIVE_SAMPLES,
+    PREDICTIVE_SAMPLES_SCHEMA_VERSION,
     ArtifactKey,
     ArtifactManifest,
     PredictiveSamples,
@@ -86,6 +88,54 @@ def load_predictive_samples_artifact(
         seq_indices=np.asarray(payload["seq_indices"], dtype=np.int64),
         method=str(np.asarray(payload["method"]).item()),
     )
+
+
+def scan_and_load_predictive_samples(artifact_dir: str | Path) -> PredictiveSamples | None:
+    """Load the first valid predictive_samples artifact found under ``artifact_dir``.
+
+    Scans ``artifact_dir / "predictive_samples" / <digest> / manifest.json`` for
+    any digest directory that contains a valid manifest and payload.  Returns the
+    first one found (alphabetical digest order), or ``None`` if the directory does
+    not exist or contains no valid artifacts.
+
+    This is used by ``evaluate merge-artifacts`` to load shard artifacts without
+    knowing the digest in advance.
+    """
+    root = Path(artifact_dir).resolve()
+    family_dir = root / PREDICTIVE_SAMPLES
+    if not family_dir.is_dir():
+        return None
+    for digest_dir in sorted(family_dir.iterdir()):
+        if not digest_dir.is_dir():
+            continue
+        manifest_path = digest_dir / ARTIFACT_MANIFEST_FILENAME
+        if not manifest_path.exists():
+            continue
+        try:
+            with open(manifest_path) as f:
+                manifest_data = json.load(f)
+            manifest = ArtifactManifest.from_dict(manifest_data)
+        except Exception:
+            continue
+        if manifest.family != PREDICTIVE_SAMPLES:
+            continue
+        payload_path = digest_dir / manifest.payload_file
+        if not payload_path.exists():
+            continue
+        try:
+            payload = np.load(payload_path)
+            return PredictiveSamples(
+                next_times=np.asarray(payload["next_times"], dtype=np.float32),
+                next_locs=np.asarray(payload["next_locs"], dtype=np.float32),
+                true_next_times=np.asarray(payload["true_next_times"], dtype=np.float32),
+                true_next_locs=np.asarray(payload["true_next_locs"], dtype=np.float32),
+                history_end_times=np.asarray(payload["history_end_times"], dtype=np.float32),
+                seq_indices=np.asarray(payload["seq_indices"], dtype=np.int64),
+                method=str(np.asarray(payload["method"]).item()),
+            )
+        except Exception:
+            continue
+    return None
 
 
 def write_predictive_bundle(out_dir: Path, result: PredictiveComparisonResult) -> dict[str, Path]:

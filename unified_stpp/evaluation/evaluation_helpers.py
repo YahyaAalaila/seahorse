@@ -60,16 +60,17 @@ def _thinning_next_events_batch(
     ymin: float,
     ymax: float,
     device: torch.device,
-    exact_time_bins: int = 12,
-    exact_spatial_bins: int = 12,
+    exact_time_bins: int = 8,
+    exact_spatial_bins: int = 8,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Draw K next-event samples via serial thinning.  Returns (times, locs).
+    """Draw K next-event samples via batched parallel thinning.  Returns (times, locs).
 
-    Builds the history state and proposal cache **once** and reuses them
-    across all K samples.  This reduces cost from O(K × encode + K × cache_build)
-    to O(1 × encode + 1 × cache_build + K × thinning_proposals).
+    Builds the history state and proposal cache **once**, then runs all K chains
+    simultaneously via ``_thinning_k_chains_batched``.  Each round issues one
+    batched intensity call for all active chains instead of K × proposals_per_sample
+    individual calls.  Expected cost: O(1 × encode + 1 × cache_build + ~2 × batch(K)).
     """
-    from .predictive_sampling import rollout_window_thinning
+    from .predictive_sampling import _thinning_k_chains_batched
 
     t_start = float(history["times"][-1]) if history["times"].size > 0 else 0.0
     t_end = t_start + float(horizon)
@@ -79,7 +80,7 @@ def _thinning_next_events_batch(
         spatial_bins=int(exact_spatial_bins),
     )
 
-    # --- Build state and proposal cache once ---
+    # Build state and proposal cache once, shared across all K chains
     state_ctx = build_state_from_history(runner, history, device)
     intensity_fn = build_exact_intensity_fn(runner, state_ctx, device)
     proposal_cache, _ = _build_exact_proposal_cache(
@@ -94,44 +95,25 @@ def _thinning_next_events_batch(
         device=device,
     )
 
-    sampled_t: list[float] = []
-    sampled_s: list[np.ndarray] = []
-
-    for _ in range(k):
-        # Pass pre-built state and cache — rollout_window_thinning will not
-        # re-encode the history or re-build the cache.
-        out_t, out_s, _, _, _ = rollout_window_thinning(
-            runner,
-            history,
-            window_start=t_start,
-            window_end=t_end,
-            xmin=xmin,
-            xmax=xmax,
-            ymin=ymin,
-            ymax=ymax,
-            lambda_bar=10.0,
-            max_events=1,
-            adaptive=True,
-            device=device,
-            initial_state_ctx=state_ctx,
-            initial_proposal_cache=proposal_cache,
-            exact_proposal=exact_proposal,
-        )
-        if out_t.size > 0:
-            sampled_t.append(float(out_t[0]))
-            sampled_s.append(out_s[0])
-        else:
-            # No event sampled in window — use t_end with a random location
-            rng_loc = np.random.uniform(
-                [xmin, ymin], [xmax, ymax], size=2
-            ).astype(np.float32)
-            sampled_t.append(t_end)
-            sampled_s.append(rng_loc)
-
-    return (
-        np.asarray(sampled_t, dtype=np.float32),
-        np.asarray(sampled_s, dtype=np.float32),
+    # Run all K chains in parallel — one batched intensity call per thinning round
+    result_t, result_s = _thinning_k_chains_batched(
+        intensity_fn,
+        k=k,
+        t_start=t_start,
+        t_max=t_end,
+        proposal_cache=proposal_cache,
+        device=device,
     )
+
+    # Chains that hit t_end (no event accepted in window) get a random fallback location
+    no_event = result_t >= t_end - 1e-6
+    if no_event.any():
+        n_missing = int(no_event.sum())
+        result_s[no_event] = np.random.uniform(
+            [xmin, ymin], [xmax, ymax], size=(n_missing, 2)
+        ).astype(np.float32)
+
+    return result_t, result_s
 
 
 def compute_predictive_samples(
@@ -141,8 +123,8 @@ def compute_predictive_samples(
     k: int,
     device: torch.device,
     seed: int = 0,
-    exact_time_bins: int = 12,
-    exact_spatial_bins: int = 12,
+    exact_time_bins: int = 8,
+    exact_spatial_bins: int = 8,
 ) -> PredictiveSamples:
     """Compute K next-event samples for every test event (teacher-forced history).
 
