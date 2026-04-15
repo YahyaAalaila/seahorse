@@ -4,9 +4,12 @@ CLI entrypoint for unified_stpp.
 Usage
 -----
 python -m unified_stpp fit   --preset auto_stpp --train data/train.jsonl --val data/val.jsonl
+python -m unified_stpp fit   --preset auto_stpp --dataset hawkesnest_hard_v2/topology_T5
 python -m unified_stpp fit   --config my.yaml   --train data/train.jsonl --val data/val.jsonl [--test data/test.jsonl] [--out runs/]
 python -m unified_stpp tune  --preset auto_stpp --train data/train.jsonl --val data/val.jsonl [--n_trials 50] [--search-alg random] [--scheduler asha]
+python -m unified_stpp tune  --preset auto_stpp --dataset hawkesnest_v20260409/bg_BG1 [--out best.yaml]
 python -m unified_stpp bench --presets auto_stpp deep_stpp --splits_dir data/ --seeds 42 43 [--out bench_out/]
+python -m unified_stpp bench --preset deep_stpp --dataset hawkesnest_hard_v2/regime_R2 --no-normalize
 
 Data format: newline-delimited JSON (.jsonl), one sequence per line:
   {"times": [0.1, 0.4, ...], "locations": [[x1, y1], [x2, y2], ...]}

@@ -34,7 +34,7 @@ class BenchmarkConfigTest(unittest.TestCase):
             primary_metric="test_nll",
         )
         self.assertEqual(cfg.primary_metric, "test_nll")
-        self.assertEqual(cfg.resolved_tuning().metric, "val_nll")
+        self.assertEqual(cfg.resolved_tuning().metric, "val_objective")
 
     def test_data_contract_wins_over_base_overrides(self):
         bench = Benchmark(
@@ -47,8 +47,10 @@ class BenchmarkConfigTest(unittest.TestCase):
             },
         )
         cfg = bench._base_config("poisson_gmm")
-        self.assertEqual(cfg.data.protocol, "standard")
+        self.assertEqual(cfg.data.protocol, "raw")
         self.assertTrue(cfg.data.normalize)
+        self.assertEqual(cfg.training.checkpoint_select, "best")
+        self.assertEqual(cfg.training.test_nll_space, "raw")
 
     def test_run_returns_table_in_sequential_mode(self):
         bench = Benchmark(
@@ -61,6 +63,77 @@ class BenchmarkConfigTest(unittest.TestCase):
         self.assertIsInstance(table, BenchmarkTable)
         self.assertEqual(len(table.runs), 1)
         self.assertEqual(table.runs[0].preset, "poisson_gmm")
+
+    def test_run_hpo_requires_explicit_tune_dataset(self):
+        bench = Benchmark(
+            presets=["poisson_gmm"],
+            splits={"toy": (self.train_seqs, self.val_seqs, self.test_seqs)},
+            config=BenchmarkConfig(
+                run_hpo=True,
+                tuning=TuningConfig(n_trials=1),
+                seeds=[42],
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "tune_dataset"):
+            bench.tune_all()
+
+    def test_effective_config_relocks_pretuned_yaml_policy(self):
+        tuned = STPPConfig.from_preset("poisson_gmm")
+        raw = tuned.model_dump(mode="json")
+        raw["data"]["protocol"] = "standard"
+        raw["data"]["normalize"] = True
+        raw["training"]["checkpoint_select"] = "last"
+        raw["training"]["test_nll_space"] = "native"
+        raw["training"]["n_epochs"] = 99
+        raw["training"]["patience"] = 7
+        tuned = STPPConfig(**raw)
+
+        bench = Benchmark(
+            presets=["poisson_gmm"],
+            splits={"toy": (self.train_seqs, self.val_seqs, self.test_seqs)},
+            config=BenchmarkConfig(seeds=[42]),
+            base_overrides={"training": {"n_epochs": 3, "patience": None}},
+            hpo_configs={"poisson_gmm": tuned},
+        )
+        effective = bench._effective_config_for_preset("poisson_gmm")
+        self.assertEqual(effective.data.protocol, "raw")
+        self.assertFalse(effective.data.normalize)
+        self.assertEqual(effective.training.checkpoint_select, "best")
+        self.assertEqual(effective.training.test_nll_space, "raw")
+        self.assertEqual(effective.training.n_epochs, 3)
+        self.assertIsNone(effective.training.patience)
+
+    def test_exact_table_requires_raw_report_space(self):
+        table = BenchmarkTable(
+            runs=[
+                RunResult(
+                    preset="exact_native",
+                    dataset_id="toy",
+                    seed=0,
+                    val_objective=1.0,
+                    test_nll=2.0,
+                    train_time_sec=0.1,
+                    n_params=10,
+                    effective_config={},
+                    nll_kind="exact",
+                    nll_report_space="native",
+                ),
+                RunResult(
+                    preset="exact_raw",
+                    dataset_id="toy",
+                    seed=0,
+                    val_objective=1.0,
+                    test_nll=1.5,
+                    train_time_sec=0.1,
+                    n_params=10,
+                    effective_config={},
+                    nll_kind="exact",
+                    nll_report_space="raw",
+                ),
+            ]
+        )
+        exact = table.to_dataframe(group="exact")
+        self.assertEqual(list(exact.index), ["exact_raw"])
 
     def test_report_uses_requested_metric(self):
         run = RunResult(

@@ -11,7 +11,13 @@ from __future__ import annotations
 
 from importlib import import_module
 
-from .contract import fingerprint_batch, validate_batch
+from .contract import (
+    fingerprint_batch,
+    validate_batch,
+    validate_sequence_record,
+    validate_sequence_records,
+)
+from .hub import CuratedDatasetSpec, download_dataset, load_dataset
 from .dataset import PaperSlidingWindowDataset, STPPDataset, collate_fn
 from .transforms import (
     CoordinateTransformArtifact,
@@ -28,6 +34,11 @@ _DIRECT_EXPORTS = {
     "PaperSlidingWindowDataset": PaperSlidingWindowDataset,
     "validate_batch": validate_batch,
     "fingerprint_batch": fingerprint_batch,
+    "validate_sequence_record": validate_sequence_record,
+    "validate_sequence_records": validate_sequence_records,
+    "CuratedDatasetSpec": CuratedDatasetSpec,
+    "download_dataset": download_dataset,
+    "load_dataset": load_dataset,
     "CoordinateTransformArtifact": CoordinateTransformArtifact,
     "IdentityTransformArtifact": IdentityTransformArtifact,
     "PaperAffineTransformArtifact": PaperAffineTransformArtifact,

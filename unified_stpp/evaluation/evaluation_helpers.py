@@ -451,6 +451,8 @@ def compute_seq_nlls(
     Returns a float32 array of shape (len(seqs),) where each entry is the
     mean NLL per event for that sequence.  NaN for SMASH (nll_kind="none").
     """
+    from unified_stpp.runner.results import resolve_loss_result_reporting
+
     caps = runner.model.event_model.capabilities
     if caps.nll_kind == "none":
         return np.full(len(seqs), float("nan"), dtype=np.float32)
@@ -469,7 +471,10 @@ def compute_seq_nlls(
                 lengths=batch["lengths"],
             )
             result = runner.model.compute_loss(fwd)
-            nll_val = float(result.nll.item())
+            nll_val, _temporal, _spatial, _extra, _space = resolve_loss_result_reporting(
+                result,
+                requested_space=runner.config.training.test_nll_space,
+            )
             nlls.append(nll_val)
 
     return np.asarray(nlls, dtype=np.float32)

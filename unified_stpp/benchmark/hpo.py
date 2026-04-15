@@ -12,8 +12,10 @@ import os
 import resource
 import subprocess
 import sys
+import csv
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from unified_stpp.config.tuning import TuningConfig
@@ -96,6 +98,160 @@ def _emit_mem_event(stage: str, **payload) -> None:
     print(json.dumps(event, sort_keys=True), flush=True)
 
 
+def extract_trial_history(analysis) -> list[dict[str, Any]]:
+    """Return a compact, JSON-serializable summary of Ray Tune trials."""
+    records: list[dict[str, Any]] = []
+    for trial in getattr(analysis, "trials", []) or []:
+        last_result = dict(getattr(trial, "last_result", {}) or {})
+        config = dict(getattr(trial, "config", {}) or {})
+        records.append(
+            {
+                "trial_id": getattr(trial, "trial_id", None),
+                "status": str(getattr(trial, "status", "")),
+                "config": config,
+                "last_result": {
+                    key: value
+                    for key, value in last_result.items()
+                    if isinstance(value, (str, int, float, bool)) or value is None
+                },
+            }
+        )
+    return records
+
+
+def _git(cmd: list[str]) -> str | None:
+    try:
+        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:
+        return None
+
+
+def extract_analysis_metadata(analysis) -> dict[str, Any]:
+    """Extract stable, JSON-serializable Ray Tune metadata when available."""
+    if analysis is None:
+        return {}
+
+    best_result = {
+        key: value
+        for key, value in dict(getattr(analysis, "best_result", {}) or {}).items()
+        if isinstance(value, (str, int, float, bool)) or value is None
+    }
+    best_trial = getattr(analysis, "best_trial", None)
+    best_trial_status = None
+    if best_trial is not None:
+        status = getattr(best_trial, "status", None)
+        best_trial_status = None if status is None else str(status)
+
+    return {
+        "ray_experiment_path": (
+            getattr(analysis, "experiment_path", None)
+            or getattr(analysis, "_experiment_path", None)
+        ),
+        "best_trial_id": None if best_trial is None else getattr(best_trial, "trial_id", None),
+        "best_trial_status": best_trial_status,
+        "best_trial_logdir": getattr(analysis, "best_logdir", None),
+        "best_result": best_result or None,
+    }
+
+
+def build_hpo_manifest(
+    *,
+    source: str,
+    preset: str,
+    dataset_id: str,
+    data_source_fingerprint: str | None,
+    tuning,
+    best_config_path: Path | None,
+    trials_json_path: Path | None = None,
+    trials_csv_path: Path | None = None,
+    analysis=None,
+    argv: list[str] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a durable HPO manifest for later provenance joins."""
+    manifest: dict[str, Any] = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "source": source,
+        "preset": preset,
+        "dataset_id": dataset_id,
+        "data_source_fingerprint": data_source_fingerprint,
+        "objective_metric": getattr(tuning, "metric", None),
+        "tuning": (
+            tuning.model_dump(mode="json")
+            if hasattr(tuning, "model_dump")
+            else tuning
+        ),
+        "argv": argv,
+        "git_sha": _git(["git", "rev-parse", "HEAD"]),
+        "git_branch": _git(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
+        "git_dirty": bool(_git(["git", "status", "--porcelain"])),
+        "container_image_tag": os.environ.get("UNIFIED_STPP_IMAGE_TAG"),
+        "best_config_path": (
+            None if best_config_path is None else str(best_config_path.resolve())
+        ),
+        "best_config_sha256": (
+            None
+            if best_config_path is None or not best_config_path.exists()
+            else _sha256_file(best_config_path)
+        ),
+        "trials_json_path": (
+            None
+            if trials_json_path is None or not trials_json_path.exists()
+            else str(trials_json_path.resolve())
+        ),
+        "trials_csv_path": (
+            None
+            if trials_csv_path is None or not trials_csv_path.exists()
+            else str(trials_csv_path.resolve())
+        ),
+    }
+    manifest.update(extract_analysis_metadata(analysis))
+    if extra:
+        manifest.update(extra)
+    return manifest
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_trial_history(analysis, *, json_path: Path, csv_path: Path | None = None) -> None:
+    """Persist Ray Tune trial history in JSON and optional CSV form."""
+    records = extract_trial_history(analysis)
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(json_path, "w") as f:
+        json.dump(records, f, indent=2, default=str)
+
+    if csv_path is None:
+        return
+    metric_keys = sorted(
+        {
+            key
+            for record in records
+            for key in (record.get("last_result", {}) or {}).keys()
+        }
+    )
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["trial_id", "status", *metric_keys],
+        )
+        writer.writeheader()
+        for record in records:
+            row = {
+                "trial_id": record.get("trial_id"),
+                "status": record.get("status"),
+            }
+            row.update(record.get("last_result", {}) or {})
+            writer.writerow(row)
+
+
 def run_hpo(
     config_dict: dict,
     tuning: "TuningConfig",
@@ -104,6 +260,7 @@ def run_hpo(
     val_seqs: "list[dict] | None" = None,
     train_path: "str | os.PathLike[str] | None" = None,
     val_path: "str | os.PathLike[str] | None" = None,
+    dataset_id: str = "hpo_trial",
     return_analysis: bool = False,
 ):
     """Run HPO over the tunable parameters in *config_dict*.
@@ -162,7 +319,10 @@ def run_hpo(
 
     if not ray_space:
         from unified_stpp.config import STPPConfig
-        return STPPConfig(**config_dict)  # nothing to tune
+        best_config = STPPConfig(**config_dict)
+        if return_analysis:
+            return best_config, None
+        return best_config  # nothing to tune
 
     metric = tuning.metric
 
@@ -216,11 +376,12 @@ def run_hpo(
         result = runner.fit(
             trial_train,
             trial_val,
-            dataset_id="hpo_trial",
+            dataset_id=dataset_id,
             data_module=dm,
         )
         tune.report({
-            metric: result.val_objective,
+            "val_objective": result.val_objective,
+            "val_metric_key": result.val_metric_key,
             "mem_rss_trial_start_mb": round(rss_trial_start_mb, 2),
             "mem_rss_after_dataset_mb": round(rss_after_dataset_mb, 2),
             "mem_peak_rss_mb": round(_peak_rss_mb(), 2),
@@ -243,7 +404,7 @@ def run_hpo(
         verbose=tuning.verbose,
         fail_fast=tuning.fail_fast,
         max_concurrent_trials=tuning.max_concurrent_trials,
-        **({"seed": tuning.seed} if tuning.seed is not None else {}),
+        seed=tuning.seed,
     )
 
     best_flat = dict(fixed)

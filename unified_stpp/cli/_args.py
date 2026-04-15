@@ -11,9 +11,26 @@ def add_config_source_args(p) -> None:
 
 
 def add_data_args(p, *, include_test: bool = True) -> None:
-    """Add ``--train``, ``--val``, and optionally ``--test``."""
-    p.add_argument("--train", required=True, help="Path to train .jsonl")
-    p.add_argument("--val",   required=True, help="Path to val .jsonl")
+    """Add named-dataset and explicit split-file arguments.
+
+    Validation happens in the config/data-resolution layer so the same contract
+    is shared by the CLI, tests, and programmatic callers:
+
+    - ``--dataset [--dataset-revision]`` for curated/local dataset resolution
+    - ``--train --val [--test]`` for explicit JSONL file paths
+    """
+    p.add_argument(
+        "--dataset",
+        default=None,
+        help="Named curated dataset or local dataset directory resolved via the dataset hub.",
+    )
+    p.add_argument(
+        "--dataset-revision",
+        default=None,
+        help="Optional dataset revision when --dataset resolves through the hub.",
+    )
+    p.add_argument("--train", default=None, help="Path to train .jsonl")
+    p.add_argument("--val",   default=None, help="Path to val .jsonl")
     if include_test:
         p.add_argument("--test", default=None, help="Path to test .jsonl (optional)")
 

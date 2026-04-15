@@ -9,6 +9,58 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+def _as_python_float(value: Any) -> float:
+    if hasattr(value, "detach"):
+        value = value.detach()
+    if hasattr(value, "reshape") and hasattr(value, "item"):
+        return float(value.reshape(()).item())
+    return float(value)
+
+
+def resolve_loss_result_reporting(
+    result: Any,
+    *,
+    requested_space: str = "raw",
+) -> tuple[float, float | None, float | None, dict[str, Any], str]:
+    """Resolve native-vs-raw reporting from a loss result.
+
+    This is the single benchmark-facing interpretation path shared by test-time
+    logging and the packaged ``evaluate metrics`` NLL computation.
+    """
+    extra = dict(getattr(result, "extra_metrics", {}) or {})
+    reported_nll = _as_python_float(result.nll)
+    reported_temporal = (
+        None if getattr(result, "temporal_nll", None) is None else float(result.temporal_nll)
+    )
+    reported_spatial = (
+        None if getattr(result, "spatial_nll", None) is None else float(result.spatial_nll)
+    )
+    report_space = "native"
+
+    if requested_space != "raw":
+        return reported_nll, reported_temporal, reported_spatial, extra, report_space
+
+    raw_nll = extra.get("raw_space_nll", extra.get("orig_space_nll"))
+    if raw_nll is None:
+        return reported_nll, reported_temporal, reported_spatial, extra, report_space
+
+    extra.setdefault("native_nll", _as_python_float(result.nll))
+    reported_nll = float(raw_nll)
+    report_space = "raw"
+
+    raw_temporal = extra.get("raw_space_temporal_nll", extra.get("orig_space_temporal_nll"))
+    if raw_temporal is not None and getattr(result, "temporal_nll", None) is not None:
+        extra.setdefault("native_temporal_nll", float(result.temporal_nll))
+        reported_temporal = float(raw_temporal)
+
+    raw_spatial = extra.get("raw_space_spatial_nll", extra.get("orig_space_spatial_nll"))
+    if raw_spatial is not None and getattr(result, "spatial_nll", None) is not None:
+        extra.setdefault("native_spatial_nll", float(result.spatial_nll))
+        reported_spatial = float(raw_spatial)
+
+    return reported_nll, reported_temporal, reported_spatial, extra, report_space
+
+
 @dataclass
 class RunResult:
     """Output of one training run.

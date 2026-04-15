@@ -14,6 +14,7 @@ import torch
 import pytorch_lightning as pl
 
 from unified_stpp.config.schema import TrainingConfig
+from unified_stpp.runner.results import resolve_loss_result_reporting
 
 
 class STPPLightningModule(pl.LightningModule):
@@ -85,39 +86,19 @@ class STPPLightningModule(pl.LightningModule):
                 batch_size=n_ev,
             )
 
-    @staticmethod
-    def _as_float(value) -> float:
-        if isinstance(value, torch.Tensor):
-            return float(value.detach().reshape(()).item())
-        return float(value)
-
     def _resolve_test_reporting(self, result) -> tuple[torch.Tensor, float | None, float | None, dict]:
-        extra = dict(result.extra_metrics or {})
-        reported_nll = result.nll
-        reported_temporal = result.temporal_nll
-        reported_spatial = result.spatial_nll
-
-        if self.tc.test_nll_space != "raw":
-            return reported_nll, reported_temporal, reported_spatial, extra
-
-        raw_nll = extra.get("raw_space_nll", extra.get("orig_space_nll"))
-        if raw_nll is None:
-            return reported_nll, reported_temporal, reported_spatial, extra
-
-        extra.setdefault("native_nll", self._as_float(result.nll))
-        reported_nll = torch.as_tensor(raw_nll, device=self.device, dtype=torch.float32)
-
-        raw_temporal = extra.get("raw_space_temporal_nll", extra.get("orig_space_temporal_nll"))
-        if raw_temporal is not None and result.temporal_nll is not None:
-            extra.setdefault("native_temporal_nll", float(result.temporal_nll))
-            reported_temporal = float(raw_temporal)
-
-        raw_spatial = extra.get("raw_space_spatial_nll", extra.get("orig_space_spatial_nll"))
-        if raw_spatial is not None and result.spatial_nll is not None:
-            extra.setdefault("native_spatial_nll", float(result.spatial_nll))
-            reported_spatial = float(raw_spatial)
-
-        return reported_nll, reported_temporal, reported_spatial, extra
+        reported_nll, reported_temporal, reported_spatial, extra, _ = (
+            resolve_loss_result_reporting(
+                result,
+                requested_space=self.tc.test_nll_space,
+            )
+        )
+        return (
+            torch.as_tensor(reported_nll, device=self.device, dtype=torch.float32),
+            reported_temporal,
+            reported_spatial,
+            extra,
+        )
 
     def training_step(self, batch, _batch_idx):
         result = self.model.compute_loss(self.forward(batch))

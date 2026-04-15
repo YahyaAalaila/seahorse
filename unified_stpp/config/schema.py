@@ -82,6 +82,28 @@ class DataConfig(BaseModel):
     paper_split_ratio: tuple[int, int, int] = (8, 1, 1)
     # Forwarded to DataAdapter constructor. Example: {"max_events": 5000}
     adapter_kwargs: dict = Field(default_factory=dict)
+    dataset: Optional[str] = None
+    dataset_revision: Optional[str] = None
+    splits_dir: Optional[str] = None
+    datasets: list[str] = Field(default_factory=list)
+    train_path: Optional[str] = None
+    val_path: Optional[str] = None
+    test_path: Optional[str] = None
+
+    def resolve_data(
+        self,
+        *,
+        mode: Literal["single", "benchmark"] = "single",
+        include_test: bool = True,
+    ):
+        """Resolve dataset sources for CLI flows.
+
+        Keeps the config schema lightweight while delegating actual path/cache
+        logic to :mod:`unified_stpp.data.resolution`.
+        """
+        from unified_stpp.data.resolution import resolve_data_source
+
+        return resolve_data_source(self, mode=mode, include_test=include_test)
 
 
 class ModelConfig(BaseModel):

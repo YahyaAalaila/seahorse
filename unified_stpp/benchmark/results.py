@@ -32,7 +32,8 @@ class BenchmarkTable:
         metric : str
             Attribute name on RunResult (e.g. ``"test_nll"``, ``"temporal_nll"``).
         group : str
-            ``"exact"``  — only runs where ``nll_kind == "exact"``.
+            ``"exact"``  — only runs where ``nll_kind == "exact"`` and
+                           ``nll_report_space == "raw"``.
             ``"approx"`` — only runs where ``nll_kind != "exact"``.
             ``"all"``    — all runs (default).
         """
@@ -41,7 +42,8 @@ class BenchmarkTable:
         records = []
         for r in self.runs:
             nll_kind = getattr(r, "nll_kind", "exact")
-            if group == "exact" and nll_kind != "exact":
+            report_space = getattr(r, "nll_report_space", "native")
+            if group == "exact" and (nll_kind != "exact" or report_space != "raw"):
                 continue
             if group == "approx" and nll_kind == "exact":
                 continue
@@ -140,7 +142,10 @@ class BenchmarkTable:
 
         exact_presets = {
             r.preset for r in self.runs
-            if getattr(r, "nll_kind", "exact") == "exact"
+            if (
+                getattr(r, "nll_kind", "exact") == "exact"
+                and getattr(r, "nll_report_space", "native") == "raw"
+            )
         }
         all_presets = {r.preset for r in self.runs}
 
@@ -329,14 +334,15 @@ def _render_html(
         obj_desc  = getattr(r, "objective_description", "") or obj
         desc      = getattr(r, "nll_description", "—")
         fn        = getattr(r, "nll_footnote", "") or "—"
+        report_space = getattr(r, "nll_report_space", "native")
         group     = "A – exact" if nll_kind == "exact" else ("B – approx" if nll_kind == "approx" else "C – none")
         # Flag asymmetry: training objective is not NLL (val metric ≠ test metric family)
         asymmetry = val_key != "nll"
         asym_flag = " ⚠" if asymmetry else ""
         meta_rows.append(
             f"<tr><td>{r.preset}{asym_flag}</td><td>{obj_desc}</td>"
-            f"<td>val/{val_key} → test/nll [{nll_kind}]</td><td>{desc}</td>"
-            f"<td>{fn}</td><td>{group}</td></tr>"
+            f"<td>val/{val_key} → test/nll [{nll_kind}]</td><td>{report_space}</td>"
+            f"<td>{desc}</td><td>{fn}</td><td>{group}</td></tr>"
         )
         if asymmetry:
             asymmetry_presets.append(r.preset)
@@ -364,7 +370,8 @@ def _render_html(
 <p class="note">For the following presets, <strong>val_objective</strong> (used for checkpoint
 selection and HPO) and <strong>test_nll</strong> (used for benchmark reporting) are
 <em>different quantities</em>. val_objective is the model's native training objective;
-test_nll is an approximation of NLL. Do not compare val_objective across model families.</p>
+test_nll remains the benchmark-facing NLL quantity and may be exact or approximate
+depending on <code>nll_kind</code>. Do not compare val_objective across model families.</p>
 <table>
 <thead>
   <tr><th>Preset</th><th>Training objective (val)</th><th>Test NLL kind</th><th>test_nll description</th></tr>
@@ -474,7 +481,7 @@ test_nll is an approximation of NLL. Do not compare val_objective across model f
 <h1>STPP Benchmark Report</h1>
 
 <h2>Section 1 — Exact-NLL Models ({metric})</h2>
-<p class="note">Only models reporting exact joint NLL/event in normalized space.
+<p class="note">Only models reporting exact joint NLL/event in the benchmark's canonical raw space.
 Directly comparable across presets.</p>
 {pivot_exact_html}
 {footnote_legend}
@@ -486,7 +493,7 @@ Directly comparable across presets.</p>
 <h2>Section 3 — Metric Metadata</h2>
 <table>
 <thead>
-  <tr><th>Preset</th><th>Objective</th><th>Val → Test (NLL kind)</th><th>NLL description</th><th>Footnote</th><th>Group</th></tr>
+  <tr><th>Preset</th><th>Objective</th><th>Val → Test (NLL kind)</th><th>Report space</th><th>NLL description</th><th>Footnote</th><th>Group</th></tr>
 </thead>
 <tbody>
 {"".join(meta_rows)}

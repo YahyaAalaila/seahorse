@@ -68,6 +68,9 @@ def write_bench_meta(
     benchmark_config: "BenchmarkConfig",
     overrides: list[str],
     hpo_configs_dir: Optional[str],
+    data_manifest: Optional[dict] = None,
+    hpo_provenance: Optional[dict] = None,
+    cell_index_path: Optional[str] = None,
 ) -> None:
     """Write ``bench_meta.json`` to *out_dir* before any training begins.
 
@@ -110,8 +113,18 @@ def write_bench_meta(
         "tune_dataset":    benchmark_config.tune_dataset,
         "primary_metric":  benchmark_config.primary_metric,
         "benchmark_config": benchmark_config.model_dump(mode="json"),
+        "benchmark_policy": {
+            "protocol": benchmark_config.protocol,
+            "normalize": benchmark_config.normalize,
+            "checkpoint_select": benchmark_config.checkpoint_select,
+            "test_nll_space": benchmark_config.test_nll_space,
+            "allow_mixed_hpo_provenance": benchmark_config.allow_mixed_hpo_provenance,
+        },
         "overrides":       overrides,
         "hpo_configs_dir": hpo_configs_dir,
+        "data_manifest": data_manifest,
+        "hpo_provenance": hpo_provenance,
+        "cell_index_path": cell_index_path,
         "python_version":  sys.version.split()[0],
         "torch_version":   torch.__version__,
         "platform":        f"{platform.system().lower()}-{platform.machine()}",

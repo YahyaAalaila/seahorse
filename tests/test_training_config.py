@@ -12,6 +12,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -209,7 +210,12 @@ extra_tuple: !!python/tuple [1, 2, 3]
 class _DummyEvalModel:
     def __init__(self, result: LossResult):
         self._result = result
-        self.event_model = SimpleNamespace(capabilities=SimpleNamespace(metric_key="nll"))
+        self.event_model = SimpleNamespace(
+            capabilities=SimpleNamespace(metric_key="nll", nll_kind="exact")
+        )
+
+    def eval(self):
+        return self
 
     def eval_forward(self, **kwargs):
         del kwargs
@@ -258,6 +264,29 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertAlmostEqual(captured["test/native_nll"], 1.0, places=6)
         self.assertAlmostEqual(captured["test/native_temporal_nll"], 0.4, places=6)
         self.assertAlmostEqual(captured["test/native_spatial_nll"], 0.6, places=6)
+
+    def test_compute_seq_nlls_uses_same_raw_reporting_resolution(self):
+        from unified_stpp.evaluation.evaluation_helpers import compute_seq_nlls
+
+        result = LossResult(
+            loss=torch.tensor(1.0),
+            nll=torch.tensor(1.0),
+            total_events=torch.tensor(2.0),
+            kl=None,
+            aux_terms={},
+            extra_metrics={"raw_space_nll": 1.25},
+        )
+        runner = SimpleNamespace(
+            model=_DummyEvalModel(result),
+            norm_stats={},
+            config=SimpleNamespace(training=TrainingConfig(test_nll_space="raw")),
+        )
+        seqs = [{"times": np.array([0.1, 0.2], dtype=np.float32), "locations": np.array([[0.0, 0.0], [1.0, 1.0]], dtype=np.float32)}]
+
+        nlls = compute_seq_nlls(runner, seqs, device=torch.device("cpu"))
+
+        self.assertEqual(nlls.shape, (1,))
+        self.assertAlmostEqual(float(nlls[0]), 1.25, places=6)
 
 
 if __name__ == "__main__":

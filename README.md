@@ -84,7 +84,7 @@ All other families learn joint spatio-temporal structure.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[all,dev]"
 ```
 
 Optional: install pre-commit hooks for linting and formatting:

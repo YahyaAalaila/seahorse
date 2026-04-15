@@ -24,9 +24,10 @@ without Ray installed.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
+import warnings
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Search-space parsing helpers (module-private)
@@ -108,7 +109,7 @@ class TuningConfig(BaseModel):
     """
 
     # Objective
-    metric: str = "val_nll"
+    metric: str = "val_objective"
     mode: str = "min"
     """Optimization direction: ``"min"`` or ``"max"``."""
 
@@ -117,8 +118,8 @@ class TuningConfig(BaseModel):
     n_gpus_per_trial: float = 0.0
 
     # Reproducibility
-    seed: Optional[int] = None
-    """RNG seed passed to ``tune.TuneConfig(seed=...)``. ``None`` = non-deterministic."""
+    seed: int = 0
+    """RNG seed passed to ``tune.TuneConfig(seed=...)``."""
 
     # Robustness / concurrency
     fail_fast: bool = False
@@ -164,6 +165,28 @@ class TuningConfig(BaseModel):
                 "Use scheduler='none' with bayesian, or search_alg='random' with asha."
             )
         return self
+
+    @field_validator("metric", mode="before")
+    @classmethod
+    def canonicalize_metric(cls, value: object) -> str:
+        if value is None:
+            return "val_objective"
+        metric = str(value).strip()
+        if metric == "val_nll":
+            warnings.warn(
+                "TuningConfig.metric='val_nll' is deprecated; use 'val_objective'.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return "val_objective"
+        return metric
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def require_explicit_seed(cls, value: object) -> int:
+        if value is None:
+            return 0
+        return int(value)
 
     # ------------------------------------------------------------------
     # Search-space parsing — no Ray dependency

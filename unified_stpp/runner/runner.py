@@ -378,7 +378,6 @@ class STPPRunner:
         if (
             cfg.training.test_nll_space == "raw"
             and "native_nll" in test_extra_metrics
-            and caps.supports_raw_reporting
         ):
             nll_report_space = "raw"
             nll_description = caps.raw_nll_description or caps.nll_description

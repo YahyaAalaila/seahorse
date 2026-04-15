@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 if TYPE_CHECKING:
     from unified_stpp.config.schema import STPPConfig
@@ -30,6 +30,9 @@ class BenchmarkConfig(BaseModel):
 
     protocol: Literal["raw", "standard"] = "raw"
     normalize: bool = False
+    checkpoint_select: Literal["best", "last"] = "best"
+    test_nll_space: Literal["native", "raw"] = "raw"
+    allow_mixed_hpo_provenance: bool = False
 
     primary_metric: str = "test_nll"
     """Reporting/aggregation metric used by benchmark tables and reports only."""
@@ -52,20 +55,29 @@ class BenchmarkConfig(BaseModel):
         """Return the configured HPO procedure or default tuning settings."""
         return self.tuning or TuningConfig()
 
-    def apply_to_config(self, cfg: "STPPConfig") -> "STPPConfig":
+    def apply_to_config(
+        self,
+        cfg: "STPPConfig",
+        *,
+        training_overrides: Optional[dict[str, Any]] = None,
+    ) -> "STPPConfig":
         """Return a copy of *cfg* with the benchmark data contract enforced.
 
         Forces ``data.protocol`` and ``data.normalize`` to match the benchmark
-        policy regardless of what the preset YAML declares.  All other fields
-        are preserved. The raw-first benchmark default keeps the canonical
-        batch contract in original dataset coordinates while legacy
-        ``protocol="standard"`` remains available for compatibility.
+        policy regardless of what the preset YAML declares. Also locks the
+        benchmark-facing checkpoint/NLL reporting policy and any caller-supplied
+        training overrides (for example frozen ``n_epochs`` / ``patience``).
         """
         from unified_stpp.config.schema import STPPConfig
         raw = cfg.model_dump(mode="json")
         raw.setdefault("data", {})
+        raw.setdefault("training", {})
         raw["data"]["protocol"] = self.protocol
         raw["data"]["normalize"] = self.normalize
+        raw["training"]["checkpoint_select"] = self.checkpoint_select
+        raw["training"]["test_nll_space"] = self.test_nll_space
+        for key, value in (training_overrides or {}).items():
+            raw["training"][key] = value
         return STPPConfig(**raw)
 
 
