@@ -83,6 +83,45 @@ class TestDatasetHub(unittest.TestCase):
 
         self.assertEqual(loaded, records)
 
+    def test_load_dataset_canonicalizes_t_x_y_aliases(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "train.jsonl"
+            alias_records = [
+                {
+                    "t": [0.1, 0.5],
+                    "x": [0.0, 1.0],
+                    "y": [1.0, 0.0],
+                }
+            ]
+            _write_jsonl(path, alias_records)
+
+            loaded = load_dataset(path)
+
+        self.assertEqual(
+            loaded,
+            [{"times": [0.1, 0.5], "locations": [[0.0, 1.0], [1.0, 0.0]], "t": [0.1, 0.5], "x": [0.0, 1.0], "y": [1.0, 0.0]}],
+        )
+
+    def test_load_dataset_canonicalizes_nested_events(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "train.jsonl"
+            nested_records = [
+                {
+                    "sequence_id": "covid_001",
+                    "events": [
+                        {"t": 0.1, "x": 0.0, "y": 1.0},
+                        {"t": 0.5, "x": 1.0, "y": 0.0},
+                    ],
+                }
+            ]
+            _write_jsonl(path, nested_records)
+
+            loaded = load_dataset(path)
+
+        self.assertEqual(loaded[0]["times"], [0.1, 0.5])
+        self.assertEqual(loaded[0]["locations"], [[0.0, 1.0], [1.0, 0.0]])
+        self.assertEqual(loaded[0]["sequence_id"], "covid_001")
+
     def test_load_dataset_rejects_invalid_records(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -7,6 +7,97 @@ import sys
 from pathlib import Path
 
 
+def _canonicalize_sequence_record(record: dict) -> dict:
+    """Return a shallow canonicalized copy of one STPP JSONL record.
+
+    Accepted minimal aliases are intentionally small and benchmark-oriented:
+    ``t``/``time`` for ``times`` and ``x``/``y``[/``z``] for ``locations``.
+    Existing canonical keys win when already present.
+    """
+    if not isinstance(record, dict):
+        return record
+
+    out = dict(record)
+
+    if "times" not in out and "locations" not in out and "events" in out:
+        events = out.get("events")
+        if isinstance(events, list):
+            times: list = []
+            locations: list[list] = []
+            marks: list = []
+            have_marks = True
+
+            for event in events:
+                if not isinstance(event, dict):
+                    have_marks = False
+                    break
+
+                time_value = None
+                for key in ("t", "time", "times"):
+                    if key in event:
+                        time_value = event[key]
+                        break
+                if time_value is None:
+                    have_marks = False
+                    break
+
+                location_value = None
+                if "locations" in event:
+                    location_value = event["locations"]
+                elif "location" in event:
+                    location_value = event["location"]
+                elif "loc" in event:
+                    location_value = event["loc"]
+                else:
+                    coord_keys = [key for key in ("x", "y", "z") if key in event]
+                    if len(coord_keys) >= 2:
+                        location_value = [event[key] for key in coord_keys]
+
+                if location_value is None:
+                    have_marks = False
+                    break
+
+                times.append(time_value)
+                locations.append(list(location_value))
+
+                mark_value = None
+                for key in ("mark", "marks", "m"):
+                    if key in event:
+                        mark_value = event[key]
+                        break
+                if mark_value is None:
+                    have_marks = False
+                else:
+                    marks.append(mark_value)
+
+            if len(times) == len(events) and len(locations) == len(events):
+                out["times"] = times
+                out["locations"] = locations
+                if have_marks and len(marks) == len(events):
+                    out["marks"] = marks
+
+    if "times" not in out:
+        for key in ("t", "time"):
+            if key in out:
+                out["times"] = out[key]
+                break
+
+    if "locations" not in out:
+        if "locs" in out:
+            out["locations"] = out["locs"]
+        elif "location" in out:
+            out["locations"] = out["location"]
+        else:
+            coord_keys = [key for key in ("x", "y", "z") if key in out]
+            if len(coord_keys) >= 2:
+                coord_arrays = [out[key] for key in coord_keys]
+                out["locations"] = [
+                    list(coords) for coords in zip(*coord_arrays, strict=True)
+                ]
+
+    return out
+
+
 def deep_update(base: dict, override: dict) -> None:
     """Recursively update *base* in-place with values from *override*.
 
@@ -21,13 +112,17 @@ def deep_update(base: dict, override: dict) -> None:
 
 
 def load_jsonl(path) -> list[dict]:
-    """Load a newline-delimited JSON file into a list of dicts."""
+    """Load a newline-delimited JSON file into a list of dicts.
+
+    Dataset records are canonicalized on read so common compact aliases like
+    ``t`` and ``x``/``y`` work throughout the benchmark path.
+    """
     seqs = []
     with open(path) as f:
         for line in f:
             line = line.strip()
             if line:
-                seqs.append(json.loads(line))
+                seqs.append(_canonicalize_sequence_record(json.loads(line)))
     return seqs
 
 

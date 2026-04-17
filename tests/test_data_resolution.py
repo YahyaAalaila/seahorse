@@ -27,6 +27,22 @@ def _records() -> list[dict]:
     return [{"times": [0.1, 0.2], "locations": [[0.0, 0.0], [1.0, 1.0]]}]
 
 
+def _alias_records() -> list[dict]:
+    return [{"t": [0.1, 0.2], "x": [0.0, 1.0], "y": [0.0, 1.0]}]
+
+
+def _nested_event_records() -> list[dict]:
+    return [
+        {
+            "sequence_id": "covid_001",
+            "events": [
+                {"t": 0.1, "x": 0.0, "y": 0.0},
+                {"t": 0.2, "x": 1.0, "y": 1.0},
+            ],
+        }
+    ]
+
+
 class DataConfigResolutionTest(unittest.TestCase):
     def test_resolve_data_named_dataset_delegates_to_hub_with_revision(self):
         with tempfile.TemporaryDirectory() as td:
@@ -84,6 +100,32 @@ class DataConfigResolutionTest(unittest.TestCase):
         self.assertEqual(resolved.files["topology_T5"]["train"], ds_dir / "train.jsonl")
         self.assertEqual(resolved.files["topology_T5"]["val"], ds_dir / "val.jsonl")
         self.assertIsNone(resolved.files["topology_T5"]["test"])
+
+    def test_resolve_data_benchmark_canonicalizes_t_x_y_aliases(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "earthquake"
+            _write_jsonl(root / "train.jsonl", _alias_records())
+            _write_jsonl(root / "val.jsonl", _alias_records())
+            cfg = DataConfig(dataset=str(root))
+
+            resolved = cfg.resolve_data(mode="benchmark")
+
+        seq = resolved.splits["earthquake"][0][0]
+        self.assertEqual(seq["times"], [0.1, 0.2])
+        self.assertEqual(seq["locations"], [[0.0, 0.0], [1.0, 1.0]])
+
+    def test_resolve_data_benchmark_canonicalizes_nested_events(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "covid"
+            _write_jsonl(root / "train.jsonl", _nested_event_records())
+            _write_jsonl(root / "val.jsonl", _nested_event_records())
+            cfg = DataConfig(dataset=str(root))
+
+            resolved = cfg.resolve_data(mode="benchmark")
+
+        seq = resolved.splits["covid"][0][0]
+        self.assertEqual(seq["times"], [0.1, 0.2])
+        self.assertEqual(seq["locations"], [[0.0, 0.0], [1.0, 1.0]])
 
 
 class FitDatasetCliTest(unittest.TestCase):
