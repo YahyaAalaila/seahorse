@@ -85,18 +85,24 @@ class FactorizedConfig(BaseModelConfig):
             HawkesProcess,
             SelfCorrectingProcess,
         )
+        from unified_stpp.models.temporal_models.neural_temporal import (
+            RMTPPTemporalProcess,
+            THPTemporalProcess,
+        )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
         from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
         from unified_stpp.models.event_models.factorized_event import FactorizedEventModel
         from unified_stpp.models.unified_model import UnifiedSTPP
 
         _temporal_cls = {
-            "poisson": HomogeneousPoissonProcess,
-            "hawkes": HawkesProcess,
+            "poisson":        HomogeneousPoissonProcess,
+            "hawkes":         HawkesProcess,
             "self_correcting": SelfCorrectingProcess,
+            "rmtpp":          RMTPPTemporalProcess,
+            "thp":            THPTemporalProcess,
         }[self._TEMPORAL_TYPE]
 
-        temporal_model = _temporal_cls()
+        temporal_model = _temporal_cls(**self._temporal_kwargs())
         spatial_model = GaussianMixtureSpatialModel(
             sigma_prior=self.sigma_prior,
             sigma_kernel=self.sigma_kernel,
@@ -114,6 +120,15 @@ class FactorizedConfig(BaseModelConfig):
             event_model=event_model,
             hidden_dim=self.hidden_dim,
         )
+
+    def _temporal_kwargs(self) -> dict:
+        """Extra kwargs forwarded to the temporal model constructor.
+
+        Parametric processes (Poisson, Hawkes, SelfCorrecting) take no arguments,
+        so the base implementation returns an empty dict. Subclasses with learnable
+        neural temporal models override this to pass their hyperparameters.
+        """
+        return {}
 
     @classmethod
     def fit_transform_artifact(cls, dm):
@@ -320,3 +335,105 @@ class SelfCorrectingTVCNFConfig(FactorizedCNFConfig):
     _TEMPORAL_TYPE: ClassVar[str]  = "self_correcting"
     _SQUASH_TIME:   ClassVar[bool] = False
     squash_time:    bool           = False
+
+
+# ---------------------------------------------------------------------------
+# Neural temporal baselines (GMM spatial, neural temporal encoder)
+# ---------------------------------------------------------------------------
+
+@ConfigRegistry.register("rmtpp_gmm")
+@dataclasses.dataclass
+class RMTPPGMMConfig(FactorizedConfig):
+    """RMTPP temporal process + GaussianMixture spatial model.
+
+    Temporal: GRU encoder + closed-form exponential intensity (Du et al., KDD 2016).
+    Spatial:  same GaussianMixtureSpatialModel as hawkes_gmm.
+
+    Note: this is a factorized STPP construction (temporal × spatial) — the
+    RMTPP was originally validated on pure temporal benchmarks only. Label as
+    "RMTPP-GMM (extended)" in paper tables. Hyperparameters need a sweep before
+    reporting final numbers.
+    """
+
+    _TEMPORAL_TYPE: ClassVar[str] = "rmtpp"
+
+    hidden_size: int = 64
+
+    @classmethod
+    def from_dict(
+        cls,
+        d: dict,
+        *,
+        hidden_dim: int = 128,
+        spatial_dim: int = 2,
+        event_cov_dim: int = 0,
+        field_cov_dim: int = 0,
+        n_marks: int = 0,
+    ) -> "RMTPPGMMConfig":
+        obj = super().from_dict(
+            d,
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            event_cov_dim=event_cov_dim,
+            field_cov_dim=field_cov_dim,
+            n_marks=n_marks,
+        )
+        obj.hidden_size = int(d.get("hidden_size", 64))
+        return obj
+
+    def _temporal_kwargs(self) -> dict:
+        return {"hidden_size": self.hidden_size}
+
+
+@ConfigRegistry.register("thp_gmm")
+@dataclasses.dataclass
+class THPGMMConfig(FactorizedConfig):
+    """Transformer Hawkes Process temporal + GaussianMixture spatial model.
+
+    Temporal: causal Transformer encoder + learned β decay (Zuo et al., ICML 2020).
+    Spatial:  same GaussianMixtureSpatialModel as hawkes_gmm.
+    MC compensator uses fixed 30-sample Monte Carlo (upstream adaptive loop replaced).
+
+    Note: this is a factorized STPP construction — THP was validated on pure temporal
+    benchmarks. Label as "THP-GMM (extended)". Hyperparameters need a sweep.
+    """
+
+    _TEMPORAL_TYPE: ClassVar[str] = "thp"
+
+    hidden_size: int = 64
+    n_heads:     int = 2
+    n_layers:    int = 1
+    dropout:     float = 0.1
+
+    @classmethod
+    def from_dict(
+        cls,
+        d: dict,
+        *,
+        hidden_dim: int = 128,
+        spatial_dim: int = 2,
+        event_cov_dim: int = 0,
+        field_cov_dim: int = 0,
+        n_marks: int = 0,
+    ) -> "THPGMMConfig":
+        obj = super().from_dict(
+            d,
+            hidden_dim=hidden_dim,
+            spatial_dim=spatial_dim,
+            event_cov_dim=event_cov_dim,
+            field_cov_dim=field_cov_dim,
+            n_marks=n_marks,
+        )
+        obj.hidden_size = int(d.get("hidden_size", 64))
+        obj.n_heads     = int(d.get("n_heads", 2))
+        obj.n_layers    = int(d.get("n_layers", 1))
+        obj.dropout     = float(d.get("dropout", 0.1))
+        return obj
+
+    def _temporal_kwargs(self) -> dict:
+        return {
+            "hidden_size": self.hidden_size,
+            "n_heads":     self.n_heads,
+            "n_layers":    self.n_layers,
+            "dropout":     self.dropout,
+        }

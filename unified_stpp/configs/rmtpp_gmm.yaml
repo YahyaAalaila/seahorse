@@ -1,0 +1,36 @@
+# RMTPP-GMM: GRU temporal (RMTPP) + Gaussian Mixture spatial
+#
+# Temporal: λ(t) = a_n · exp(−b_n · (t − t_n))
+#           where (a_n, b_n) = softplus(MLP(GRU(Δt₁…Δtₙ)))
+#           Compensator is closed-form.
+# Spatial:  same GaussianMixtureSpatialModel as hawkes_gmm
+#
+# This is a factorized STPP extension — RMTPP was originally validated on
+# pure temporal benchmarks (Du et al., KDD 2016). The spatial head is held
+# constant across all factorized presets, isolating temporal modeling.
+# Label as "RMTPP-GMM (extended)" in paper tables.
+#
+# NOTE: hidden_size=64 and lr=1e-3 are provisional starting points.
+# Run a sweep before reporting final benchmark numbers.
+
+model:
+  preset: rmtpp_gmm
+  hidden_dim: 128
+  spatial_dim: 2
+  build_overrides:
+    hidden_size: 64
+    sigma_prior: 1.0
+    sigma_kernel: 0.5
+    tau: 1.0
+
+training:
+  optimizer: adam
+  lr: 1.0e-3
+  weight_decay: 0.0
+  grad_clip: 1.0
+  n_epochs: 100
+  batch_size: 128
+
+data:
+  protocol: unified
+  normalize: true
