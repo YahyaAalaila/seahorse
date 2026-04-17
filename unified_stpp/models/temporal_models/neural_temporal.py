@@ -265,9 +265,16 @@ class THPTemporalProcess(nn.Module):
             nhead=n_heads,
             dim_feedforward=hidden_size,
             dropout=dropout,
-            batch_first=True,  # expects (B, S, D) — avoids nested-tensor warning
+            batch_first=True,
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+        # Disable nested-tensor fast path: MPS currently misses
+        # aten::_nested_tensor_from_mask_left_aligned.
+        try:
+            self.transformer = nn.TransformerEncoder(
+                encoder_layer, num_layers=n_layers, enable_nested_tensor=False
+            )
+        except TypeError:
+            self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
         self.f = nn.Linear(hidden_size, 1)
         self.beta = nn.Parameter(torch.full((1,), 0.15))
 
