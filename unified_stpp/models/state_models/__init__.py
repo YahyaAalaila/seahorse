@@ -5,6 +5,7 @@ from .auto_stpp_faithful_state import AutoSTPPFaithfulStateModel
 from .smash_state import SMASHStateModel
 from .diffusion_state import DiffusionStateModel
 from .factorized_state import FactorizedStateModel
+from .nsmpp_deepbasis_state import NSMPPDeepBasisStateModel
 
 __all__ = [
     "NeuralSTPPStateModel",
@@ -14,4 +15,5 @@ __all__ = [
     "SMASHStateModel",
     "DiffusionStateModel",
     "FactorizedStateModel",
+    "NSMPPDeepBasisStateModel",
 ]

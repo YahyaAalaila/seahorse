@@ -19,6 +19,7 @@ from .neural_stpp import (
 )
 from .smash import SMASHConfig
 from .diffusion_stpp import DiffusionSTPPConfig
+from .nsmpp_deepbasis import NSMPPDeepBasisConfig
 from .factorized import (
     FactorizedConfig, PoissonGMMConfig, HawkesGMMConfig, SelfCorrectingGMMConfig,
     FactorizedCNFConfig, PoissonCNFConfig, HawkesCNFConfig, SelfCorrectingCNFConfig,
@@ -39,6 +40,7 @@ __all__ = [
     "NeuralSTPPSharedAttnCNFConfig",
     "SMASHConfig",
     "DiffusionSTPPConfig",
+    "NSMPPDeepBasisConfig",
     "FactorizedConfig",
     "PoissonGMMConfig",
     "HawkesGMMConfig",

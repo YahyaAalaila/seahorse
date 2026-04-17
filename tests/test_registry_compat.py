@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from unified_stpp.config.schema import STPPConfig
 from unified_stpp.registry import PRESETS, build_model
 
 
@@ -36,6 +37,10 @@ class TestRegistryCompat(unittest.TestCase):
 
         provisional = ConfigRegistry.describe("neural_cond_gmm")
         self.assertEqual(provisional.status, "provisional")
+
+    def test_config_loading_supports_nsmpp_without_direct_module_import(self):
+        cfg = STPPConfig.from_source(preset="nsmpp", config=None)
+        self.assertEqual(cfg.model.preset, "nsmpp")
 
     def test_build_model_supports_known_preset(self):
         from unified_stpp.models.unified_model import UnifiedSTPP
