@@ -22,7 +22,10 @@ def add_data_args(p, *, include_test: bool = True) -> None:
     p.add_argument(
         "--dataset",
         default=None,
-        help="Named curated dataset or local dataset directory resolved via the dataset hub.",
+        help=(
+            "Named curated dataset, local dataset directory, or Hugging Face "
+            "dataset repo/path like owner/repo[/subdir]."
+        ),
     )
     p.add_argument(
         "--dataset-revision",

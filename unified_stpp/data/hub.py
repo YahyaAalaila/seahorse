@@ -142,6 +142,49 @@ def _resolve_local_input(name: str | os.PathLike[str]) -> Path | None:
     return None
 
 
+def _parse_hf_dataset_ref(name: str | os.PathLike[str]) -> tuple[str, str] | None:
+    raw = os.fspath(name).strip().strip("/")
+    parts = [part for part in raw.split("/") if part]
+    if len(parts) < 2:
+        return None
+    repo_id = "/".join(parts[:2])
+    repo_path = "/".join(parts[2:])
+    return repo_id, repo_path
+
+
+def _snapshot_repo_path(
+    *,
+    repo_id: str,
+    repo_path: str = "",
+    revision: str | None = None,
+    force_download: bool = False,
+    local_files_only: bool = False,
+) -> Path:
+    allow_patterns = [f"{repo_path}/**"] if repo_path else None
+    try:
+        snapshot_root = Path(
+            _snapshot_download(
+                repo_id=repo_id,
+                repo_type="dataset",
+                revision=revision,
+                allow_patterns=allow_patterns,
+                force_download=force_download,
+                local_files_only=local_files_only,
+            )
+        ).resolve()
+    except Exception as exc:
+        raise FileNotFoundError(
+            f"Failed to resolve Hugging Face dataset repo '{repo_id}'."
+        ) from exc
+
+    resolved = snapshot_root / repo_path if repo_path else snapshot_root
+    if not resolved.exists():
+        raise FileNotFoundError(
+            f"Dataset repo '{repo_id}' was downloaded but the resolved path does not exist: {resolved}"
+        )
+    return resolved
+
+
 def _load_records(path: Path, *, validate: bool) -> list[dict]:
     records = load_jsonl(path)
     if validate:
@@ -175,8 +218,19 @@ def download_dataset(
     key = os.fspath(name)
     spec = _CURATED_DATASETS.get(key)
     if spec is None:
+        direct_hf = _parse_hf_dataset_ref(key)
+        if direct_hf is not None:
+            repo_id, repo_path = direct_hf
+            return _snapshot_repo_path(
+                repo_id=repo_id,
+                repo_path=repo_path,
+                revision=revision,
+                force_download=force_download,
+                local_files_only=local_files_only,
+            )
         raise ValueError(
-            f"Unknown dataset '{key}'. Pass a local file/directory path or a curated dataset name."
+            f"Unknown dataset '{key}'. Pass a local file/directory path, a curated dataset name, "
+            "or a Hugging Face dataset repo id like 'owner/repo[/subdir]'."
         )
 
     if not force_download:
@@ -191,29 +245,13 @@ def download_dataset(
             "for this curated entry."
         )
 
-    repo_path = spec.repo_path.strip("/")
-    allow_patterns = None
-    if repo_path:
-        allow_patterns = [f"{repo_path}/**"]
-
-    snapshot_root = Path(
-        _snapshot_download(
-            repo_id=spec.repo_id,
-            repo_type="dataset",
-            revision=revision if revision is not None else spec.revision,
-            allow_patterns=allow_patterns,
-            force_download=force_download,
-            local_files_only=local_files_only,
-        )
-    ).resolve()
-
-    resolved = snapshot_root / repo_path if repo_path else snapshot_root
-    if not resolved.exists():
-        raise FileNotFoundError(
-            f"Dataset '{key}' was downloaded from '{spec.repo_id}' but the resolved path "
-            f"does not exist: {resolved}"
-        )
-    return resolved
+    return _snapshot_repo_path(
+        repo_id=spec.repo_id,
+        repo_path=spec.repo_path.strip("/"),
+        revision=revision if revision is not None else spec.revision,
+        force_download=force_download,
+        local_files_only=local_files_only,
+    )
 
 
 def load_dataset(

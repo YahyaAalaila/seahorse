@@ -59,7 +59,10 @@ def execute(args) -> None:
         dataset_revision=getattr(args, "dataset_revision", None),
         datasets=list(getattr(args, "datasets", None) or []),
     )
-    resolved = data_config.resolve_data(mode="benchmark")
+    try:
+        resolved = data_config.resolve_data(mode="benchmark")
+    except (ValueError, FileNotFoundError, ImportError) as exc:
+        sys.exit(f"error: {exc}")
     splits = resolved.splits
     data_manifest = build_benchmark_data_provenance(data_config, resolved)
 

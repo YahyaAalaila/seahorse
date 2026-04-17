@@ -58,7 +58,10 @@ def execute(args) -> None:
         train_path=getattr(args, "train", None),
         val_path=getattr(args, "val", None),
     )
-    resolved = data_config.resolve_data(mode="single", include_test=False)
+    try:
+        resolved = data_config.resolve_data(mode="single", include_test=False)
+    except (ValueError, FileNotFoundError, ImportError) as exc:
+        sys.exit(f"error: {exc}")
 
     hpo_result = run_hpo(
         config_dict=config_dict,

@@ -141,6 +141,40 @@ class TestDatasetHub(unittest.TestCase):
         self.assertFalse(kwargs["local_files_only"])
         self.assertFalse(kwargs["force_download"])
 
+    def test_download_dataset_accepts_direct_hf_repo_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            snapshot_root = Path(td) / "snapshot"
+            _write_jsonl(snapshot_root / "train.jsonl", _toy_records())
+
+            with patch(
+                "unified_stpp.data.hub._snapshot_download",
+                return_value=str(snapshot_root),
+            ) as download_mock:
+                resolved = download_dataset("owner/repo", revision="main")
+
+        self.assertEqual(resolved, snapshot_root.resolve())
+        kwargs = download_mock.call_args.kwargs
+        self.assertEqual(kwargs["repo_id"], "owner/repo")
+        self.assertEqual(kwargs["revision"], "main")
+        self.assertIsNone(kwargs["allow_patterns"])
+
+    def test_download_dataset_accepts_direct_hf_repo_subdir(self):
+        with tempfile.TemporaryDirectory() as td:
+            snapshot_root = Path(td) / "snapshot"
+            remote_path = snapshot_root / "datasets" / "toy_remote"
+            _write_jsonl(remote_path / "train.jsonl", _toy_records())
+
+            with patch(
+                "unified_stpp.data.hub._snapshot_download",
+                return_value=str(snapshot_root),
+            ) as download_mock:
+                resolved = download_dataset("owner/repo/datasets/toy_remote")
+
+        self.assertEqual(resolved, remote_path.resolve())
+        kwargs = download_mock.call_args.kwargs
+        self.assertEqual(kwargs["repo_id"], "owner/repo")
+        self.assertEqual(kwargs["allow_patterns"], ["datasets/toy_remote/**"])
+
     def test_load_dataset_can_select_one_split_from_curated_spec(self):
         with tempfile.TemporaryDirectory() as td:
             local_root = Path(td) / "toy_dataset"

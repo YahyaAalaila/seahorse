@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import sys
 
 from unified_stpp.cli._args import add_config_source_args, add_data_args
 from unified_stpp.cli._bridge import extract_explicit_cli_values
@@ -49,7 +50,10 @@ def execute(args) -> None:
         override_list=args.override,
     )
 
-    resolved = runner.config.data.resolve_data(mode="single", include_test=True)
+    try:
+        resolved = runner.config.data.resolve_data(mode="single", include_test=True)
+    except (ValueError, FileNotFoundError, ImportError) as exc:
+        sys.exit(f"error: {exc}")
 
     train_seqs = load_jsonl(resolved.train_path)
     val_seqs = load_jsonl(resolved.val_path)

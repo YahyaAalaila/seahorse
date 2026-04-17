@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from unified_stpp.utils import load_splits_dir
+from unified_stpp.utils import load_jsonl, load_splits_dir
 
 if TYPE_CHECKING:
     from unified_stpp.config.schema import DataConfig
@@ -73,6 +73,15 @@ def _maybe_path(value: str | None) -> Path | None:
 def _dataset_filter(data_config: "DataConfig") -> list[str] | None:
     datasets = list(getattr(data_config, "datasets", []) or [])
     return datasets or None
+
+
+def _requested_dataset_id(data_config: "DataConfig", resolved_root: Path) -> str:
+    requested = getattr(data_config, "dataset", None)
+    if requested:
+        parts = [part for part in str(requested).strip().strip("/").split("/") if part]
+        if parts:
+            return parts[-1]
+    return resolved_root.name
 
 
 def build_single_data_provenance(
@@ -311,7 +320,7 @@ def resolve_single_data(
             train_path=train_path,
             val_path=val_path,
             test_path=test_path,
-            dataset_id=root.name,
+            dataset_id=_requested_dataset_id(data_config, root),
             source_root=root,
         )
 
@@ -334,6 +343,29 @@ def resolve_benchmark_data(data_config: "DataConfig") -> ResolvedBenchmarkData:
     mode = _validate_benchmark_source(data_config)
     if mode == "dataset":
         splits_dir = _resolve_dataset_root(data_config)
+        if (splits_dir / "train.jsonl").exists():
+            dataset_id = _requested_dataset_id(data_config, splits_dir)
+            datasets = _dataset_filter(data_config)
+            if datasets not in (None, [], [dataset_id]):
+                raise ValueError(
+                    f"Requested datasets {datasets!r}, but '{data_config.dataset}' resolves to one dataset: {dataset_id!r}."
+                )
+            test_path = splits_dir / "test.jsonl"
+            files = {
+                dataset_id: {
+                    "train": splits_dir / "train.jsonl",
+                    "val": splits_dir / "val.jsonl",
+                    "test": test_path if test_path.exists() else None,
+                }
+            }
+            splits = {
+                dataset_id: (
+                    load_jsonl(splits_dir / "train.jsonl"),
+                    load_jsonl(splits_dir / "val.jsonl"),
+                    load_jsonl(test_path) if test_path.exists() else None,
+                )
+            }
+            return ResolvedBenchmarkData(splits_dir=splits_dir, splits=splits, files=files)
     else:
         splits_dir = _maybe_path(getattr(data_config, "splits_dir", None))
         assert splits_dir is not None
