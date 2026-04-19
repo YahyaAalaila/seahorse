@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import tempfile
+import sys
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
+from unified_stpp.benchmark.hpo import run_hpo
 from unified_stpp.config.schema import STPPConfig
 from unified_stpp.config.tuning import TuningConfig
 from unified_stpp.runner import STPPRunner
@@ -143,6 +147,53 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(cfg_dict["training"]["device"], "cuda")
             self.assertEqual(tuning.n_gpus_per_trial, 1)
             self.assertEqual(tuning.max_concurrent_trials, 1)
+
+    def test_hpo_does_not_pass_seed_to_legacy_tune_run(self):
+        captured_kwargs = {}
+
+        fake_tune = types.ModuleType("ray.tune")
+        fake_tune.choice = lambda values: ("choice", values)
+        fake_tune.uniform = lambda lo, hi: ("uniform", lo, hi)
+        fake_tune.loguniform = lambda lo, hi: ("loguniform", lo, hi)
+        fake_tune.randint = lambda lo, hi: ("randint", lo, hi)
+        fake_tune.report = lambda metrics: None
+
+        def fake_run(*args, **kwargs):
+            del args
+            captured_kwargs.update(kwargs)
+            if "seed" in kwargs:
+                raise TypeError("run() got an unexpected keyword argument 'seed'")
+            return types.SimpleNamespace(best_config={"training.lr": 1.0e-3})
+
+        fake_tune.run = fake_run
+        fake_ray = types.ModuleType("ray")
+        fake_ray.tune = fake_tune
+        fake_ray.is_initialized = lambda: False
+        fake_ray.init = lambda **kwargs: None
+
+        raw = {
+            "data": {"seed": 0},
+            "model": {"preset": "poisson_gmm", "spatial_dim": 2},
+            "training": {"lr": [1.0e-3, 2.0e-3]},
+            "logging": {"out_dir": "runs"},
+        }
+        tuning = TuningConfig(
+            n_trials=1,
+            scheduler="none",
+            search_alg="random",
+            seed=123,
+        )
+
+        with patch.dict(sys.modules, {"ray": fake_ray, "ray.tune": fake_tune}):
+            best = run_hpo(
+                raw,
+                tuning,
+                train_seqs=[],
+                val_seqs=[],
+            )
+
+        self.assertEqual(best.training.lr, 1.0e-3)
+        self.assertNotIn("seed", captured_kwargs)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import resource
 import subprocess
 import sys
@@ -96,6 +97,28 @@ def _emit_mem_event(stage: str, **payload) -> None:
     }
     event.update(payload)
     print(json.dumps(event, sort_keys=True), flush=True)
+
+
+def _seed_hpo_driver(seed: int | None) -> None:
+    """Seed driver-side RNGs without relying on Ray Tune API compatibility."""
+    if seed is None:
+        return
+    value = int(seed)
+    random.seed(value)
+    try:
+        import numpy as np
+
+        np.random.seed(value)
+    except Exception:
+        pass
+    try:
+        import torch
+
+        torch.manual_seed(value)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(value)
+    except Exception:
+        pass
 
 
 def extract_trial_history(analysis) -> list[dict[str, Any]]:
@@ -315,6 +338,7 @@ def run_hpo(
             val_len=len(val_seqs),
         )
 
+    _seed_hpo_driver(tuning.seed)
     ray_space, fixed = tuning.build_ray_config(config_dict)
 
     if not ray_space:
@@ -404,7 +428,6 @@ def run_hpo(
         verbose=tuning.verbose,
         fail_fast=tuning.fail_fast,
         max_concurrent_trials=tuning.max_concurrent_trials,
-        seed=tuning.seed,
     )
 
     best_flat = dict(fixed)
