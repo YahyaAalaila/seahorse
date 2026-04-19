@@ -6,9 +6,13 @@ model:
     type: autoint_faithful
     lookback: 20
     lookahead: 1
+    # Upstream real-data config fixes hidden_size=128 and num_layers=2.
+    # Keep the benchmark HPO focused on the structural knob that actually
+    # differs between the upstream real-data run (n_prodnet=10) and the
+    # current bundled benchmark default (n_prodnet=2).
     n_prodnet: [2, 4, 6, 10]
-    hidden_size: [64, 128, 192, 256]
-    num_layers: [1, 2, 3]
+    hidden_size: [128]
+    num_layers: [2]
     activation: tanh
     bias: true
     trunc: false
@@ -20,27 +24,30 @@ model:
 training:
   optimizer: adam
   adam_beta1: 0.9
-  lr: {min: 5.0e-4, max: 1.0e-2}
-  weight_decay: [0.0, 1.0e-6, 1.0e-5]
-  grad_clip: [0.0, 1.0, 5.0]
+  # Upstream real-data config uses lr=0.004; the bundled benchmark default is
+  # also in the same regime, so keep the search narrow enough to be efficient.
+  lr: {min: 2.0e-3, max: 1.0e-2}
+  weight_decay: [0.0, 1.0e-5]
+  grad_clip: [1.0, 5.0]
   n_epochs: 50
   batch_size: 128
-  lr_step_size: [10, 20, 30]
-  lr_step_gamma: [0.3, 0.5, 0.7]
+  lr_step_size: [20, 30]
+  lr_step_gamma: [0.3, 0.5]
   test_nll_space: raw
 
 data:
   protocol: raw
-  normalize: true
+  # Keep HPO on the same raw-input policy as the benchmark path.
+  normalize: false
 
 tuning:
   n_trials: 40
   search_alg: random
   scheduler: asha
-  metric: val_nll
+  metric: val_objective
   mode: min
-  n_cpus_per_trial: 2
-  n_gpus_per_trial: 0
-  max_concurrent_trials: 4
+  n_cpus_per_trial: 4
+  n_gpus_per_trial: 1
+  max_concurrent_trials: 1
   fail_fast: false
   verbose: 1

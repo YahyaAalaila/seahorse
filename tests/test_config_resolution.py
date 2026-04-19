@@ -110,6 +110,27 @@ class ConfigResolutionTest(unittest.TestCase):
         self.assertEqual(tuning.search_alg, "random")
         self.assertEqual(tuning.scheduler, "none")
 
+    def test_bundled_hpo_configs_use_raw_data_and_non_deprecated_metric(self):
+        config_dir = Path("unified_stpp/configs")
+        for name in (
+            "auto_stpp_hpo.yaml",
+            "auto_stpp_faithful_hpo.yaml",
+            "nsmpp_hpo.yaml",
+        ):
+            raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
+            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
+            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+
+            self.assertFalse(
+                cfg_dict["data"]["normalize"],
+                f"{name} should keep HPO on raw data to match the benchmark path",
+            )
+            self.assertEqual(
+                tuning.metric,
+                "val_objective",
+                f"{name} should not rely on the deprecated val_nll label",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
