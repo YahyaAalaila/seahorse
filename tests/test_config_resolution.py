@@ -148,6 +148,20 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(tuning.n_gpus_per_trial, 1)
             self.assertEqual(tuning.max_concurrent_trials, 1)
 
+    def test_auto_stpp_hpo_configs_are_memory_bounded_for_exact_path(self):
+        config_dir = Path("unified_stpp/configs")
+        for name in ("auto_stpp_hpo.yaml", "auto_stpp_faithful_hpo.yaml"):
+            raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
+            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
+            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+
+            self.assertLessEqual(cfg_dict["training"]["batch_size"], 16)
+            self.assertEqual(
+                cfg_dict["model"]["decoder"]["n_prodnet"],
+                [2, 4],
+            )
+            self.assertLessEqual(tuning.n_trials, 24)
+
     def test_hpo_does_not_pass_seed_to_legacy_tune_run(self):
         captured_kwargs = {}
 

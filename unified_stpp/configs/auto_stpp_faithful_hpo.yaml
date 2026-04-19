@@ -8,7 +8,7 @@ model:
     lookahead: 1
     # Legacy compatibility preset; keep its HPO policy aligned with the
     # canonical auto_stpp benchmark-facing search.
-    n_prodnet: [2, 4, 6, 10]
+    n_prodnet: [2, 4]
     hidden_size: [128]
     num_layers: [2]
     activation: tanh
@@ -26,7 +26,7 @@ training:
   weight_decay: [0.0, 1.0e-5]
   grad_clip: [1.0, 5.0]
   n_epochs: 50
-  batch_size: 128
+  batch_size: 16
   lr_step_size: [20, 30]
   lr_step_gamma: [0.3, 0.5]
   test_nll_space: raw
@@ -36,7 +36,7 @@ data:
   normalize: false
 
 tuning:
-  n_trials: 40
+  n_trials: 24
   search_alg: random
   scheduler: asha
   metric: val_objective
