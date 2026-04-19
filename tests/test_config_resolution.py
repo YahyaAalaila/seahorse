@@ -115,6 +115,8 @@ class ConfigResolutionTest(unittest.TestCase):
         for name in (
             "auto_stpp_hpo.yaml",
             "auto_stpp_faithful_hpo.yaml",
+            "neural_attncnf_hpo.yaml",
+            "neural_jumpcnf_hpo.yaml",
             "nsmpp_hpo.yaml",
         ):
             raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
@@ -130,6 +132,17 @@ class ConfigResolutionTest(unittest.TestCase):
                 "val_objective",
                 f"{name} should not rely on the deprecated val_nll label",
             )
+
+    def test_slow_neural_hpo_configs_are_gpu_bounded(self):
+        config_dir = Path("unified_stpp/configs")
+        for name in ("neural_attncnf_hpo.yaml", "neural_jumpcnf_hpo.yaml"):
+            raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
+            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
+            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+
+            self.assertEqual(cfg_dict["training"]["device"], "cuda")
+            self.assertEqual(tuning.n_gpus_per_trial, 1)
+            self.assertEqual(tuning.max_concurrent_trials, 1)
 
 
 if __name__ == "__main__":
