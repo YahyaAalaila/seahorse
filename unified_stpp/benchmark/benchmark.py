@@ -321,6 +321,7 @@ class Benchmark:
             "data.normalize",
             "training.checkpoint_select",
             "training.test_nll_space",
+            "training.predictive_test_nll_samples",
             "training.n_epochs",
             "training.patience",
         )
@@ -338,6 +339,7 @@ class Benchmark:
             "data.normalize": self.config.normalize,
             "training.checkpoint_select": self.config.checkpoint_select,
             "training.test_nll_space": self.config.test_nll_space,
+            "training.predictive_test_nll_samples": self.config.predictive_test_nll_samples,
             "training.n_epochs": locked_training["n_epochs"],
             "training.patience": locked_training["patience"],
         }
@@ -429,6 +431,11 @@ class Benchmark:
                     "checkpoint_select": result.effective_config.get("training", {}).get("checkpoint_select"),
                     "nll_kind": result.nll_kind,
                     "nll_report_space": result.nll_report_space,
+                    "test_nll_method": result.test_nll_method,
+                    "test_nll_contexts": result.test_nll_contexts,
+                    "test_nll_scored_contexts": result.test_nll_scored_contexts,
+                    "test_nll_missing_contexts": result.test_nll_missing_contexts,
+                    "native_test_nll": result.native_test_nll,
                     "hpo_source": self._hpo_provenance.get(result.preset, {}).get("source", "base_yaml"),
                     "hpo_manifest_path": self._hpo_provenance.get(result.preset, {}).get("manifest_path"),
                     "data_source_fingerprint": self._dataset_source_fingerprint(result.dataset_id),

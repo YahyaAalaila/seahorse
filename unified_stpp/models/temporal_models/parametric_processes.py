@@ -81,6 +81,22 @@ class HomogeneousPoissonProcess(nn.Module):
         window = (t1 - t0).clamp(min=1e-7)
         return n_events * torch.log(lamb + 1e-20) - window * lamb
 
+    def event_logprob_matrix(
+        self,
+        event_times: Tensor,
+        locations: Tensor,
+        input_mask: Tensor,
+        t0: Tensor,
+        t1: Tensor,
+    ) -> Tensor:
+        """Per-event temporal log-prob contributions over the observation path."""
+        del locations, t1
+        lamb = F.softplus(self.log_lambda).squeeze()
+        prev_times = torch.cat([t0.unsqueeze(-1), event_times[:, :-1]], dim=-1)
+        dt = (event_times - prev_times).clamp(min=0.0)
+        event_ll = torch.log(lamb + 1e-20) - lamb * dt
+        return event_ll * input_mask
+
 
 class HawkesProcess(nn.Module):
     """
@@ -182,6 +198,51 @@ class HawkesProcess(nn.Module):
 
         return ll_events - compensator
 
+    def event_logprob_matrix(
+        self,
+        event_times: Tensor,
+        locations: Tensor,
+        input_mask: Tensor,
+        t0: Tensor,
+        t1: Tensor,
+    ) -> Tensor:
+        """Per-event temporal log-prob contributions over successive intervals."""
+        del locations, t1
+        mu = F.softplus(self.log_mu).squeeze()
+        alpha = F.softplus(self.log_alpha).squeeze()
+        beta = F.softplus(self.log_beta).squeeze()
+
+        batch_size, seq_len = event_times.shape
+        device = event_times.device
+        lower = torch.tril(
+            torch.ones(seq_len, seq_len, device=device, dtype=torch.bool),
+            diagonal=-1,
+        )
+
+        dt = event_times.unsqueeze(-1) - event_times.unsqueeze(-2)
+        causal_valid = lower.unsqueeze(0) * (input_mask.unsqueeze(-2) > 0)
+        hawkes_contrib = (
+            alpha
+            * torch.exp(-beta * dt.clamp(min=0.0))
+            * causal_valid.to(dtype=event_times.dtype)
+        )
+        hawkes_sum = hawkes_contrib.sum(dim=-1)
+        log_intensity = torch.log(mu + hawkes_sum + 1e-20)
+
+        prev_times = torch.cat([t0.unsqueeze(-1), event_times[:, :-1]], dim=-1)
+        prev_dt = (prev_times.unsqueeze(-1) - event_times.unsqueeze(-2)).clamp(min=0.0)
+        curr_dt = dt.clamp(min=0.0)
+        comp_base = mu * (event_times - prev_times).clamp(min=1e-7)
+        comp_hawkes = (alpha / (beta + 1e-20)) * (
+            (
+                torch.exp(-beta * prev_dt)
+                - torch.exp(-beta * curr_dt)
+            )
+            * causal_valid.to(dtype=event_times.dtype)
+        ).sum(dim=-1)
+        event_ll = log_intensity - (comp_base + comp_hawkes)
+        return event_ll * input_mask
+
 
 class SelfCorrectingProcess(nn.Module):
     """
@@ -282,3 +343,31 @@ class SelfCorrectingProcess(nn.Module):
         compensator = (comp_intervals * interval_mask).sum(dim=-1)  # (B,)
 
         return ll_events - compensator
+
+    def event_logprob_matrix(
+        self,
+        event_times: Tensor,
+        locations: Tensor,
+        input_mask: Tensor,
+        t0: Tensor,
+        t1: Tensor,
+    ) -> Tensor:
+        """Per-event temporal log-prob contributions over successive intervals."""
+        del locations, t1
+        mu = F.softplus(self.log_mu).squeeze()
+        beta = F.softplus(self.log_beta).squeeze()
+
+        n_before = torch.cumsum(input_mask, dim=-1) - input_mask
+        log_intensity = mu * event_times - beta * n_before
+
+        prev_times = torch.cat([t0.unsqueeze(-1), event_times[:, :-1]], dim=-1)
+        dt = (event_times - prev_times).clamp(min=1e-7)
+        log_comp = (
+            mu * prev_times
+            - beta * n_before
+            - torch.log(mu + 1e-20)
+            + torch.log(torch.expm1(mu * dt) + 1e-20)
+        )
+        comp = torch.exp(log_comp.clamp(max=80.0))
+        event_ll = log_intensity - comp
+        return event_ll * input_mask

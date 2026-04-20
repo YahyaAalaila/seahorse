@@ -128,7 +128,8 @@ def _add_metrics_subparser(sub) -> None:
 def _add_predictive_compare_subparser(sub) -> None:
     p = sub.add_parser(
         "predictive-compare",
-        help="Primary benchmark path: sample-based predictive rollout comparison",
+        help="Qualitative future-window comparison for sampled predictive rollouts",
+        description="Qualitative future-window comparison for sampled predictive rollouts",
     )
     p.add_argument(
         "--run",
@@ -334,8 +335,8 @@ def _add_surface_subparser(sub) -> None:
     )
     p.add_argument(
         "--profile",
-        default="notebook_faithful",
-        choices=("notebook_faithful", "future_exact"),
+        default="history_frame",
+        choices=("history_frame", "future_exact"),
         help=(
             "Surface profile. Neural future_exact support remains provisional until "
             "packaged parity is proven."
@@ -354,7 +355,7 @@ def _add_surface_subparser(sub) -> None:
         "--frame-index",
         type=int,
         default=-1,
-        help="Static-frame index to render for notebook_faithful mode. Negative means middle.",
+        help="Static-frame index to render for history_frame mode. Negative means middle.",
     )
     p.add_argument(
         "--no-round-time",
@@ -366,13 +367,13 @@ def _add_surface_subparser(sub) -> None:
         dest="trunc",
         action="store_true",
         default=None,
-        help="Force truncation to the model's max_history in notebook_faithful mode.",
+        help="Force truncation to the model's max_history in history_frame mode.",
     )
     p.add_argument(
         "--no-trunc",
         dest="trunc",
         action="store_false",
-        help="Disable truncation override in notebook_faithful mode.",
+        help="Disable truncation override in history_frame mode.",
     )
     p.add_argument("--xmin", type=float, default=None, help="Optional original-space xmin override.")
     p.add_argument("--xmax", type=float, default=None, help="Optional original-space xmax override.")
@@ -422,6 +423,9 @@ def execute(args) -> None:
 
 def _execute_metrics(args) -> None:
     from unified_stpp.evaluation.evaluator import evaluate
+    from unified_stpp.evaluation.predictive.benchmark import (
+        write_next_event_benchmark_summary,
+    )
     from unified_stpp.evaluation.profiles import (
         MetricPlanError,
         metric_profile as resolve_metric_profile,
@@ -431,7 +435,7 @@ def _execute_metrics(args) -> None:
     from unified_stpp.runner.runner import STPPRunner
     from unified_stpp.utils import load_jsonl
 
-    from unified_stpp.evaluation.common import load_run_result, resolve_device
+    from unified_stpp.evaluation.runtime import load_run_result, resolve_device
 
     run_dir = Path(args.run).resolve()
     data_path = Path(args.data).resolve()
@@ -511,6 +515,17 @@ def _execute_metrics(args) -> None:
     metrics_path = out_dir / "metrics.json"
     per_event_files = sorted(out_dir.glob("*_per_event.npy"))
     result = load_run_result(run_dir)
+    predictive_outputs = None
+    predictive_samples = _load_predictive_samples_for_report(
+        artifact_dir=artifact_dir,
+        report=report,
+    )
+    if predictive_samples is not None:
+        predictive_outputs = write_next_event_benchmark_summary(
+            out_dir=out_dir,
+            report=report,
+            samples=predictive_samples,
+        )
     manifest_path = out_dir / "evaluation_manifest.json"
     manifest = _metrics_evaluation_manifest(
         run_dir=run_dir,
@@ -528,6 +543,8 @@ def _execute_metrics(args) -> None:
         device=device,
         requested_profile=requested_profile,
         canonical_profile=canonical_profile,
+        predictive_samples=predictive_samples,
+        predictive_outputs=predictive_outputs,
     )
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
@@ -535,6 +552,9 @@ def _execute_metrics(args) -> None:
         "metrics": metrics_path,
         "evaluation_manifest": manifest_path,
     }
+    if predictive_outputs is not None:
+        artifacts["next_event_benchmark_summary"] = predictive_outputs["summary_path"]
+        artifacts["next_event_context_index"] = predictive_outputs["context_index_path"]
     for path in per_event_files:
         artifacts[f"per_event_{path.stem.removesuffix('_per_event')}"] = path
     artifacts["manifest"] = _write_manifest(out_dir, artifacts)
@@ -625,6 +645,8 @@ def _metrics_evaluation_manifest(
     device,
     requested_profile: str,
     canonical_profile: str,
+    predictive_samples,
+    predictive_outputs,
 ) -> dict[str, Any]:
     run_id = run_dir.name
     preset = getattr(result, "preset", None)
@@ -641,8 +663,13 @@ def _metrics_evaluation_manifest(
         if selected_metrics is not None
         else list(report.results.keys())
     )
+    value_array_files = _value_array_file_entries(
+        per_event_files=per_event_files,
+        predictive_samples=predictive_samples,
+        test_seqs=test_seqs,
+    )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "evaluation_id": _metrics_evaluation_id(
             run_dir=run_dir,
             data_path=data_path,
@@ -683,13 +710,12 @@ def _metrics_evaluation_manifest(
             ),
             "result_names": list(report.results.keys()),
             "report": str(metrics_path),
-            "per_event_files": [str(path) for path in per_event_files],
+            "value_array_files": value_array_files,
         },
         "artifacts": {
             "artifact_dir": str(artifact_dir),
             "artifact_mode": str(args.artifact_mode),
-            "events": dict(report.artifact_events),
-            "links": _artifact_links(artifact_dir, report.artifact_events),
+            "artifact_resolution": dict(report.artifact_events),
         },
         "execution": {
             "device": str(device),
@@ -700,6 +726,20 @@ def _metrics_evaluation_manifest(
             "exact_spatial_bins": int(args.exact_spatial_bins),
             "out_dir": str(out_dir),
         },
+        "evaluation_task": (
+            None
+            if predictive_outputs is None
+            else dict(predictive_outputs["evaluation_task"])
+        ),
+        "predictive_benchmark_outputs": (
+            None
+            if predictive_outputs is None
+            else {
+                "summary_json": str(predictive_outputs["summary_path"]),
+                "context_index": str(predictive_outputs["context_index_path"]),
+                "score_files": dict(predictive_outputs["score_files"]),
+            }
+        ),
     }
 
 
@@ -730,32 +770,74 @@ def _metrics_evaluation_id(
     return digest[:24]
 
 
-def _artifact_links(artifact_dir: Path, events: dict[str, str]) -> dict[str, dict[str, str | None]]:
-    links: dict[str, dict[str, str | None]] = {}
-    for family, event in events.items():
-        action, sep, key = str(event).partition(":")
-        entry: dict[str, str | None] = {
-            "event": action,
-            "key": key if sep else None,
-            "manifest": None,
-            "payload": None,
-        }
-        if sep and key:
-            base = artifact_dir / family / key
-            entry["manifest"] = str(base / "manifest.json")
-            entry["payload"] = str(base / f"{family}.npz")
-        links[family] = entry
-    return links
+def _load_predictive_samples_for_report(
+    *,
+    artifact_dir: Path,
+    report,
+):
+    from unified_stpp.evaluation.artifacts import (
+        ArtifactKey,
+        PREDICTIVE_SAMPLES_SCHEMA_VERSION,
+    )
+    from unified_stpp.evaluation.bundle_io import load_predictive_samples_artifact
+    from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
+
+    resolution = report.artifact_events.get(PREDICTIVE_SAMPLES)
+    if not isinstance(resolution, dict):
+        return None
+    digest = resolution.get("key")
+    if not digest:
+        return None
+    return load_predictive_samples_artifact(
+        artifact_dir,
+        ArtifactKey(
+            family=PREDICTIVE_SAMPLES,
+            schema_version=PREDICTIVE_SAMPLES_SCHEMA_VERSION,
+            digest=str(digest),
+            metadata={},
+        ),
+    )
+
+
+def _value_array_file_entries(
+    *,
+    per_event_files: list[Path],
+    predictive_samples,
+    test_seqs: list[dict[str, np.ndarray]],
+) -> list[dict[str, Any]]:
+    n_contexts = None if predictive_samples is None else int(predictive_samples.next_times.shape[0])
+    n_sequences = len(test_seqs)
+    entries: list[dict[str, Any]] = []
+    for path in per_event_files:
+        metric_name = path.stem.removesuffix("_per_event")
+        arr = np.load(path)
+        if n_contexts is not None and arr.shape == (n_contexts,):
+            aggregation_unit = "held_out_next_event_context"
+        elif arr.shape == (n_sequences,):
+            aggregation_unit = "sequence"
+        else:
+            aggregation_unit = "metric_defined"
+        entries.append(
+            {
+                "metric_name": metric_name,
+                "path": str(path),
+                "aggregation_unit": aggregation_unit,
+            }
+        )
+    return entries
 
 
 def _execute_predictive_compare(args) -> None:
-    from unified_stpp.evaluation.common import HistoryQuery, RunTarget
-    from unified_stpp.evaluation.io import load_predictive_bundle, write_predictive_bundle
-    from unified_stpp.evaluation.predictive_compare import (
+    from unified_stpp.evaluation.bundle_io import (
+        load_predictive_bundle,
+        write_predictive_bundle,
+    )
+    from unified_stpp.evaluation.predictive import (
+        ExactProposalConfig,
         PredictiveComparator,
         PredictiveCompareSpec,
     )
-    from unified_stpp.evaluation.predictive_sampling import ExactProposalConfig
+    from unified_stpp.evaluation.runtime import HistoryQuery, RunTarget
     from unified_stpp.viz import PredictiveRenderConfig, render_predictive_bundle
 
     labels = list(args.label or [])
@@ -822,8 +904,11 @@ def _execute_predictive_compare(args) -> None:
 
 
 def _execute_surface(args) -> None:
-    from unified_stpp.evaluation.common import HistoryQuery, RunTarget
-    from unified_stpp.evaluation.io import load_surface_bundle, write_surface_bundle
+    from unified_stpp.evaluation.bundle_io import (
+        load_surface_bundle,
+        write_surface_bundle,
+    )
+    from unified_stpp.evaluation.runtime import HistoryQuery, RunTarget
     from unified_stpp.evaluation.surface import (
         SurfaceDiagnosticEvaluator,
         SurfaceDiagnosticSpec,
@@ -956,7 +1041,7 @@ def _add_merge_artifacts_subparser(sub) -> None:
 
 def _execute_merge_artifacts(args) -> None:
     from unified_stpp.evaluation.artifacts import merge_predictive_samples
-    from unified_stpp.evaluation.io import (
+    from unified_stpp.evaluation.bundle_io import (
         scan_and_load_predictive_samples,
         write_predictive_samples_artifact,
     )
@@ -984,7 +1069,11 @@ def _execute_merge_artifacts(args) -> None:
         print(f"  loaded: {d} ({samples.next_times.shape[0]} contexts)")
 
     merged = merge_predictive_samples(parts)
-    print(f"  merged: {merged.next_times.shape[0]} total contexts, method={merged.method!r}")
+    print(
+        "  merged: "
+        f"{merged.next_times.shape[0]} total contexts, "
+        f"sampling_backend={merged.sampling_backend!r}"
+    )
 
     # Build a synthetic key for the merged artifact so it can be loaded by downstream code
     digest_payload = {
@@ -992,7 +1081,7 @@ def _execute_merge_artifacts(args) -> None:
         "n_parts": len(parts),
         "n_contexts": int(merged.next_times.shape[0]),
         "k_pred": int(merged.next_times.shape[1]) if merged.next_times.ndim == 2 else 0,
-        "method": merged.method,
+        "sampling_backend": merged.sampling_backend,
     }
     digest = hashlib.sha256(
         _canonical_json(digest_payload).encode("utf-8")

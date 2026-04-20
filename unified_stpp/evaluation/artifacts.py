@@ -16,24 +16,28 @@ import numpy as np
 
 from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
 
-PREDICTIVE_SAMPLES_SCHEMA_VERSION = 1
+PREDICTIVE_SAMPLES_SCHEMA_VERSION = 2
 ARTIFACT_MANIFEST_FILENAME = "manifest.json"
 PREDICTIVE_SAMPLES_PAYLOAD_FILENAME = "predictive_samples.npz"
 
 
 @dataclass
 class PredictiveSamples:
-    """K next-event samples for each test event.
+    """K next-event samples for each held-out next-event context.
 
     Arrays are in raw coordinates.
 
-    next_times:        (N_events, K) float32 sampled next-event absolute times.
-    next_locs:         (N_events, K, 2) float32 sampled next-event locations.
-    true_next_times:   (N_events,) float32 ground-truth next-event times.
-    true_next_locs:    (N_events, 2) float32 ground-truth next-event locations.
-    history_end_times: (N_events,) float32 conditioning-history end times.
-    seq_indices:       (N_events,) int64 source sequence index per event.
-    method:            Sampling backend, currently "thinning" or "native".
+    next_times:          (N_contexts, K) float32 sampled next-event absolute times.
+    next_locs:           (N_contexts, K, d) float32 sampled next-event locations.
+    true_next_times:     (N_contexts,) float32 ground-truth next-event times.
+    true_next_locs:      (N_contexts, d) float32 ground-truth next-event locations.
+    history_end_times:   (N_contexts,) float32 conditioning-history end times.
+    sequence_index:      (N_contexts,) int64 source sequence index per context.
+    target_event_index:  (N_contexts,) int64 target-event index within the source sequence.
+    history_length:      (N_contexts,) int64 number of events in the conditioning prefix.
+    is_last_context:     (N_contexts,) bool marks H_{T-1} -> e_T for each sequence.
+    sampling_succeeded:  (N_contexts,) bool marks whether all K samples were produced.
+    sampling_backend:    Precise backend label for the predictive artifact.
     """
 
     next_times: np.ndarray
@@ -41,8 +45,22 @@ class PredictiveSamples:
     true_next_times: np.ndarray
     true_next_locs: np.ndarray
     history_end_times: np.ndarray
-    seq_indices: np.ndarray
-    method: str
+    sequence_index: np.ndarray
+    target_event_index: np.ndarray
+    history_length: np.ndarray
+    is_last_context: np.ndarray
+    sampling_succeeded: np.ndarray
+    sampling_backend: str
+
+    @property
+    def seq_indices(self) -> np.ndarray:
+        """Backward-compatible alias for older internal callers."""
+        return self.sequence_index
+
+    @property
+    def method(self) -> str:
+        """Backward-compatible alias for older metric/report code."""
+        return self.sampling_backend
 
 
 @dataclass(frozen=True)
@@ -94,6 +112,9 @@ def predictive_samples_payload_path(root: str | Path, key: ArtifactKey) -> Path:
 
 
 def predictive_samples_manifest(key: ArtifactKey, samples: PredictiveSamples) -> ArtifactManifest:
+    sampling_succeeded = np.asarray(samples.sampling_succeeded, dtype=bool)
+    sequence_index = np.asarray(samples.sequence_index, dtype=np.int64)
+    is_last_context = np.asarray(samples.is_last_context, dtype=bool)
     return ArtifactManifest(
         family=PREDICTIVE_SAMPLES,
         schema_version=PREDICTIVE_SAMPLES_SCHEMA_VERSION,
@@ -101,8 +122,11 @@ def predictive_samples_manifest(key: ArtifactKey, samples: PredictiveSamples) ->
         payload_file=PREDICTIVE_SAMPLES_PAYLOAD_FILENAME,
         metadata={
             **key.metadata,
-            "method": samples.method,
+            "sampling_backend": samples.sampling_backend,
             "n_contexts": int(samples.next_times.shape[0]),
+            "n_sequences": int(sequence_index.max()) + 1 if sequence_index.size > 0 else 0,
+            "n_last_contexts": int(is_last_context.sum()),
+            "n_sampling_failures": int((~sampling_succeeded).sum()),
             "k_pred": int(samples.next_times.shape[1]) if samples.next_times.ndim == 2 else 0,
         },
     )
@@ -126,9 +150,11 @@ def build_predictive_samples_key(
     metadata: dict[str, Any] = {
         "family": PREDICTIVE_SAMPLES,
         "schema_version": PREDICTIVE_SAMPLES_SCHEMA_VERSION,
-        "conditioning": "teacher_forced_next_event",
-        "horizon_policy": "median_inter_event_time_x4",
-        "spatial_bounds_policy": "test_sequence_bounds_pad_0.08",
+        "evaluation_task": "held_out_next_event_prediction",
+        "conditioning_protocol": "teacher_forced_test_prefixes",
+        "target_protocol": "immediate_next_observed_event",
+        "context_selection": "all_valid_nonempty_test_prefixes",
+        "spatial_proposal_bounds": "test_sequence_bounds_pad_0.08",
         "run_dir": None if run_dir is None else str(run_dir),
         "run_id": None if run_dir is None else run_dir.name,
         "run_files": _run_file_fingerprints(run_dir),
@@ -136,11 +162,18 @@ def build_predictive_samples_key(
         "nll_kind": getattr(caps, "nll_kind", None),
         "has_intensity": bool(getattr(caps, "has_intensity", False)),
         "has_native_sampler": bool(getattr(caps, "has_native_sampler", False)),
-        "sampling_backend": "native" if getattr(caps, "has_native_sampler", False) else "thinning",
-        "exact_proposal": {
-            "mode": "coarse",
-            "time_bins": int(exact_time_bins),
-            "spatial_bins": int(exact_spatial_bins),
+        "sampling_backend": (
+            "native_next_event_sampler"
+            if getattr(caps, "has_native_sampler", False)
+            else "exact_intensity_thinning"
+        ),
+        "exact_intensity_sampler": {
+            "proposal_mode": "coarse",
+            "proposal_time_bins": int(exact_time_bins),
+            "proposal_spatial_bins": int(exact_spatial_bins),
+            "initial_time_window_policy": "max(4*median_inter_event_time,1e-3)",
+            "window_expansion_factor": 2.0,
+            "max_window_expansions": 8,
         },
         "k_pred": int(k),
         "seed": int(seed),
@@ -211,8 +244,8 @@ def _canonical_json(data: dict[str, Any]) -> str:
 def merge_predictive_samples(parts: list[PredictiveSamples]) -> PredictiveSamples:
     """Merge shard PredictiveSamples into one artifact.
 
-    Each shard's ``seq_indices`` are assumed to be 0-based (relative to the
-    shard's own sequence list).  This function remaps them so that shard i's
+    Each shard's ``sequence_index`` array is assumed to be 0-based (relative to the
+    shard's own sequence list). This function remaps them so that shard i's
     indices are offset by the total number of distinct sequences in shards 0..i-1.
 
     Parameters
@@ -221,22 +254,23 @@ def merge_predictive_samples(parts: list[PredictiveSamples]) -> PredictiveSample
 
     Returns
     -------
-    Merged PredictiveSamples with contiguous seq_indices across all shards.
+    Merged PredictiveSamples with contiguous sequence indices across all shards.
     """
     if not parts:
         raise ValueError("merge_predictive_samples requires at least one part.")
 
-    methods = {p.method for p in parts}
-    if len(methods) > 1:
+    sampling_backends = {p.sampling_backend for p in parts}
+    if len(sampling_backends) > 1:
         raise ValueError(
-            f"Cannot merge PredictiveSamples with different methods: {sorted(methods)}"
+            "Cannot merge PredictiveSamples with different sampling backends: "
+            f"{sorted(sampling_backends)}"
         )
-    method = parts[0].method
+    sampling_backend = parts[0].sampling_backend
 
     remapped_seq_indices: list[np.ndarray] = []
     offset = 0
     for part in parts:
-        si = np.asarray(part.seq_indices, dtype=np.int64)
+        si = np.asarray(part.sequence_index, dtype=np.int64)
         remapped_seq_indices.append(si + offset)
         # next shard's offset = one past the highest seq index in this shard
         offset += int(si.max()) + 1 if si.size > 0 else 0
@@ -247,6 +281,10 @@ def merge_predictive_samples(parts: list[PredictiveSamples]) -> PredictiveSample
         true_next_times=np.concatenate([p.true_next_times for p in parts], axis=0),
         true_next_locs=np.concatenate([p.true_next_locs for p in parts], axis=0),
         history_end_times=np.concatenate([p.history_end_times for p in parts], axis=0),
-        seq_indices=np.concatenate(remapped_seq_indices, axis=0),
-        method=method,
+        sequence_index=np.concatenate(remapped_seq_indices, axis=0),
+        target_event_index=np.concatenate([p.target_event_index for p in parts], axis=0),
+        history_length=np.concatenate([p.history_length for p in parts], axis=0),
+        is_last_context=np.concatenate([p.is_last_context for p in parts], axis=0),
+        sampling_succeeded=np.concatenate([p.sampling_succeeded for p in parts], axis=0),
+        sampling_backend=sampling_backend,
     )

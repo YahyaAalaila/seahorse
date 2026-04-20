@@ -172,7 +172,7 @@ class EvalContext:
             )
         if self.artifact_dir is None and self.artifact_mode == "load_only":
             raise ValueError("artifact_mode='load_only' requires artifact_dir.")
-        self.artifact_events: dict[str, str] = {}
+        self.artifact_events: dict[str, dict[str, Any]] = {}
 
         if device is None:
             try:
@@ -271,8 +271,15 @@ class EvalContext:
         return self._compute_predictive_samples(memory_only=True)
 
     def _load_or_compute_predictive_samples(self) -> PredictiveSamples:
-        from .artifacts import build_predictive_samples_key
-        from .io import load_predictive_samples_artifact, write_predictive_samples_artifact
+        from .artifacts import (
+            build_predictive_samples_key,
+            manifest_path_for_key,
+            predictive_samples_payload_path,
+        )
+        from .bundle_io import (
+            load_predictive_samples_artifact,
+            write_predictive_samples_artifact,
+        )
 
         assert self.artifact_dir is not None
         key = build_predictive_samples_key(
@@ -286,7 +293,12 @@ class EvalContext:
         )
         loaded = load_predictive_samples_artifact(self.artifact_dir, key)
         if loaded is not None:
-            self.artifact_events[PREDICTIVE_SAMPLES] = f"loaded:{key.digest}"
+            self.artifact_events[PREDICTIVE_SAMPLES] = {
+                "status": "loaded_from_cache",
+                "key": key.digest,
+                "manifest_path": str(manifest_path_for_key(self.artifact_dir, key)),
+                "payload_path": str(predictive_samples_payload_path(self.artifact_dir, key)),
+            }
             return loaded
         if self.artifact_mode == "load_only":
             raise MetricPlanError(
@@ -294,12 +306,17 @@ class EvalContext:
                 f"{self.artifact_dir} and artifact_mode='load_only'."
             )
         samples = self._compute_predictive_samples(memory_only=False)
-        write_predictive_samples_artifact(self.artifact_dir, key, samples)
-        self.artifact_events[PREDICTIVE_SAMPLES] = f"computed_written:{key.digest}"
+        written = write_predictive_samples_artifact(self.artifact_dir, key, samples)
+        self.artifact_events[PREDICTIVE_SAMPLES] = {
+            "status": "computed_and_saved",
+            "key": key.digest,
+            "manifest_path": str(written["manifest"]),
+            "payload_path": str(written["payload"]),
+        }
         return samples
 
     def _compute_predictive_samples(self, *, memory_only: bool) -> PredictiveSamples:
-        from .evaluation_helpers import compute_predictive_samples
+        from .predictive.sampling import compute_predictive_samples
 
         samples = compute_predictive_samples(
             self.runner,
@@ -311,13 +328,18 @@ class EvalContext:
             exact_spatial_bins=self.exact_spatial_bins,
         )
         if memory_only:
-            self.artifact_events[PREDICTIVE_SAMPLES] = "computed_memory"
+            self.artifact_events[PREDICTIVE_SAMPLES] = {
+                "status": "computed_ephemeral",
+                "key": None,
+                "manifest_path": None,
+                "payload_path": None,
+            }
         return samples
 
     @cached_property
     def samples_generative(self) -> GenerativeRollouts:
         """K full-sequence rollouts for every test sequence."""
-        from .evaluation_helpers import compute_generative_rollouts
+        from .predictive.rollout import compute_generative_rollouts
 
         self._require_planned_artifact(GENERATIVE_ROLLOUTS)
         return compute_generative_rollouts(
@@ -331,7 +353,7 @@ class EvalContext:
     @cached_property
     def intensity_grid(self) -> IntensityGrid:
         """Spatiotemporal intensity surface on the shared grid spec."""
-        from .evaluation_helpers import compute_intensity_grid
+        from .intensity import compute_intensity_grid
 
         self._require_planned_artifact(INTENSITY_GRID)
         generative_rollouts = None
@@ -355,7 +377,7 @@ class EvalContext:
         For approx models (DSTPP) this is the ELBO-based approximation.
         For SMASH (nll_kind="none") this is NaN for all sequences.
         """
-        from .evaluation_helpers import compute_seq_nlls
+        from .likelihood import compute_seq_nlls
 
         return compute_seq_nlls(self.runner, self.test_seqs, device=self.device)
 

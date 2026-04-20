@@ -18,7 +18,12 @@ from .contract import (
     validate_sequence_records,
 )
 from .hub import CuratedDatasetSpec, download_dataset, load_dataset
-from .dataset import PaperSlidingWindowDataset, STPPDataset, collate_fn
+from .dataset import (
+    PaperSlidingWindowDataset,
+    SlidingWindowSTPPDataset,
+    STPPDataset,
+    collate_fn,
+)
 from .transforms import (
     CoordinateTransformArtifact,
     IdentityTransformArtifact,
@@ -30,6 +35,7 @@ from .transforms import (
 
 _DIRECT_EXPORTS = {
     "STPPDataset": STPPDataset,
+    "SlidingWindowSTPPDataset": SlidingWindowSTPPDataset,
     "collate_fn": collate_fn,
     "PaperSlidingWindowDataset": PaperSlidingWindowDataset,
     "validate_batch": validate_batch,

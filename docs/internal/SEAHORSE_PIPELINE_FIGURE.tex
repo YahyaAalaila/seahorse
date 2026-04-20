@@ -1,0 +1,116 @@
+% ── Preamble (add to your paper .tex) ────────────────────────────────────────
+% \usepackage{tikz}
+% \usetikzlibrary{positioning, fit, backgrounds, arrows.meta}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    node distance   = 0.48cm,
+    every node/.style = {font=\small},
+    % ── box styles ──────────────────────────────────────────────────────
+    sbox/.style = {                        % shared / frozen
+        draw=blue!45, fill=blue!6,
+        rounded corners=3pt,
+        minimum width=5.4cm, minimum height=0.72cm,
+        align=center, inner sep=5pt},
+    fbox/.style = {                        % family-owned
+        draw=orange!55, fill=orange!10,
+        rounded corners=3pt,
+        minimum width=5.4cm, minimum height=0.72cm,
+        align=center, inner sep=5pt},
+    rbox/.style = {                        % RunResult artifact
+        draw=teal!50, fill=teal!6,
+        rounded corners=3pt,
+        minimum width=5.4cm,
+        align=center, inner sep=7pt},
+    mrow/.style = {                        % execution-mode row
+        draw=gray!45, fill=gray!6,
+        rounded corners=3pt,
+        minimum width=5.4cm, minimum height=0.72cm,
+        align=center, inner sep=5pt},
+    % ── arrow styles ────────────────────────────────────────────────────
+    arr/.style  = {->, >=Stealth, semithick},
+    darr/.style = {->, >=Stealth, semithick, dashed, gray!65},
+]
+
+%% ── Pipeline nodes ────────────────────────────────────────────────────
+
+\node[sbox] (data)
+    {Raw dataset \;/\; fixed splits};
+
+\node[sbox, below=of data] (policy)
+    {Benchmark policy\\[-2pt]
+     {\scriptsize raw-first $\;\cdot\;$ reporting space $\;\cdot\;$ checkpoint policy}};
+
+\node[sbox, below=of policy] (config)
+    {Preset $+$ config resolution};
+
+\node[fbox, below=of config] (desc)
+    {\textsc{PresetDescriptor}\\[-2pt]
+     {\scriptsize data-dependent transforms $\;/\;$ support bounds}};
+
+\node[fbox, below=of desc] (model)
+    {Model instantiation\\[-2pt]
+     {\scriptsize \textit{StateModel} $\;+\;$ \textit{EventModel}}};
+
+\node[mrow, below=0.65cm of model] (modes)
+    {\texttt{fit}\quad\texttt{tune}\quad\texttt{bench}\quad\texttt{evaluate}};
+
+\node[rbox, below=0.65cm of modes] (result)
+    {\textbf{RunResult artifact}\\[2pt]
+     {\scriptsize
+      \texttt{objective} $\;\cdot\;$ \texttt{nll\_kind} $\;\cdot\;$ \texttt{nll\_report\_space}\\[-2pt]
+      \texttt{evaluation\_exposure} $\;\cdot\;$ \texttt{preset\_status}}};
+
+%% ── Main flow arrows ──────────────────────────────────────────────────
+
+\draw[arr] (data)   -- (policy);
+\draw[arr] (policy) -- (config);
+\draw[arr] (config) -- (desc);
+\draw[arr] (desc)   -- (model);
+\draw[arr] (model)  -- (modes);
+\draw[arr] (modes)  -- (result);
+
+%% ── Side annotation: YAML overrides ───────────────────────────────────
+
+\node[right=1.15cm of config, font=\scriptsize, align=center, text=gray!75]
+    (yaml) {YAML\\overrides};
+\draw[darr] (yaml.west) -- (config.east);
+
+%% ── Background panels ─────────────────────────────────────────────────
+
+\begin{scope}[on background layer]
+    \node[draw=blue!22, fill=blue!3, rounded corners=6pt, inner sep=9pt,
+          fit=(data)(policy)(config)] (shared-bg) {};
+    \node[draw=orange!28, fill=orange!3, rounded corners=6pt, inner sep=9pt,
+          fit=(desc)(model)] (family-bg) {};
+\end{scope}
+
+%% ── Panel labels ──────────────────────────────────────────────────────
+
+\node[below right=3pt and 4pt of shared-bg.north west,
+      font=\scriptsize\itshape, text=blue!60]
+    {shared / frozen};
+
+\node[below right=3pt and 4pt of family-bg.north west,
+      font=\scriptsize\itshape, text=orange!65]
+    {family-owned};
+
+\end{tikzpicture}
+\caption{%
+    \textbf{Seahorse benchmarking pipeline.}
+    Blue-shaded boxes constitute the shared, frozen benchmark contract applied
+    identically to all presets.
+    Orange-shaded boxes are family-owned: each \textsc{PresetDescriptor}
+    derives data-dependent quantities (coordinate transforms, spatial support
+    bounds) from the training partition only, injecting them before model
+    instantiation.
+    All four execution modes (\texttt{fit}, \texttt{tune}, \texttt{bench},
+    \texttt{evaluate}) operate under the same frozen policy.
+    The \textsc{RunResult} artifact records first-class reporting metadata
+    that distinguishes training objective, NLL kind and reporting space,
+    evaluation exposure, and reproducibility tier.%
+}
+\label{fig:seahorse-pipeline}
+\end{figure}

@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import yaml
 
-from unified_stpp.benchmark.hpo import run_hpo
+from unified_stpp.benchmark.hpo import RayTuneValidationReportCallback, run_hpo
 from unified_stpp.config.schema import STPPConfig
 from unified_stpp.config.tuning import TuningConfig
 from unified_stpp.runner import STPPRunner
@@ -118,7 +118,6 @@ class ConfigResolutionTest(unittest.TestCase):
         config_dir = Path("unified_stpp/configs")
         for name in (
             "auto_stpp_hpo.yaml",
-            "auto_stpp_faithful_hpo.yaml",
             "neural_attncnf_hpo.yaml",
             "neural_jumpcnf_hpo.yaml",
             "nsmpp_hpo.yaml",
@@ -148,19 +147,29 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(tuning.n_gpus_per_trial, 1)
             self.assertEqual(tuning.max_concurrent_trials, 1)
 
-    def test_auto_stpp_hpo_configs_are_memory_bounded_for_exact_path(self):
+    def test_auto_stpp_configs_use_paper_sliding_window_training_view(self):
         config_dir = Path("unified_stpp/configs")
-        for name in ("auto_stpp_hpo.yaml", "auto_stpp_faithful_hpo.yaml"):
+        for name in (
+            "auto_stpp.yaml",
+            "auto_stpp_hpo.yaml",
+        ):
             raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
             cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
-            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
 
-            self.assertLessEqual(cfg_dict["training"]["batch_size"], 16)
-            self.assertEqual(
-                cfg_dict["model"]["decoder"]["n_prodnet"],
-                [2, 4],
-            )
-            self.assertLessEqual(tuning.n_trials, 24)
+            adapter_kwargs = cfg_dict["data"]["adapter_kwargs"]
+            self.assertFalse(cfg_dict["data"]["normalize"])
+            self.assertEqual(adapter_kwargs["training_view"], "sliding_window")
+            self.assertEqual(adapter_kwargs["lookback"], 20)
+            self.assertEqual(adapter_kwargs["lookahead"], 1)
+            self.assertEqual(cfg_dict["training"]["batch_size"], 128)
+
+            if raw_tuning:
+                tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+                self.assertEqual(tuning.n_trials, 30)
+                self.assertEqual(
+                    cfg_dict["model"]["decoder"]["n_prodnet"],
+                    [2, 4, 6, 10],
+                )
 
     def test_hpo_does_not_pass_seed_to_legacy_tune_run(self):
         captured_kwargs = {}
@@ -208,6 +217,39 @@ class ConfigResolutionTest(unittest.TestCase):
 
         self.assertEqual(best.training.lr, 1.0e-3)
         self.assertNotIn("seed", captured_kwargs)
+
+    def test_ray_tune_validation_callback_reports_intermediate_val_objective(self):
+        reports = []
+        callback = RayTuneValidationReportCallback(report_fn=reports.append)
+        trainer = types.SimpleNamespace(
+            callback_metrics={"val/nll": 1.25},
+            current_epoch=3,
+            is_global_zero=True,
+        )
+        lightning_module = types.SimpleNamespace(val_monitor_key="val/nll")
+
+        callback.on_validation_epoch_end(trainer, lightning_module)
+
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]["val_objective"], 1.25)
+        self.assertEqual(reports[0]["val_metric_key"], "nll")
+        self.assertEqual(reports[0]["epoch"], 3)
+        self.assertIn("mem_rss_mb", reports[0])
+        self.assertIn("mem_peak_rss_mb", reports[0])
+
+    def test_ray_tune_validation_callback_skips_non_global_rank(self):
+        reports = []
+        callback = RayTuneValidationReportCallback(report_fn=reports.append)
+        trainer = types.SimpleNamespace(
+            callback_metrics={"val/nll": 1.25},
+            current_epoch=0,
+            is_global_zero=False,
+        )
+        lightning_module = types.SimpleNamespace(val_monitor_key="val/nll")
+
+        callback.on_validation_epoch_end(trainer, lightning_module)
+
+        self.assertEqual(reports, [])
 
 
 if __name__ == "__main__":

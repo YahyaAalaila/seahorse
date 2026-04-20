@@ -8,6 +8,7 @@ Search-space YAML syntax is documented in
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import resource
@@ -18,8 +19,63 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import pytorch_lightning as pl
+
 if TYPE_CHECKING:
     from unified_stpp.config.tuning import TuningConfig
+
+
+class RayTuneValidationReportCallback(pl.Callback):
+    """Report validation progress to Ray Tune after each validation epoch."""
+
+    def __init__(
+        self,
+        *,
+        monitor_key: str | None = None,
+        report_metric: str = "val_objective",
+        report_fn=None,
+    ):
+        self.monitor_key = monitor_key
+        self.report_metric = report_metric
+        if report_fn is None:
+            from ray import tune
+
+            report_fn = tune.report
+        self._report_fn = report_fn
+
+    @staticmethod
+    def _to_float(value) -> float:
+        if hasattr(value, "detach"):
+            value = value.detach()
+        if hasattr(value, "cpu"):
+            value = value.cpu()
+        if hasattr(value, "item"):
+            value = value.item()
+        return float(value)
+
+    def on_validation_epoch_end(self, trainer, pl_module) -> None:
+        if not bool(getattr(trainer, "is_global_zero", True)):
+            return
+        monitor_key = self.monitor_key or getattr(pl_module, "val_monitor_key", None)
+        if not monitor_key:
+            return
+        metrics = getattr(trainer, "callback_metrics", {}) or {}
+        raw_value = metrics.get(monitor_key)
+        if raw_value is None:
+            return
+        value = self._to_float(raw_value)
+        if not math.isfinite(value):
+            return
+        metric_key = monitor_key.split("/", 1)[1] if "/" in monitor_key else monitor_key
+        self._report_fn(
+            {
+                self.report_metric: value,
+                "val_metric_key": metric_key,
+                "epoch": int(getattr(trainer, "current_epoch", 0)),
+                "mem_rss_mb": round(_current_rss_mb(), 2),
+                "mem_peak_rss_mb": round(_peak_rss_mb(), 2),
+            }
+        )
 
 
 def _unflatten(flat: dict) -> dict:
@@ -402,6 +458,7 @@ def run_hpo(
             trial_val,
             dataset_id=dataset_id,
             data_module=dm,
+            extra_callbacks=[RayTuneValidationReportCallback()],
         )
         tune.report({
             "val_objective": result.val_objective,

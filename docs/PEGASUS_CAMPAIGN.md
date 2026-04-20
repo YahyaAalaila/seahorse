@@ -33,8 +33,9 @@ decide to absorb their extra validation cost.
    - run with frozen configs via `--hpo_configs_dir`
    - always pass `--no-normalize` for the frozen raw-first contract
 4. `evaluate`
-   - `metrics` for systematic heavy metrics and artifact-backed post-fit metrics
-   - `predictive-compare` for shortlisted sample-based comparisons
+   - `metrics --metric-profile predictive` for benchmark-aligned held-out
+     next-event predictive artifacts
+   - `predictive-compare` for qualitative future-window comparisons
    - `surface` for selected exact/factorized diagnostics only
 5. `combine`
    - build a campaign index that joins HPO, bench, and evaluation outputs
@@ -75,7 +76,7 @@ one giant mixed bench invocation.
   - exact/factorized `surface`
 - GPU evaluation:
   - native-sampler `smash` / `diffusion_stpp` metrics
-  - `predictive-compare` for approximate families
+  - `predictive-compare` for qualitative approximate-family comparisons
 
 ## Environment Strategy
 

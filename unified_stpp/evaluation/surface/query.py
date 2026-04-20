@@ -15,10 +15,6 @@ Architecture
     Carrier for one evaluated surface frame.  All coordinates in original space.
     ``comparable=True`` for intensity/density; ``False`` for proxy_kde.
 
-``SurfaceQuery``
-    Backward-compatibility shim wrapping ``SurfaceEvaluator``.
-    New code should use ``SurfaceEvaluator`` directly.
-
 Surface types (``surface_type``)
 ---------------------------------
 ``"intensity"``  — λ*(t,s|H).  Units: events / (unit_time × unit_area).
@@ -37,7 +33,6 @@ import torch
 
 if TYPE_CHECKING:
     from unified_stpp.models.unified_model import UnifiedSTPP
-    from unified_stpp.runner.runner import STPPRunner
 
 _LOG = logging.getLogger(__name__)
 
@@ -453,29 +448,3 @@ class SurfaceEvaluator:
         t_lo, t_hi = float(all_times.min()), float(all_times.max())
         return list(np.linspace(t_lo, t_hi, n))
 
-
-class SurfaceQuery:
-    """Backward-compatible wrapper around ``SurfaceEvaluator``."""
-
-    def __init__(self, runner: "STPPRunner"):
-        self._runner = runner
-        self._evaluator = SurfaceEvaluator(runner.model, runner.norm_stats)
-
-    def query(
-        self,
-        *,
-        history_times: np.ndarray,
-        history_locs: np.ndarray,
-        t_query: float,
-        spatial_domain: Optional[Tuple] = None,
-        n_grid: int = 50,
-        n_samples: int = 500,
-    ) -> SurfaceResult:
-        return self._evaluator.evaluate_frame(
-            history_times=np.asarray(history_times, dtype=np.float32),
-            history_locs=np.asarray(history_locs, dtype=np.float32),
-            t_query=float(t_query),
-            spatial_domain=spatial_domain,
-            n_grid=int(n_grid),
-            n_samples=int(n_samples),
-        )

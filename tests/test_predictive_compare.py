@@ -6,21 +6,26 @@ from pathlib import Path
 
 import numpy as np
 
-from unified_stpp.evaluation import (
+from unified_stpp.evaluation.bundle_io import load_predictive_bundle, write_predictive_bundle
+from unified_stpp.evaluation.predictive import (
     ExactProposalConfig,
-    FrameWindow,
-    HistoryQuery,
     PredictiveComparator,
     PredictiveCompareSpec,
     PredictiveComparisonResult,
     PredictiveFrameResult,
     PredictiveModelResult,
-    RunTarget,
-    load_predictive_bundle,
-    write_predictive_bundle,
 )
-from unified_stpp.evaluation.common import derive_seed, load_runs, load_sequence, resolve_device, slice_initial_history
-from unified_stpp.evaluation.predictive_sampling import evaluate_teacher_forced_frame
+from unified_stpp.evaluation.predictive.rollout import evaluate_teacher_forced_frame
+from unified_stpp.evaluation.runtime import (
+    FrameWindow,
+    HistoryQuery,
+    RunTarget,
+    derive_seed,
+    load_runs,
+    load_sequence,
+    resolve_device,
+    slice_initial_history,
+)
 from unified_stpp.viz import PredictiveRenderConfig, render_predictive_bundle
 
 from tests.eval_test_helpers import assert_finite_array, make_saved_run, write_history_jsonl

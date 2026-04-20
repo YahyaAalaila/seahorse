@@ -161,22 +161,51 @@ def _build_standard_datasets(data_config, train_seqs, val_seqs, test_seqs):
 
 @register_dataset("raw")
 def _build_raw_datasets(data_config, train_seqs, val_seqs, test_seqs):
-    from unified_stpp.data.dataset import STPPDataset
+    from unified_stpp.data.dataset import SlidingWindowSTPPDataset, STPPDataset
 
-    train_ds = STPPDataset(
-        train_seqs,
-        normalize_time=False,
-        normalize_space=False,
-        normalize_covariates=False,
-    )
-    val_ds = STPPDataset(
-        val_seqs,
-        normalize_time=False,
-        normalize_space=False,
-        normalize_covariates=False,
-    )
+    adapter_kwargs = dict(getattr(data_config, "adapter_kwargs", None) or {})
+    training_view = str(adapter_kwargs.get("training_view", "full_sequence"))
+    if training_view not in {"full_sequence", "sliding_window"}:
+        raise ValueError(
+            "data.adapter_kwargs.training_view must be either "
+            f"'full_sequence' or 'sliding_window', got {training_view!r}."
+        )
+
+    if training_view == "sliding_window":
+        lookback = int(
+            adapter_kwargs.get("lookback", getattr(data_config, "paper_lookback", None) or 20)
+        )
+        lookahead = int(
+            adapter_kwargs.get("lookahead", getattr(data_config, "paper_lookahead", 1))
+        )
+        train_ds = SlidingWindowSTPPDataset(
+            train_seqs,
+            lookback=lookback,
+            lookahead=lookahead,
+        )
+        val_ds = SlidingWindowSTPPDataset(
+            val_seqs,
+            lookback=lookback,
+            lookahead=lookahead,
+        )
+    else:
+        train_ds = STPPDataset(
+            train_seqs,
+            normalize_time=False,
+            normalize_space=False,
+            normalize_covariates=False,
+        )
+        val_ds = STPPDataset(
+            val_seqs,
+            normalize_time=False,
+            normalize_space=False,
+            normalize_covariates=False,
+        )
+
     test_ds = None
     if test_seqs is not None:
+        # Benchmark test NLL is computed post-fit over full held-out prefixes,
+        # so test data stays full-sequence even when train/val use windows.
         test_ds = STPPDataset(
             test_seqs,
             normalize_time=False,

@@ -1,4 +1,4 @@
-"""Upstream-faithful AutoSTPP Cuboid / ProdNet kernel helpers.
+"""AutoSTPP Cuboid / ProdNet kernel helpers.
 
 This is a compact reimplementation of the active upstream AutoSTPP kernel path:
 
@@ -33,7 +33,7 @@ def _activation_forward(name: str, x: Tensor) -> Tensor:
     if name == "elu":
         return F.elu(x)
     raise ValueError(
-        f"Unsupported AutoSTPP faithful activation '{name}'. "
+        f"Unsupported AutoSTPP activation '{name}'. "
         "Supported: tanh, sigmoid, relu, elu."
     )
 
@@ -49,7 +49,7 @@ def _activation_grad(name: str, pre: Tensor, post: Tensor) -> Tensor:
     if name == "elu":
         return torch.where(pre > 0, torch.ones_like(pre), torch.exp(pre))
     raise ValueError(
-        f"Unsupported AutoSTPP faithful activation '{name}'. "
+        f"Unsupported AutoSTPP activation '{name}'. "
         "Supported: tanh, sigmoid, relu, elu."
     )
 
@@ -107,7 +107,7 @@ class _AxisMLP(nn.Module):
                 layer.weight.clamp_(min=0.0)
 
 
-class AutoSTPPFaithfulProdNet(nn.Module):
+class AutoSTPPProdNet(nn.Module):
     """Separable ProdNet used by upstream AutoSTPP."""
 
     def __init__(
@@ -198,11 +198,11 @@ class AutoSTPPFaithfulProdNet(nn.Module):
 
 
 class _SumProdNet(nn.Module):
-    def __init__(self, nets: Iterable[AutoSTPPFaithfulProdNet]):
+    def __init__(self, nets: Iterable[AutoSTPPProdNet]):
         super().__init__()
         self.nets = nn.ModuleList(list(nets))
         if not self.nets:
-            raise ValueError("AutoSTPP faithful SumProdNet requires at least one ProdNet.")
+            raise ValueError("AutoSTPP SumProdNet requires at least one ProdNet.")
 
     def forward(self, st_diff: Tensor) -> Tensor:
         out = self.nets[0].forward(st_diff)
@@ -242,7 +242,7 @@ class _SumProdNet(nn.Module):
             net.project()
 
 
-class AutoSTPPFaithfulCuboid(nn.Module):
+class AutoSTPPCuboid(nn.Module):
     """Exact Cuboid kernel used by upstream AutoSTPP."""
 
     def __init__(
@@ -256,7 +256,7 @@ class AutoSTPPFaithfulCuboid(nn.Module):
     ):
         super().__init__()
         self.L = _SumProdNet(
-            AutoSTPPFaithfulProdNet(
+            AutoSTPPProdNet(
                 hidden_size=hidden_size,
                 num_layers=num_layers,
                 activation=activation,
@@ -266,7 +266,7 @@ class AutoSTPPFaithfulCuboid(nn.Module):
             for _ in range(n_prodnet)
         )
         self.M = _SumProdNet(
-            AutoSTPPFaithfulProdNet(
+            AutoSTPPProdNet(
                 hidden_size=hidden_size,
                 num_layers=num_layers,
                 activation=activation,

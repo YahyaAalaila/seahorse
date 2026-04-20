@@ -232,6 +232,8 @@ class TrainingConfig(BaseModel):
     """Which checkpoint to use for post-fit test and load flows."""
     test_nll_space: Literal["native", "raw"] = "raw"
     """Reporting space for test NLL: native/model space or raw/original data space when supported."""
+    predictive_test_nll_samples: int = 128
+    """Monte Carlo sample count for sample-based held-out next-event test NLL reporting."""
     vae_beta: float = 0.0
     """KL weight for VAE regularization (ELBO beta). 0 disables KL (non-VAE mode)."""
 
@@ -346,7 +348,14 @@ class TrainingConfig(BaseModel):
             "Valid options: 'constant', 'cosine', 'linear_decay', 'step', 'reduce_on_plateau'."
         )
 
-    def build_trainer(self, run_dir: Path, accelerator: str, loggers: list, monitor_key: str = "val/nll"):
+    def build_trainer(
+        self,
+        run_dir: Path,
+        accelerator: str,
+        loggers: list,
+        monitor_key: str = "val/nll",
+        extra_callbacks: Optional[list] = None,
+    ):
         """Construct and return a Lightning Trainer.
 
         ``inference_mode=False`` is required so decoders using
@@ -354,10 +363,14 @@ class TrainingConfig(BaseModel):
         ``enable_grad()`` during validation/test.
         """
         import pytorch_lightning as pl
+        callbacks = self.build_callbacks(run_dir, monitor_key=monitor_key)
+        if extra_callbacks:
+            callbacks.extend(extra_callbacks)
+
         trainer_kwargs = dict(
             max_epochs=self.n_epochs,
             accelerator=accelerator,
-            callbacks=self.build_callbacks(run_dir, monitor_key=monitor_key),
+            callbacks=callbacks,
             logger=loggers,
             enable_progress_bar=True,
             enable_model_summary=False,

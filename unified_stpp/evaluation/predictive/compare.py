@@ -9,7 +9,7 @@ from typing import Any, Iterable, Literal
 
 import numpy as np
 
-from unified_stpp.evaluation.common import (
+from ..runtime import (
     FrameWindow,
     HistoryQuery,
     RunTarget,
@@ -24,7 +24,7 @@ from unified_stpp.evaluation.common import (
     sanitize_label,
     slice_initial_history,
 )
-from unified_stpp.evaluation.predictive_sampling import (
+from .rollout import (
     ExactProposalConfig,
     SUPPORTED_PRESETS,
     evaluate_free_running_model,

@@ -14,8 +14,8 @@ frozen, and what must be true before launching new benchmark experiments.
   config-validated.
 - New configs and runs canonicalize deprecated aliases to final preset IDs, and
   run artifacts persist preset status.
-- `auto_stpp` now names the faithful AutoSTPP variant; `auto_stpp_faithful` is
-  a deprecated alias, and the older coarse implementation is `auto_stpp_legacy`.
+- `auto_stpp` is the canonical AutoSTPP preset, and the older coarse
+  implementation is `auto_stpp_legacy`.
 - A package-side surface evaluation and visualization workflow exists.
 - Exact-vs-approx metric labeling exists in the benchmark/reporting stack.
 

@@ -188,6 +188,7 @@ class STPPRunner:
         test_seqs: Optional[list[dict]] = None,
         data_module: Optional[STPPDataModule] = None,
         dataset_id: str = "unknown",
+        extra_callbacks: Optional[list[pl.Callback]] = None,
     ) -> RunResult:
         """Train the model and return a ``RunResult``.
 
@@ -196,14 +197,20 @@ class STPPRunner:
         train_seqs:   Training sequences — list of ``{"times": ..., "locations": ...}``.
         val_seqs:     Validation sequences.
         test_seqs:    Optional test sequences; ``result.test_nll`` is ``nan`` if omitted.
-        data_module:  Override the auto-built data module (researcher escape hatch).
-        dataset_id:   Human-readable name stored in the returned ``RunResult``.
+        data_module:     Override the auto-built data module (researcher escape hatch).
+        dataset_id:      Human-readable name stored in the returned ``RunResult``.
+        extra_callbacks: Optional Lightning callbacks for orchestration layers
+                         such as HPO. Normal fit/bench callers leave this unset.
         """
         _seed_fit(self.config.data.seed)
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
         run_dir = self._prepare_run_dir(self.config.model.preset)
         with _quiet_lightning():
-            model, lm, trainer = self._build_training_stack(dm, run_dir)
+            model, lm, trainer = self._build_training_stack(
+                dm,
+                run_dir,
+                extra_callbacks=extra_callbacks,
+            )
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         _print_run_header(
             self.config.model.preset, dataset_id, run_dir, n_params,
@@ -212,7 +219,7 @@ class STPPRunner:
         t0 = time.perf_counter()
         with _quiet_lightning():
             trainer.fit(lm, datamodule=dm)
-        return self._finalize_fit(trainer, lm, dm, dataset_id, t0, run_dir)
+        return self._finalize_fit(trainer, lm, dm, dataset_id, t0, run_dir, test_seqs)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -247,6 +254,8 @@ class STPPRunner:
         self,
         dm: STPPDataModule,
         run_dir: Path,
+        *,
+        extra_callbacks: Optional[list[pl.Callback]] = None,
     ):
         """Build model, LightningModule, and Trainer."""
         model = self._build_model(dm)
@@ -256,7 +265,11 @@ class STPPRunner:
         )
         loggers = self.config.logging.build_loggers(run_dir)
         trainer = self.config.training.build_trainer(
-            run_dir, accelerator, loggers, monitor_key=lm.val_monitor_key
+            run_dir,
+            accelerator,
+            loggers,
+            monitor_key=lm.val_monitor_key,
+            extra_callbacks=extra_callbacks,
         )
         return model, lm, trainer
 
@@ -268,15 +281,22 @@ class STPPRunner:
         dataset_id: str,
         start_time: float,
         run_dir: Path,
+        test_seqs: Optional[list[dict]] = None,
     ) -> RunResult:
         """Stash trained state, collect result, update symlink."""
         self._lightning_module = lm
         self._data_module = dm
         self._run_dir = run_dir
-        result = self._collect_result(
-            trainer, lm, dm, dataset_id, time.perf_counter() - start_time, run_dir
-        )
         self._restore_selected_checkpoint(lm, run_dir)
+        result = self._collect_result(
+            trainer,
+            lm,
+            dm,
+            dataset_id,
+            time.perf_counter() - start_time,
+            run_dir,
+            test_seqs,
+        )
         self._norm_stats = result.norm_stats
         update_latest_symlink(run_dir)
         return result
@@ -364,23 +384,54 @@ class STPPRunner:
         dataset_id: str,
         train_time: float,
         run_dir: Path,
+        test_seqs: Optional[list[dict]] = None,
     ) -> RunResult:
         """Assemble and persist a RunResult from the completed training run."""
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
         cfg = self.config
-        val_objective, test_nll, temporal_nll, spatial_nll, test_extra_metrics = self._extract_fit_metrics(
+        val_objective, reported_test_nll, reported_temporal_nll, reported_spatial_nll, test_extra_metrics = self._extract_fit_metrics(
             trainer, lm, dm
         )
         ckpt_path = self._extract_checkpoint_path(trainer)
         norm_stats = dm.get_norm_stats(cfg.data.normalize)
+        self._norm_stats = norm_stats
         caps = lm.model.event_model.capabilities
-        nll_report_space = "native"
-        nll_description = caps.nll_description
-        if (
-            cfg.training.test_nll_space == "raw"
-            and "native_nll" in test_extra_metrics
-        ):
-            nll_report_space = "raw"
-            nll_description = caps.raw_nll_description or caps.nll_description
+        native_test_nll = float(test_extra_metrics.get("native_nll", reported_test_nll))
+        native_temporal_nll = float(
+            test_extra_metrics.get("native_temporal_nll", reported_temporal_nll)
+        )
+        native_spatial_nll = float(
+            test_extra_metrics.get("native_spatial_nll", reported_spatial_nll)
+        )
+        benchmark_test_nll = {
+            "mean_nll": float("nan"),
+            "method": "unavailable_no_test_data",
+            "kind": caps.nll_kind,
+            "report_space": "native",
+            "description": "held-out next-event test NLL unavailable (no test split)",
+            "footnote": caps.nll_footnote,
+            "per_context_nll": np.zeros((0,), dtype=np.float32),
+            "n_contexts": 0,
+            "n_scored_contexts": 0,
+            "n_missing_contexts": 0,
+            "sampling_backend": None,
+        }
+        if test_seqs:
+            model_device = next(lm.model.parameters()).device
+            benchmark_test_nll = compute_next_event_test_nll(
+                self,
+                test_seqs,
+                device=model_device,
+                predictive_samples=cfg.training.predictive_test_nll_samples,
+                seed=cfg.data.seed,
+            )
+            test_extra_metrics["test_nll_sampling_backend"] = (
+                benchmark_test_nll.get("sampling_backend")
+            )
+        test_extra_metrics["native_nll_description"] = caps.nll_description
+        test_extra_metrics["native_nll_kind"] = caps.nll_kind
+        test_extra_metrics["native_nll_report_space"] = "native"
         result = RunResult(
             preset=cfg.model.preset,
             preset_status=ConfigRegistry.canonical_status(cfg.model.preset),
@@ -388,7 +439,7 @@ class STPPRunner:
             seed=cfg.data.seed,
             val_objective=val_objective,
             val_metric_key=caps.metric_key,
-            test_nll=test_nll,
+            test_nll=benchmark_test_nll["mean_nll"],
             train_time_sec=train_time,
             n_params=sum(p.numel() for p in lm.model.parameters() if p.requires_grad),
             effective_config=self._effective_config_dump(),
@@ -397,12 +448,19 @@ class STPPRunner:
             run_dir=run_dir,
             training_objective=caps.training_objective,
             objective_description=caps.objective_description,
-            nll_kind=caps.nll_kind,
-            nll_description=nll_description,
-            nll_footnote=caps.nll_footnote,
-            nll_report_space=nll_report_space,
-            temporal_nll=temporal_nll,
-            spatial_nll=spatial_nll,
+            nll_kind=benchmark_test_nll["kind"],
+            nll_description=benchmark_test_nll["description"],
+            nll_footnote=benchmark_test_nll["footnote"],
+            nll_report_space=benchmark_test_nll["report_space"],
+            test_nll_method=benchmark_test_nll["method"],
+            test_nll_contexts=benchmark_test_nll["n_contexts"],
+            test_nll_scored_contexts=benchmark_test_nll["n_scored_contexts"],
+            test_nll_missing_contexts=benchmark_test_nll["n_missing_contexts"],
+            native_test_nll=native_test_nll,
+            native_temporal_nll=native_temporal_nll,
+            native_spatial_nll=native_spatial_nll,
+            temporal_nll=native_temporal_nll,
+            spatial_nll=native_spatial_nll,
             extra_metrics=test_extra_metrics,
         )
         save_run_artifacts(run_dir, result, cfg)

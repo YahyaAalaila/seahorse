@@ -31,6 +31,21 @@ if TYPE_CHECKING:
     from unified_stpp.evaluation.context import EvalContext
 
 
+def _sampling_success_mask(samples) -> np.ndarray:
+    return np.asarray(
+        getattr(samples, "sampling_succeeded", np.ones(samples.next_times.shape[0], dtype=np.bool_)),
+        dtype=np.bool_,
+    )
+
+
+def _nan_out_failed_contexts(values: np.ndarray, samples) -> np.ndarray:
+    out = np.asarray(values, dtype=np.float64).copy()
+    mask = _sampling_success_mask(samples)
+    if out.ndim == 1 and out.shape[0] == mask.shape[0]:
+        out[~mask] = np.nan
+    return out
+
+
 # ---------------------------------------------------------------------------
 # M6: Temporal CRPS
 # ---------------------------------------------------------------------------
@@ -58,11 +73,11 @@ class TemporalCRPS(Metric):
         # Clip to zero — sampling can produce negatives for thinning edge cases
         pred_iets = np.maximum(pred_iets, 0.0)
 
-        per_event = _crps_energy(pred_iets, true_iets)  # (N,)
+        per_event = _nan_out_failed_contexts(_crps_energy(pred_iets, true_iets), samples)
         return MetricResult(
             value=float(np.nanmean(per_event)),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -119,11 +134,11 @@ class SpatialEnergyScore(Metric):
         b = pred_locs[:, idx[half : 2 * half], :]
         term2 = np.mean(np.linalg.norm(a - b, axis=-1), axis=1)  # (N,)
 
-        per_event = (term1 - term2).astype(np.float64)
+        per_event = _nan_out_failed_contexts(term1 - term2, samples)
         return MetricResult(
             value=float(np.nanmean(per_event)),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -159,14 +174,16 @@ class TemporalPIT(Metric):
         pit_values = np.mean(pred_iets < true_iets[:, None], axis=1).astype(np.float64)
         # Clip away exact 0/1 for numerical stability in downstream tests
         pit_values = np.clip(pit_values, 1e-6, 1.0 - 1e-6)
+        pit_values = _nan_out_failed_contexts(pit_values, samples)
 
         # KS statistic: sup |F_n(u) - u|
-        ks_stat = _ks_uniform(pit_values)
+        valid = pit_values[np.isfinite(pit_values)]
+        ks_stat = _ks_uniform(valid)
 
         return MetricResult(
             value=float(ks_stat),
             per_event=pit_values,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -211,6 +228,7 @@ class SpatialPIT(Metric):
         true_locs = samples.true_next_locs.astype(np.float64)  # (N, 2)
 
         ks_stats: list[float] = []
+        success_mask = _sampling_success_mask(samples)
         for v in directions:
             # Project: (N, K) and (N,)
             proj_samples = pred_locs @ v          # (N, K)
@@ -218,11 +236,11 @@ class SpatialPIT(Metric):
             # PIT: fraction of samples < true projection
             pit = np.mean(proj_samples < proj_true[:, None], axis=1)
             pit = np.clip(pit, 1e-6, 1.0 - 1e-6)
-            ks_stats.append(_ks_uniform(pit))
+            ks_stats.append(_ks_uniform(pit[success_mask]))
 
         return MetricResult(
             value=float(np.max(ks_stats)),
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -273,8 +291,13 @@ class HotspotRecall(Metric):
         dy = (hi[1] - lo[1]) / G
 
         recall_by_alpha: dict[str, list[float]] = {str(a): [] for a in self._ALPHAS}
+        success_mask = _sampling_success_mask(samples)
 
         for i in range(pred_locs.shape[0]):
+            if not bool(success_mask[i]):
+                for a in self._ALPHAS:
+                    recall_by_alpha[str(a)].append(float("nan"))
+                continue
             s_samples = pred_locs[i].T  # (2, K)
             try:
                 kde = gaussian_kde(s_samples)
@@ -301,7 +324,7 @@ class HotspotRecall(Metric):
         return MetricResult(
             value=value,
             curve=curve,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -328,11 +351,13 @@ class CoverageAtDistance(Metric):
         samples = ctx.samples_predictive
         pred_locs = samples.next_locs.astype(np.float64)  # (N, K, 2)
         true_locs = samples.true_next_locs.astype(np.float64)  # (N, 2)
+        success_mask = _sampling_success_mask(samples)
 
         # Minimum distance from any sample to the true location, per event
         min_dists = np.min(
             np.linalg.norm(pred_locs - true_locs[:, None, :], axis=-1), axis=1
         )  # (N,)
+        min_dists = _nan_out_failed_contexts(min_dists, samples)
 
         # Determine r range from data
         all_dists = np.linalg.norm(
@@ -345,16 +370,20 @@ class CoverageAtDistance(Metric):
         rs = np.logspace(math.log10(r_lo), math.log10(r_hi), 10)
 
         curve = {
-            f"{r:.4g}": float(np.mean(min_dists < r))
+            f"{r:.4g}": float(np.nanmean(np.where(np.isfinite(min_dists), min_dists < r, np.nan)))
             for r in rs
         }
         # Primary scalar: coverage at the median r
         mid_r = rs[len(rs) // 2]
-        value = float(np.mean(min_dists < mid_r))
+        value = (
+            float(np.nanmean(np.where(np.isfinite(min_dists), min_dists < mid_r, np.nan)))
+            if np.any(success_mask)
+            else float("nan")
+        )
         return MetricResult(
             value=value,
             curve=curve,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -380,11 +409,14 @@ class TemporalMAE(Metric):
         pred_median_iet = np.median(pred_iets, axis=1)  # (N,)
         pred_t = samples.history_end_times.astype(np.float64) + pred_median_iet
 
-        per_event = np.abs(pred_t - samples.true_next_times.astype(np.float64))
+        per_event = _nan_out_failed_contexts(
+            np.abs(pred_t - samples.true_next_times.astype(np.float64)),
+            samples,
+        )
         return MetricResult(
             value=float(np.nanmean(per_event)),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -407,11 +439,14 @@ class SpatialMAE(Metric):
         samples = ctx.samples_predictive
         pred_mean = samples.next_locs.astype(np.float64).mean(axis=1)  # (N, 2)
         true_locs = samples.true_next_locs.astype(np.float64)          # (N, 2)
-        per_event = np.linalg.norm(pred_mean - true_locs, axis=1)      # (N,)
+        per_event = _nan_out_failed_contexts(
+            np.linalg.norm(pred_mean - true_locs, axis=1),
+            samples,
+        )
         return MetricResult(
             value=float(np.nanmean(per_event)),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -430,11 +465,12 @@ class SpatialRMSE(Metric):
         pred_mean = samples.next_locs.astype(np.float64).mean(axis=1)
         true_locs = samples.true_next_locs.astype(np.float64)
         sq_err = np.sum((pred_mean - true_locs) ** 2, axis=1)  # (N,)
-        per_event = np.sqrt(sq_err)
+        per_event = _nan_out_failed_contexts(np.sqrt(sq_err), samples)
+        sq_err = _nan_out_failed_contexts(sq_err, samples)
         return MetricResult(
             value=float(np.sqrt(np.nanmean(sq_err))),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )
 
 
@@ -478,9 +514,9 @@ class JointDistance(Metric):
         median_ds = float(np.median(ds[ds > 0])) if np.any(ds > 0) else 1.0
         alpha = median_ds / max(median_dt, 1e-8)
 
-        per_event = np.sqrt((alpha * dt) ** 2 + ds ** 2)
+        per_event = _nan_out_failed_contexts(np.sqrt((alpha * dt) ** 2 + ds ** 2), samples)
         return MetricResult(
             value=float(np.nanmean(per_event)),
             per_event=per_event,
-            method=samples.method,
+            method=samples.sampling_backend,
         )

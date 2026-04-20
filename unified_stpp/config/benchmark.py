@@ -32,6 +32,7 @@ class BenchmarkConfig(BaseModel):
     normalize: bool = False
     checkpoint_select: Literal["best", "last"] = "best"
     test_nll_space: Literal["native", "raw"] = "raw"
+    predictive_test_nll_samples: int = 128
     allow_mixed_hpo_provenance: bool = False
 
     primary_metric: str = "test_nll"
@@ -76,6 +77,7 @@ class BenchmarkConfig(BaseModel):
         raw["data"]["normalize"] = self.normalize
         raw["training"]["checkpoint_select"] = self.checkpoint_select
         raw["training"]["test_nll_space"] = self.test_nll_space
+        raw["training"]["predictive_test_nll_samples"] = self.predictive_test_nll_samples
         for key, value in (training_overrides or {}).items():
             raw["training"][key] = value
         return STPPConfig(**raw)

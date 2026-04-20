@@ -22,7 +22,7 @@ CMD=(
   "${PYTHON_BIN}" -m unified_stpp evaluate surface
   --run "${RUN_DIR}"
   --history "${HISTORY_PATH}"
-  --profile "${PROFILE:-notebook_faithful}"
+  --profile "${PROFILE:-history_frame}"
   --device "${DEVICE:-cpu}"
   --out "${OUT_DIR}"
 )

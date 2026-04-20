@@ -128,7 +128,7 @@ class TestNeuralAttnCNFSpatial(unittest.TestCase):
 
 
 class TestNeuralAttnCNFPreset(unittest.TestCase):
-    def test_preset_loads_builds_and_wires_faithful_decoder(self):
+    def test_preset_loads_builds_and_wires_attentive_decoder(self):
         cfg = STPPConfig.from_source(preset="neural_attncnf")
         self.assertEqual(cfg.model.preset, "neural_attncnf")
         self.assertEqual(cfg.data.adapter_kwargs.get("max_events"), 4000)

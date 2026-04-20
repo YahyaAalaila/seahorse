@@ -34,5 +34,5 @@ training:
   batch_size: 128
 
 data:
-  protocol: unified
+  protocol: raw
   normalize: true

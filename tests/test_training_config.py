@@ -18,6 +18,7 @@ import torch.nn as nn
 
 from unified_stpp.training.lightning_module import STPPLightningModule
 from unified_stpp.config.schema import STPPConfig, TrainingConfig
+from unified_stpp.evaluation.artifacts import PredictiveSamples
 from unified_stpp.models.unified_model import LossResult
 
 
@@ -68,6 +69,10 @@ class TestSchedulerSelection(unittest.TestCase):
         tc = TrainingConfig(test_nll_space="native")
         self.assertEqual(tc.test_nll_space, "native")
 
+    def test_predictive_test_nll_samples_defaults_to_128(self):
+        tc = TrainingConfig()
+        self.assertEqual(tc.predictive_test_nll_samples, 128)
+
     def test_checkpoint_select_accepts_last(self):
         tc = TrainingConfig(checkpoint_select="last")
         self.assertEqual(tc.checkpoint_select, "last")
@@ -79,16 +84,24 @@ class TestSchedulerSelection(unittest.TestCase):
             precision="16-mixed",
             num_nodes=3,
         )
+        extra_callback = object()
         with tempfile.TemporaryDirectory() as td:
             run_dir = Path(td)
             with patch("pytorch_lightning.Trainer") as trainer_cls:
-                tc.build_trainer(run_dir, accelerator="gpu", loggers=[], monitor_key="val/nll")
+                tc.build_trainer(
+                    run_dir,
+                    accelerator="gpu",
+                    loggers=[],
+                    monitor_key="val/nll",
+                    extra_callbacks=[extra_callback],
+                )
         kwargs = trainer_cls.call_args.kwargs
         self.assertEqual(kwargs["accelerator"], "gpu")
         self.assertEqual(kwargs["devices"], 2)
         self.assertEqual(kwargs["strategy"], "ddp")
         self.assertEqual(kwargs["precision"], "16-mixed")
         self.assertEqual(kwargs["num_nodes"], 3)
+        self.assertIn(extra_callback, kwargs["callbacks"])
 
     def test_constant_uses_lambda_lr(self):
         sched = _scheduler_from(_make_lm("constant"))
@@ -194,7 +207,7 @@ class TestYamlConfigCompatibility(unittest.TestCase):
 data:
   protocol: raw
 model:
-  preset: auto_stpp_faithful
+  preset: auto_stpp
 training:
   batch_size: 128
   checkpoint_select: best
@@ -224,6 +237,74 @@ class _DummyEvalModel:
     def compute_loss(self, output):
         del output
         return self._result
+
+
+class _DummyStructuredEvalModel:
+    def __init__(self, output: dict, result: LossResult, *, nll_kind: str):
+        self._output = output
+        self._result = result
+        self.event_model = SimpleNamespace(
+            capabilities=SimpleNamespace(
+                metric_key="nll",
+                nll_kind=nll_kind,
+                has_native_sampler=(nll_kind == "approx"),
+                nll_footnote="",
+            )
+        )
+
+    def eval(self):
+        return self
+
+    def eval_forward(self, **kwargs):
+        del kwargs
+        return self._output
+
+    def compute_loss(self, output):
+        self.assert_output_matches(output)
+        return self._result
+
+    def assert_output_matches(self, output):
+        if output is not self._output:
+            raise AssertionError("Unexpected eval_forward output payload.")
+
+
+class _DummyPrefixFallbackModel:
+    def __init__(self, correction: float = 0.25):
+        self.correction = float(correction)
+        self.forward_calls = 0
+        self.event_model = SimpleNamespace(
+            capabilities=SimpleNamespace(metric_key="nll", nll_kind="exact")
+        )
+
+    def eval(self):
+        return self
+
+    def eval_forward(self, *, times, locations, lengths, **kwargs):
+        del times, locations, kwargs
+        self.forward_calls += 1
+        max_len = int(lengths.max().item()) if lengths.numel() else 0
+        idx = torch.arange(max_len, device=lengths.device).unsqueeze(0)
+        mask = (idx < lengths.unsqueeze(1)).to(torch.float64)
+        nll_per_event = lengths.to(torch.float64) * 0.5 + 0.1
+        return {
+            "nll_per_event": nll_per_event,
+            "mask": mask,
+        }
+
+    def compute_loss(self, output):
+        counts = output["mask"].sum(dim=1)
+        total_events = counts.sum()
+        native_nll = (output["nll_per_event"] * counts).sum() / total_events.clamp(min=1.0)
+        return LossResult(
+            loss=native_nll,
+            nll=native_nll,
+            total_events=total_events,
+            kl=None,
+            aux_terms={},
+            extra_metrics={
+                "raw_space_nll": float(native_nll.detach().item() + self.correction)
+            },
+        )
 
 
 class TestTestNLLReporting(unittest.TestCase):
@@ -266,7 +347,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertAlmostEqual(captured["test/native_spatial_nll"], 0.6, places=6)
 
     def test_compute_seq_nlls_uses_same_raw_reporting_resolution(self):
-        from unified_stpp.evaluation.evaluation_helpers import compute_seq_nlls
+        from unified_stpp.evaluation.likelihood import compute_seq_nlls
 
         result = LossResult(
             loss=torch.tensor(1.0),
@@ -287,6 +368,195 @@ class TestTestNLLReporting(unittest.TestCase):
 
         self.assertEqual(nlls.shape, (1,))
         self.assertAlmostEqual(float(nlls[0]), 1.25, places=6)
+
+    def test_compute_next_event_test_nll_prefers_eventwise_exact_terms(self):
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
+        output = {
+            "nll_matrix": torch.tensor([[0.5, 0.7, 0.9]], dtype=torch.float32),
+            "mask": torch.tensor([[1.0, 1.0, 1.0]], dtype=torch.float32),
+        }
+        result = LossResult(
+            loss=torch.tensor(0.7),
+            nll=torch.tensor(0.7),
+            total_events=torch.tensor(3.0),
+            kl=None,
+            aux_terms={},
+            extra_metrics={"raw_space_nll": 1.0},
+        )
+        runner = SimpleNamespace(
+            model=_DummyStructuredEvalModel(output, result, nll_kind="exact"),
+            norm_stats={},
+            config=SimpleNamespace(
+                training=TrainingConfig(test_nll_space="raw"),
+                data=SimpleNamespace(seed=0),
+            ),
+        )
+        seqs = [
+            {
+                "times": np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32),
+                "locations": np.array(
+                    [[0.0, 0.0], [0.2, 0.1], [0.4, 0.2], [0.6, 0.3]],
+                    dtype=np.float32,
+                ),
+            }
+        ]
+
+        summary = compute_next_event_test_nll(runner, seqs, device=torch.device("cpu"))
+
+        np.testing.assert_allclose(
+            summary["per_context_nll"],
+            np.array([0.8, 1.0, 1.2], dtype=np.float32),
+            rtol=1e-6,
+            atol=1e-6,
+        )
+        self.assertAlmostEqual(summary["mean_nll"], 1.0, places=6)
+        self.assertEqual(summary["method"], "exact_next_event_from_eventwise_terms")
+        self.assertEqual(summary["report_space"], "raw")
+        self.assertEqual(summary["n_contexts"], 3)
+        self.assertEqual(summary["n_scored_contexts"], 3)
+        self.assertEqual(summary["n_missing_contexts"], 0)
+
+    def test_compute_next_event_test_nll_approx_tracks_missing_contexts(self):
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
+        rng = np.random.default_rng(0)
+        sample_dt = rng.normal(loc=0.5, scale=0.03, size=(16,)).astype(np.float32)
+        sample_loc = rng.normal(loc=(0.3, 0.6), scale=0.04, size=(16, 2)).astype(np.float32)
+        samples = PredictiveSamples(
+            next_times=np.stack(
+                [
+                    1.0 + np.maximum(sample_dt, 1e-3),
+                    np.full((16,), np.nan, dtype=np.float32),
+                ],
+                axis=0,
+            ),
+            next_locs=np.stack(
+                [
+                    sample_loc,
+                    np.full((16, 2), np.nan, dtype=np.float32),
+                ],
+                axis=0,
+            ),
+            true_next_times=np.array([1.5, 2.5], dtype=np.float32),
+            true_next_locs=np.array([[0.31, 0.61], [0.7, 0.8]], dtype=np.float32),
+            history_end_times=np.array([1.0, 2.0], dtype=np.float32),
+            sequence_index=np.array([0, 1], dtype=np.int64),
+            target_event_index=np.array([1, 1], dtype=np.int64),
+            history_length=np.array([1, 1], dtype=np.int64),
+            is_last_context=np.array([True, True], dtype=np.bool_),
+            sampling_succeeded=np.array([True, False], dtype=np.bool_),
+            sampling_backend="native_next_event_sampler",
+        )
+        runner = SimpleNamespace(
+            model=_DummyStructuredEvalModel({}, result=LossResult(
+                loss=torch.tensor(0.0),
+                nll=torch.tensor(0.0),
+                total_events=torch.tensor(0.0),
+                kl=None,
+                aux_terms={},
+            ), nll_kind="approx"),
+            config=SimpleNamespace(
+                training=TrainingConfig(predictive_test_nll_samples=16),
+                data=SimpleNamespace(seed=7),
+            ),
+        )
+
+        with patch(
+            "unified_stpp.evaluation.likelihood.compute_predictive_samples",
+            return_value=samples,
+        ):
+            summary = compute_next_event_test_nll(runner, [{}], device=torch.device("cpu"))
+
+        self.assertEqual(summary["method"], "approx_next_event_joint_sample_kde")
+        self.assertEqual(summary["report_space"], "raw")
+        self.assertEqual(summary["n_contexts"], 2)
+        self.assertEqual(summary["n_scored_contexts"], 1)
+        self.assertEqual(summary["n_missing_contexts"], 1)
+        self.assertTrue(np.isfinite(summary["per_context_nll"][0]))
+        self.assertTrue(np.isnan(summary["per_context_nll"][1]))
+
+    def test_batched_prefix_fallback_matches_unbatched(self):
+        from unified_stpp.evaluation.likelihood import (
+            _prefix_difference_next_event_nlls,
+            _prefix_difference_next_event_nlls_unbatched,
+        )
+
+        seq = {
+            "times": np.array([0.1, 0.3, 0.6, 1.0, 1.5], dtype=np.float32),
+            "locations": np.array(
+                [[0.0, 0.0], [0.1, 0.2], [0.2, 0.4], [0.3, 0.6], [0.4, 0.8]],
+                dtype=np.float32,
+            ),
+        }
+        runner = SimpleNamespace(
+            model=_DummyPrefixFallbackModel(),
+            norm_stats={},
+            config=SimpleNamespace(training=TrainingConfig(test_nll_space="raw")),
+        )
+
+        batched = _prefix_difference_next_event_nlls(
+            runner,
+            seq,
+            device=torch.device("cpu"),
+        )
+        baseline = _prefix_difference_next_event_nlls_unbatched(
+            runner,
+            seq,
+            device=torch.device("cpu"),
+        )
+
+        np.testing.assert_allclose(batched, baseline, rtol=1e-8, atol=1e-8)
+
+    def test_batched_prefix_fallback_preserves_order_across_chunks(self):
+        from unified_stpp.evaluation.likelihood import (
+            _prefix_difference_next_event_nlls,
+            _prefix_difference_next_event_nlls_unbatched,
+        )
+
+        seq = {
+            "times": np.array([0.1, 0.3, 0.6, 1.0, 1.5, 2.1], dtype=np.float32),
+            "locations": np.array(
+                [
+                    [0.0, 0.0],
+                    [0.1, 0.2],
+                    [0.2, 0.4],
+                    [0.3, 0.6],
+                    [0.4, 0.8],
+                    [0.5, 1.0],
+                ],
+                dtype=np.float32,
+            ),
+        }
+        batched_runner = SimpleNamespace(
+            model=_DummyPrefixFallbackModel(),
+            norm_stats={},
+            config=SimpleNamespace(training=TrainingConfig(test_nll_space="raw")),
+        )
+        baseline_runner = SimpleNamespace(
+            model=_DummyPrefixFallbackModel(),
+            norm_stats={},
+            config=SimpleNamespace(training=TrainingConfig(test_nll_space="raw")),
+        )
+
+        with patch(
+            "unified_stpp.evaluation.likelihood._prefix_chunk_token_budget",
+            return_value=8,
+        ):
+            batched = _prefix_difference_next_event_nlls(
+                batched_runner,
+                seq,
+                device=torch.device("cpu"),
+            )
+        baseline = _prefix_difference_next_event_nlls_unbatched(
+            baseline_runner,
+            seq,
+            device=torch.device("cpu"),
+        )
+
+        np.testing.assert_allclose(batched, baseline, rtol=1e-8, atol=1e-8)
+        self.assertGreater(batched_runner.model.forward_calls, 1)
+        self.assertLess(batched_runner.model.forward_calls, len(seq["times"]))
 
 
 if __name__ == "__main__":

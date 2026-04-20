@@ -10,8 +10,10 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
+from unified_stpp.data.transforms import transform_from_spec
 from unified_stpp.evaluation.intensity import paper_output_scale_factor
-from unified_stpp.evaluation.common import (
+from unified_stpp.evaluation.context import GenerativeRollouts
+from unified_stpp.evaluation.runtime import (
     FrameWindow,
     LoadedRun,
     append_events,
@@ -29,6 +31,29 @@ SUPPORTED_PRESETS = {"smash", "diffusion_stpp", "deep_stpp", "auto_stpp"}
 
 def is_exact_preset(preset: str) -> bool:
     return preset in {"deep_stpp", "auto_stpp"}
+
+
+def _spatial_bounds_from_seqs(
+    seqs: list[dict[str, np.ndarray]],
+    pad: float = 0.08,
+) -> tuple[float, float, float, float]:
+    loc_chunks = [
+        np.asarray(s["locations"], dtype=np.float32)
+        for s in seqs
+        if np.asarray(s["locations"], dtype=np.float32).size > 0
+    ]
+    if not loc_chunks:
+        return (0.0, 1.0, 0.0, 1.0)
+    all_locs = np.concatenate(loc_chunks, axis=0).astype(np.float32)
+    lo = all_locs.min(axis=0)
+    hi = all_locs.max(axis=0)
+    span = np.maximum(hi - lo, 1e-4)
+    return (
+        float(lo[0] - pad * span[0]),
+        float(hi[0] + pad * span[0]),
+        float(lo[1] - pad * span[1]),
+        float(hi[1] + pad * span[1]),
+    )
 
 
 @dataclass(frozen=True)
@@ -264,6 +289,180 @@ def sample_next_events_diffusion_batch(
     return next_times, locs
 
 
+def _rollout_one_sequence_native(
+    runner: STPPRunner,
+    history: dict[str, np.ndarray],
+    target_length: int,
+    *,
+    device: torch.device,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate one autoregressive rollout of target_length events."""
+    preset = runner.config.model.preset
+    h = copy_history(history)
+    out_times: list[float] = []
+    out_locs: list[np.ndarray] = []
+
+    for _ in range(target_length):
+        if preset == "smash":
+            t_next, s_next = sample_next_event_smash(runner, h, device)
+        else:
+            t_next, s_next = sample_next_event_diffusion(runner, h, device)
+        out_times.append(t_next)
+        out_locs.append(s_next)
+        h = append_events(
+            h,
+            np.asarray([t_next], dtype=np.float32),
+            np.asarray(s_next, dtype=np.float32).reshape(1, 2),
+        )
+
+    return (
+        np.asarray(out_times, dtype=np.float32),
+        np.asarray(out_locs, dtype=np.float32).reshape(-1, 2),
+    )
+
+
+def _rollout_one_sequence_thinning(
+    runner: STPPRunner,
+    history: dict[str, np.ndarray],
+    target_length: int,
+    *,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    horizon: float,
+    device: torch.device,
+    initial_state_ctx=None,
+    initial_proposal_cache=None,
+) -> tuple[np.ndarray, np.ndarray]:
+    t_start = float(history["times"][-1]) if history["times"].size > 0 else 0.0
+    t_end = t_start + horizon
+    exact_proposal = ExactProposalConfig(mode="coarse")
+
+    out_t, out_s, _, _, _ = rollout_window_thinning(
+        runner,
+        history,
+        window_start=t_start,
+        window_end=t_end,
+        xmin=xmin,
+        xmax=xmax,
+        ymin=ymin,
+        ymax=ymax,
+        lambda_bar=10.0,
+        max_events=target_length,
+        adaptive=True,
+        device=device,
+        initial_state_ctx=initial_state_ctx,
+        initial_proposal_cache=initial_proposal_cache,
+        exact_proposal=exact_proposal,
+    )
+    return out_t, out_s
+
+
+def compute_generative_rollouts(
+    runner: STPPRunner,
+    test_seqs: list[dict[str, np.ndarray]],
+    *,
+    k: int,
+    device: torch.device,
+    seed: int = 1,
+) -> GenerativeRollouts:
+    """Draw K autoregressive rollouts for each test sequence."""
+    np.random.seed(seed)
+    caps = runner.model.event_model.capabilities
+    use_native = caps.has_native_sampler
+    method = "native" if use_native else "thinning"
+
+    xmin, xmax, ymin, ymax = _spatial_bounds_from_seqs(test_seqs)
+    median_iet = float(
+        np.median(
+            np.concatenate(
+                [
+                    np.diff(s["times"].astype(np.float32))
+                    for s in test_seqs
+                    if s["times"].shape[0] > 1
+                ]
+            )
+        )
+    )
+
+    rollout_times: list[list[np.ndarray]] = []
+    rollout_locs: list[list[np.ndarray]] = []
+    true_times: list[np.ndarray] = []
+    true_locs: list[np.ndarray] = []
+
+    runner.model.eval()
+    with torch.no_grad():
+        for seq in test_seqs:
+            times = np.asarray(seq["times"], dtype=np.float32)
+            locs = np.asarray(seq["locations"], dtype=np.float32)
+            n = times.shape[0]
+            true_times.append(times)
+            true_locs.append(locs)
+
+            cond_len = max(1, n // 2)
+            history = {
+                "times": times[:cond_len].copy(),
+                "locations": locs[:cond_len].copy(),
+            }
+            target_len = n - cond_len
+
+            seq_rollout_t: list[np.ndarray] = []
+            seq_rollout_s: list[np.ndarray] = []
+
+            shared_state_ctx = None
+            shared_proposal_cache = None
+            if not use_native and target_len > 0:
+                horizon = float(target_len) * median_iet * 3.0
+                t_start = float(history["times"][-1]) if history["times"].size > 0 else 0.0
+                shared_state_ctx = build_state_from_history(runner, history, device)
+                intensity_fn = build_exact_intensity_fn(runner, shared_state_ctx, device)
+                shared_proposal_cache, _ = _build_exact_proposal_cache(
+                    intensity_fn,
+                    t_start=t_start,
+                    t_max=t_start + horizon,
+                    xmin=xmin,
+                    xmax=xmax,
+                    ymin=ymin,
+                    ymax=ymax,
+                    config=ExactProposalConfig(mode="coarse"),
+                    device=device,
+                )
+
+            for _ in range(k):
+                if use_native:
+                    t_out, s_out = _rollout_one_sequence_native(
+                        runner, history, target_len, device=device
+                    )
+                else:
+                    t_out, s_out = _rollout_one_sequence_thinning(
+                        runner,
+                        history,
+                        target_len,
+                        xmin=xmin,
+                        xmax=xmax,
+                        ymin=ymin,
+                        ymax=ymax,
+                        horizon=horizon,
+                        device=device,
+                        initial_state_ctx=shared_state_ctx,
+                        initial_proposal_cache=shared_proposal_cache,
+                    )
+                seq_rollout_t.append(t_out)
+                seq_rollout_s.append(s_out)
+
+            rollout_times.append(seq_rollout_t)
+            rollout_locs.append(seq_rollout_s)
+
+    return GenerativeRollouts(
+        rollout_times=rollout_times,
+        rollout_locs=rollout_locs,
+        true_times=true_times,
+        true_locs=true_locs,
+        method=method,
+    )
+
+
 def build_exact_intensity_fn(
     runner: STPPRunner,
     state,
@@ -278,12 +477,36 @@ def build_exact_intensity_fn(
         np.asarray(norm_stats.get("loc_std", [1.0, 1.0]), dtype=np.float32),
         1e-8,
     )
-    scale_factor = paper_output_scale_factor(runner.model)
-    if scale_factor is None:
-        raise RuntimeError(
-            "Exact rollout sampling requires paper-space output stats. "
-            "This preset does not expose paper_loc_range / paper_dt_range."
-        )
+    payload = getattr(state, "payload", {})
+    transform_spec = payload.get("input_transform")
+    transform = transform_from_spec(transform_spec if isinstance(transform_spec, dict) else None)
+    event_model = runner.model.event_model
+
+    def _transform_queries_if_needed(
+        qt: torch.Tensor,
+        qs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if transform is None:
+            return qt, qs
+        # Direct-history families such as NSMPP store transformed event vectors in
+        # the state but do not own query-side transform routing inside intensity().
+        # In that case, apply the transform here once.
+        if "event_vectors" in payload and "paper_dt_range" not in payload:
+            lengths = qt.new_full((qt.shape[0],), 1, dtype=torch.long)
+            return (
+                transform.forward_times(qt, lengths),
+                transform.forward_locations(qs, lengths),
+            )
+        return qt, qs
+
+    def _intensity_reporting_scale(values: torch.Tensor) -> torch.Tensor:
+        if transform is not None and bool(getattr(transform, "supports_raw_reporting", False)):
+            correction = transform.reporting_correction(ref=values)
+            return torch.exp(correction).clamp(min=1e-8)
+        scale_factor = paper_output_scale_factor(runner.model)
+        if scale_factor is None:
+            return values.new_ones(())
+        return values.new_tensor(max(float(scale_factor), 1e-8))
 
     def intensity_fn(query_times_raw: torch.Tensor, query_locations_raw: torch.Tensor) -> torch.Tensor:
         qt = query_times_raw.unsqueeze(-1) if query_times_raw.ndim == 1 else query_times_raw
@@ -298,15 +521,16 @@ def build_exact_intensity_fn(
                 device=device,
                 dtype=torch.float32,
             )
+        qt, qs = _transform_queries_if_needed(qt, qs)
         with torch.no_grad():
-            values = runner.model.event_model.intensity(
+            values = event_model.intensity(
                 state=state,
                 query_times=qt,
                 query_locations=qs,
                 device=device,
             )
         values = values.to(dtype=torch.float32)
-        values = values / max(float(scale_factor), 1e-8)
+        values = values / _intensity_reporting_scale(values)
         return values.clamp(min=0.0)
 
     return intensity_fn

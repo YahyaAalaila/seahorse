@@ -370,8 +370,9 @@ def _render_html(
 <p class="note">For the following presets, <strong>val_objective</strong> (used for checkpoint
 selection and HPO) and <strong>test_nll</strong> (used for benchmark reporting) are
 <em>different quantities</em>. val_objective is the model's native training objective;
-test_nll remains the benchmark-facing NLL quantity and may be exact or approximate
-depending on <code>nll_kind</code>. Do not compare val_objective across model families.</p>
+test_nll is the benchmark-facing held-out next-event NLL and may be exact or
+approximate depending on <code>nll_kind</code>. Do not compare val_objective across
+model families.</p>
 <table>
 <thead>
   <tr><th>Preset</th><th>Training objective (val)</th><th>Test NLL kind</th><th>test_nll description</th></tr>

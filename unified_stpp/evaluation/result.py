@@ -46,7 +46,9 @@ class MetricResult:
     Attributes
     ----------
     value:      Primary scalar result (None when unavailable or metric only produces a curve).
-    per_event:  Optional (N,) float64 array of per-event values, saved to eval/<name>_per_event.npy.
+    per_event:  Optional (N,) float64 array of per-observation values, saved to
+                eval/<name>_per_event.npy. The filename is legacy; the scoring
+                unit may be a held-out context, a sequence, or another metric-owned unit.
     curve:      Optional x→y mapping (e.g. recall curves, context-sensitivity curves).
     method:     How the metric was computed: "exact" | "quadrature" | "kde" | "vb" | "thinning" | "native".
     available:  False when the metric was skipped (missing requirements or error).
@@ -78,7 +80,7 @@ class Report:
     """Collection of MetricResults from one evaluation run."""
 
     results: dict[str, MetricResult] = field(default_factory=dict)
-    artifact_events: dict[str, str] = field(default_factory=dict)
+    artifact_events: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __getitem__(self, name: str) -> MetricResult:
         return self.results[name]

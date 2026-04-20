@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from unified_stpp.config.schema import DataConfig
-from unified_stpp.data.dataset import STPPDataset, collate_fn
+from unified_stpp.data.dataset import SlidingWindowSTPPDataset, STPPDataset, collate_fn
 from unified_stpp.data.registry import DataRegistry
 from unified_stpp.data.transforms import ZScoreTransformArtifact
 from unified_stpp.models.configs.factorized import FactorizedConfig
@@ -55,6 +55,50 @@ class TestRawDatasetContract(unittest.TestCase):
         self.assertEqual(test_ds.coordinate_space, "raw")
         self.assertFalse(train_ds.normalize_time)
         self.assertFalse(train_ds.normalize_space)
+
+    def test_raw_builder_can_window_train_val_while_test_stays_full_sequence(self):
+        seqs = [
+            {
+                "times": np.array([1.0, 3.0, 6.0, 10.0, 15.0], dtype=np.float32),
+                "locations": np.array(
+                    [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]],
+                    dtype=np.float32,
+                ),
+            }
+        ]
+        cfg = DataConfig(
+            protocol="raw",
+            normalize=False,
+            batch_size=2,
+            adapter_kwargs={
+                "training_view": "sliding_window",
+                "lookback": 3,
+                "lookahead": 1,
+            },
+        )
+
+        train_ds, val_ds, test_ds = DataRegistry.build_datasets(
+            cfg.protocol,
+            cfg,
+            seqs,
+            seqs,
+            seqs,
+        )
+
+        self.assertIsInstance(train_ds, SlidingWindowSTPPDataset)
+        self.assertIsInstance(val_ds, SlidingWindowSTPPDataset)
+        self.assertIsInstance(test_ds, STPPDataset)
+        self.assertEqual(len(train_ds), 2)
+        self.assertEqual(len(test_ds), 1)
+
+        torch.testing.assert_close(
+            train_ds[0]["times"],
+            torch.tensor([1.0, 3.0, 6.0, 10.0]),
+        )
+        torch.testing.assert_close(
+            train_ds[1]["times"],
+            torch.tensor([2.0, 5.0, 9.0, 14.0]),
+        )
 
 
 class TestRawTransformFitting(unittest.TestCase):

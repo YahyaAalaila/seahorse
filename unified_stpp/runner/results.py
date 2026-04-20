@@ -74,10 +74,12 @@ class RunResult:
         ``val_metric_key`` names the metric ("sm", "elbo", "nll").
 
     Layer 2 — NLL (``test_nll``):
-        A benchmark-facing likelihood quantity independent of the training objective.
-        Always NLL semantics (exact or approximate).  ``nan`` when no test set or
-        ``nll_kind="none"``.  ``nll_kind`` describes accuracy: "exact" | "approx" | "none".
-        ``temporal_nll`` / ``spatial_nll`` are per-component breakdowns when available.
+        A benchmark-facing held-out next-event NLL independent of the training objective.
+        It is scored over teacher-forced test prefixes and reported per target event.
+        ``nan`` when no test set or ``nll_kind="none"``. ``nll_kind`` describes
+        accuracy: "exact" | "approx" | "none". ``temporal_nll`` / ``spatial_nll``
+        are preserved native-model breakdowns when available and should not be
+        confused with the benchmark-facing next-event score unless explicitly documented.
 
     Layer 3 — Sampling-based eval metrics (future):
         ``test_rmse``, ``test_mae``, … populated post-training from model samples.
@@ -85,10 +87,9 @@ class RunResult:
 
     Normalization
     -------------
-    ``test_nll`` may be reported either in the model's native benchmark-facing
-    space or, for exact families that support it, in raw/original data space.
-    The exact convention is described by ``nll_description`` and
-    ``nll_report_space``.
+    ``test_nll`` may be reported either in native family space or, when supported,
+    in raw/original data space. The exact convention is described by
+    ``nll_description`` and ``nll_report_space``.
 
     Attributes
     ----------
@@ -97,8 +98,8 @@ class RunResult:
     seed:             Random seed used for this run.
     val_objective:    Best validation objective score (Layer 1; e.g. best val/sm).
     val_metric_key:   Name of the val metric: "nll", "elbo", "sm", … (Layer 1).
-    test_nll:         Test NLL/event in the documented reporting space
-                      (Layer 2; ``nan`` if unavailable).
+    test_nll:         Held-out next-event test NLL/event in the documented
+                      reporting space (Layer 2; ``nan`` if unavailable).
     nll_kind:         Quality of test_nll: "exact" | "approx" | "none" (Layer 2).
     train_time_sec:   Wall-clock training time in seconds.
     n_params:         Total number of trainable model parameters.
@@ -112,7 +113,7 @@ class RunResult:
     dataset_id: str
     seed: int
     val_objective: float       # Layer 1: best val objective score
-    test_nll: float            # Layer 2: test NLL (exact or approx)
+    test_nll: float            # Layer 2: held-out next-event test NLL
     train_time_sec: float
     n_params: int
     effective_config: dict[str, Any]
@@ -150,11 +151,27 @@ class RunResult:
     nll_report_space: str = "native"
     # ^ "native" or "raw"; describes the space used by ``test_nll``.
 
+    test_nll_method: str = ""
+    # ^ exact computation route for ``test_nll``.
+
+    test_nll_contexts: int = 0
+    # ^ total held-out next-event contexts considered across the test split.
+
+    test_nll_scored_contexts: int = 0
+    # ^ number of contexts that contributed finite values to ``test_nll``.
+
+    test_nll_missing_contexts: int = 0
+    # ^ contexts skipped or unresolved during ``test_nll`` computation.
+
+    native_test_nll: float = float("nan")
+    native_temporal_nll: float = float("nan")
+    native_spatial_nll: float = float("nan")
+
     # ------------------------------------------------------------------
     # Layer 2 — Temporal/spatial NLL breakdowns
     # ------------------------------------------------------------------
-    temporal_nll: float = float("nan")   # mean temporal NLL/event (test set)
-    spatial_nll: float = float("nan")    # mean spatial NLL/event (test set)
+    temporal_nll: float = float("nan")   # preserved native-model temporal test NLL/event
+    spatial_nll: float = float("nan")    # preserved native-model spatial test NLL/event
 
     # ------------------------------------------------------------------
     # Layer 3 — Sampling-based eval metrics (future)

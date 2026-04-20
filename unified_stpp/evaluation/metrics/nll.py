@@ -169,12 +169,19 @@ class TemporalNLL(Metric):
             return MetricResult(value=None, available=False, reason="scipy not available")
 
         samples = ctx.samples_predictive
+        success_mask = np.asarray(
+            getattr(samples, "sampling_succeeded", np.ones(samples.next_times.shape[0], dtype=np.bool_)),
+            dtype=np.bool_,
+        )
         # samples.next_times: (N, K) absolute times
         # true inter-event times: true_next_times - history_end_times
         true_iets = samples.true_next_times - samples.history_end_times  # (N,)
         per_event_nll: list[float] = []
 
         for i in range(samples.next_times.shape[0]):
+            if not bool(success_mask[i]):
+                per_event_nll.append(float("nan"))
+                continue
             sample_iets = samples.next_times[i] - samples.history_end_times[i]  # (K,)
             sample_iets = np.maximum(sample_iets, 1e-8)
             if sample_iets.std() < 1e-10:
@@ -285,10 +292,17 @@ class SpatialNLL(Metric):
             return MetricResult(value=None, available=False, reason="scipy not available")
 
         samples = ctx.samples_predictive
+        success_mask = np.asarray(
+            getattr(samples, "sampling_succeeded", np.ones(samples.next_locs.shape[0], dtype=np.bool_)),
+            dtype=np.bool_,
+        )
         true_locs = samples.true_next_locs  # (N, 2)
         per_event_nll: list[float] = []
 
         for i in range(samples.next_locs.shape[0]):
+            if not bool(success_mask[i]):
+                per_event_nll.append(float("nan"))
+                continue
             s_samples = samples.next_locs[i]  # (K, 2)
             if s_samples.shape[0] < 5:
                 per_event_nll.append(float("nan"))
@@ -358,7 +372,7 @@ class TrainTestNLLGap(Metric):
                 available=False,
                 reason="model has no density (nll_kind='none')",
             )
-        from unified_stpp.evaluation.evaluation_helpers import compute_seq_nlls
+        from unified_stpp.evaluation.likelihood import compute_seq_nlls
 
         test_nlls = ctx.seq_nlls
         train_nlls = compute_seq_nlls(ctx.runner, ctx.train_data, device=ctx.device)
@@ -453,7 +467,7 @@ class ContextSensitivity(Metric):
                 reason="model has no density — cannot compute context sensitivity",
             )
 
-        from unified_stpp.evaluation.evaluation_helpers import compute_seq_nlls
+        from unified_stpp.evaluation.likelihood import compute_seq_nlls
 
         curve: dict[str, float] = {}
 
@@ -462,7 +476,7 @@ class ContextSensitivity(Metric):
         curve["full"] = float(np.nanmean(full_nlls))
 
         # Capped variants
-        from unified_stpp.evaluation.common import cap_history
+        from unified_stpp.evaluation.runtime import cap_history
 
         for k in self._K_VALUES:
             capped_seqs = [

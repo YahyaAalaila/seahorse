@@ -19,14 +19,14 @@ from unified_stpp.evaluation.artifacts import (
     predictive_samples_manifest,
     predictive_samples_payload_path,
 )
-from unified_stpp.evaluation.common import FrameWindow
-from unified_stpp.evaluation.predictive_compare import (
+from unified_stpp.evaluation.predictive.compare import (
     PredictiveCompareSpec,
     PredictiveComparisonResult,
     PredictiveFrameResult,
     PredictiveModelResult,
 )
-from unified_stpp.evaluation.predictive_sampling import ExactProposalConfig
+from unified_stpp.evaluation.predictive.rollout import ExactProposalConfig
+from unified_stpp.evaluation.runtime import FrameWindow
 from unified_stpp.evaluation.surface import SurfaceDiagnosticResult
 
 
@@ -45,8 +45,12 @@ def write_predictive_samples_artifact(
         true_next_times=np.asarray(samples.true_next_times, dtype=np.float32),
         true_next_locs=np.asarray(samples.true_next_locs, dtype=np.float32),
         history_end_times=np.asarray(samples.history_end_times, dtype=np.float32),
-        seq_indices=np.asarray(samples.seq_indices, dtype=np.int64),
-        method=np.asarray(samples.method, dtype="<U32"),
+        sequence_index=np.asarray(samples.sequence_index, dtype=np.int64),
+        target_event_index=np.asarray(samples.target_event_index, dtype=np.int64),
+        history_length=np.asarray(samples.history_length, dtype=np.int64),
+        is_last_context=np.asarray(samples.is_last_context, dtype=np.bool_),
+        sampling_succeeded=np.asarray(samples.sampling_succeeded, dtype=np.bool_),
+        sampling_backend=np.asarray(samples.sampling_backend, dtype="<U64"),
     )
     manifest = predictive_samples_manifest(key, samples)
     manifest_path = manifest_path_for_key(artifact_root, key)
@@ -79,15 +83,7 @@ def load_predictive_samples_artifact(
             f"Artifact manifest exists but payload is missing: {payload_path}"
         )
     payload = np.load(payload_path)
-    return PredictiveSamples(
-        next_times=np.asarray(payload["next_times"], dtype=np.float32),
-        next_locs=np.asarray(payload["next_locs"], dtype=np.float32),
-        true_next_times=np.asarray(payload["true_next_times"], dtype=np.float32),
-        true_next_locs=np.asarray(payload["true_next_locs"], dtype=np.float32),
-        history_end_times=np.asarray(payload["history_end_times"], dtype=np.float32),
-        seq_indices=np.asarray(payload["seq_indices"], dtype=np.int64),
-        method=str(np.asarray(payload["method"]).item()),
-    )
+    return _predictive_samples_from_payload(payload)
 
 
 def scan_and_load_predictive_samples(artifact_dir: str | Path) -> PredictiveSamples | None:
@@ -124,18 +120,55 @@ def scan_and_load_predictive_samples(artifact_dir: str | Path) -> PredictiveSamp
             continue
         try:
             payload = np.load(payload_path)
-            return PredictiveSamples(
-                next_times=np.asarray(payload["next_times"], dtype=np.float32),
-                next_locs=np.asarray(payload["next_locs"], dtype=np.float32),
-                true_next_times=np.asarray(payload["true_next_times"], dtype=np.float32),
-                true_next_locs=np.asarray(payload["true_next_locs"], dtype=np.float32),
-                history_end_times=np.asarray(payload["history_end_times"], dtype=np.float32),
-                seq_indices=np.asarray(payload["seq_indices"], dtype=np.int64),
-                method=str(np.asarray(payload["method"]).item()),
-            )
+            return _predictive_samples_from_payload(payload)
         except Exception:
             continue
     return None
+
+
+def _predictive_samples_from_payload(payload) -> PredictiveSamples:
+    next_times = np.asarray(payload["next_times"], dtype=np.float32)
+    true_next_times = np.asarray(payload["true_next_times"], dtype=np.float32)
+    sequence_index = np.asarray(
+        payload["sequence_index"] if "sequence_index" in payload else payload["seq_indices"],
+        dtype=np.int64,
+    )
+    target_event_index = np.asarray(
+        payload["target_event_index"] if "target_event_index" in payload else np.zeros_like(sequence_index),
+        dtype=np.int64,
+    )
+    history_length = np.asarray(
+        payload["history_length"] if "history_length" in payload else np.maximum(target_event_index, 0),
+        dtype=np.int64,
+    )
+    is_last_context = np.asarray(
+        payload["is_last_context"] if "is_last_context" in payload else np.zeros_like(sequence_index, dtype=np.bool_),
+        dtype=np.bool_,
+    )
+    sampling_succeeded = np.asarray(
+        payload["sampling_succeeded"]
+        if "sampling_succeeded" in payload
+        else np.ones_like(sequence_index, dtype=np.bool_),
+        dtype=np.bool_,
+    )
+    sampling_backend = str(
+        np.asarray(
+            payload["sampling_backend"] if "sampling_backend" in payload else payload["method"]
+        ).item()
+    )
+    return PredictiveSamples(
+        next_times=next_times,
+        next_locs=np.asarray(payload["next_locs"], dtype=np.float32),
+        true_next_times=true_next_times,
+        true_next_locs=np.asarray(payload["true_next_locs"], dtype=np.float32),
+        history_end_times=np.asarray(payload["history_end_times"], dtype=np.float32),
+        sequence_index=sequence_index,
+        target_event_index=target_event_index,
+        history_length=history_length,
+        is_last_context=is_last_context,
+        sampling_succeeded=sampling_succeeded,
+        sampling_backend=sampling_backend,
+    )
 
 
 def write_predictive_bundle(out_dir: Path, result: PredictiveComparisonResult) -> dict[str, Path]:

@@ -1,4 +1,4 @@
-"""Regression checks for the canonical upstream-faithful AutoSTPP preset."""
+"""Regression checks for the canonical AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 import torch
 
 from unified_stpp.config.schema import STPPConfig
-from unified_stpp.models.configs.auto_stpp_faithful import AutoSTPPFaithfulConfig
-from unified_stpp.models.event_models.auto_stpp_faithful_kernel import AutoSTPPFaithfulCuboid
+from unified_stpp.models.configs.auto_stpp import AutoSTPPConfig
+from unified_stpp.models.event_models.auto_stpp_kernel import AutoSTPPCuboid
 from unified_stpp.registry import build_model
 
 
@@ -33,7 +33,7 @@ def _tiny_batch():
     return times, locations, lengths
 
 
-class TestAutoSTPPFaithfulDataInit(unittest.TestCase):
+class TestAutoSTPPDataInit(unittest.TestCase):
     def test_data_init_overrides_uses_train_only_minmax(self):
         seqs = [
             {
@@ -56,7 +56,7 @@ class TestAutoSTPPFaithfulDataInit(unittest.TestCase):
         )
         dm = types.SimpleNamespace(_bundle=types.SimpleNamespace(train_dataset=train_ds))
 
-        overrides = AutoSTPPFaithfulConfig.data_init_overrides(dm)
+        overrides = AutoSTPPConfig.data_init_overrides(dm)
         self.assertAlmostEqual(overrides["paper_dt_min"], 0.1, places=6)
         self.assertAlmostEqual(overrides["paper_dt_range"], 0.4, places=6)
         self.assertEqual(overrides["paper_loc_min"], (0.0, 2.0))
@@ -64,7 +64,7 @@ class TestAutoSTPPFaithfulDataInit(unittest.TestCase):
         self.assertTrue(overrides["input_normalized"])
 
 
-class TestAutoSTPPFaithfulForward(unittest.TestCase):
+class TestAutoSTPPForward(unittest.TestCase):
     def test_outputs_include_exact_terms_and_orig_space_metrics(self):
         torch.manual_seed(7)
         model = build_model(
@@ -272,10 +272,10 @@ class TestAutoSTPPFaithfulForward(unittest.TestCase):
         )
 
 
-class TestAutoSTPPFaithfulKernel(unittest.TestCase):
+class TestAutoSTPPKernel(unittest.TestCase):
     def test_compensator_monotone_and_matches_temporal_derivative(self):
         torch.manual_seed(3)
-        kernel = AutoSTPPFaithfulCuboid(
+        kernel = AutoSTPPCuboid(
             n_prodnet=2,
             hidden_size=8,
             num_layers=1,
@@ -299,7 +299,7 @@ class TestAutoSTPPFaithfulKernel(unittest.TestCase):
         torch.testing.assert_close(fd, lamb_t, rtol=5e-2, atol=5e-2)
 
 
-class TestAutoSTPPFaithfulSmoke(unittest.TestCase):
+class TestAutoSTPPSmoke(unittest.TestCase):
     def test_canonical_auto_stpp_replaces_old_coarse_variant(self):
         torch.manual_seed(1)
         old_model = build_model(
@@ -321,11 +321,6 @@ class TestAutoSTPPFaithfulSmoke(unittest.TestCase):
         self.assertEqual(cfg.model.preset, "auto_stpp")
         self.assertEqual(cfg.training.optimizer, "adam")
         self.assertEqual(cfg.data.protocol, "raw")
-
-    def test_deprecated_alias_loads_canonical_preset(self):
-        cfg = STPPConfig.from_preset("auto_stpp_faithful")
-        self.assertEqual(cfg.model.preset, "auto_stpp")
-        self.assertEqual(cfg.training.optimizer, "adam")
 
 
 if __name__ == "__main__":

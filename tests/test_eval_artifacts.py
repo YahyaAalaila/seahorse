@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 
 from unified_stpp.evaluation import evaluate
-from unified_stpp.evaluation.artifacts import PredictiveSamples
+from unified_stpp.evaluation.artifacts import PredictiveSamples, merge_predictive_samples
 from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
 from unified_stpp.evaluation.registry import metric_by_name
 
@@ -51,8 +51,12 @@ def _sample_payload() -> PredictiveSamples:
         true_next_times=np.asarray([1.0], dtype=np.float32),
         true_next_locs=np.asarray([[0.2, 0.3]], dtype=np.float32),
         history_end_times=np.asarray([0.0], dtype=np.float32),
-        seq_indices=np.asarray([0], dtype=np.int64),
-        method="test",
+        sequence_index=np.asarray([0], dtype=np.int64),
+        target_event_index=np.asarray([1], dtype=np.int64),
+        history_length=np.asarray([1], dtype=np.int64),
+        is_last_context=np.asarray([True], dtype=np.bool_),
+        sampling_succeeded=np.asarray([True], dtype=np.bool_),
+        sampling_backend="native_next_event_sampler",
     )
 
 
@@ -74,7 +78,7 @@ class TestEvalArtifacts(unittest.TestCase):
             metric = metric_by_name("temporal_mae")
 
             with patch(
-                "unified_stpp.evaluation.evaluation_helpers.compute_predictive_samples",
+                "unified_stpp.evaluation.predictive.sampling.compute_predictive_samples",
                 return_value=_sample_payload(),
             ) as compute:
                 report = evaluate(
@@ -89,11 +93,14 @@ class TestEvalArtifacts(unittest.TestCase):
                 )
             self.assertEqual(compute.call_count, 1)
             self.assertEqual(report["temporal_mae"].value, 0.0)
-            self.assertTrue(report.artifact_events[PREDICTIVE_SAMPLES].startswith("computed_written:"))
+            self.assertEqual(
+                report.artifact_events[PREDICTIVE_SAMPLES]["status"],
+                "computed_and_saved",
+            )
             self.assertTrue(any(artifact_dir.glob("predictive_samples/*/manifest.json")))
 
             with patch(
-                "unified_stpp.evaluation.evaluation_helpers.compute_predictive_samples",
+                "unified_stpp.evaluation.predictive.sampling.compute_predictive_samples",
                 side_effect=AssertionError("should load saved predictive samples"),
             ) as compute_again:
                 report = evaluate(
@@ -109,7 +116,54 @@ class TestEvalArtifacts(unittest.TestCase):
                 )
             compute_again.assert_not_called()
             self.assertEqual(report["temporal_mae"].value, 0.0)
-            self.assertTrue(report.artifact_events[PREDICTIVE_SAMPLES].startswith("loaded:"))
+            self.assertEqual(
+                report.artifact_events[PREDICTIVE_SAMPLES]["status"],
+                "loaded_from_cache",
+            )
+
+    def test_merge_predictive_samples_remaps_context_indices_and_flags(self):
+        merged = merge_predictive_samples(
+            [
+                PredictiveSamples(
+                    next_times=np.asarray([[1.0]], dtype=np.float32),
+                    next_locs=np.asarray([[[0.0, 0.0]]], dtype=np.float32),
+                    true_next_times=np.asarray([1.0], dtype=np.float32),
+                    true_next_locs=np.asarray([[0.0, 0.0]], dtype=np.float32),
+                    history_end_times=np.asarray([0.5], dtype=np.float32),
+                    sequence_index=np.asarray([0], dtype=np.int64),
+                    target_event_index=np.asarray([1], dtype=np.int64),
+                    history_length=np.asarray([1], dtype=np.int64),
+                    is_last_context=np.asarray([True], dtype=np.bool_),
+                    sampling_succeeded=np.asarray([True], dtype=np.bool_),
+                    sampling_backend="exact_intensity_thinning",
+                ),
+                PredictiveSamples(
+                    next_times=np.asarray([[2.0], [3.0]], dtype=np.float32),
+                    next_locs=np.asarray(
+                        [[[1.0, 1.0]], [[2.0, 2.0]]],
+                        dtype=np.float32,
+                    ),
+                    true_next_times=np.asarray([2.0, 3.0], dtype=np.float32),
+                    true_next_locs=np.asarray([[1.0, 1.0], [2.0, 2.0]], dtype=np.float32),
+                    history_end_times=np.asarray([1.5, 2.5], dtype=np.float32),
+                    sequence_index=np.asarray([0, 1], dtype=np.int64),
+                    target_event_index=np.asarray([1, 1], dtype=np.int64),
+                    history_length=np.asarray([1, 1], dtype=np.int64),
+                    is_last_context=np.asarray([True, True], dtype=np.bool_),
+                    sampling_succeeded=np.asarray([False, True], dtype=np.bool_),
+                    sampling_backend="exact_intensity_thinning",
+                ),
+            ]
+        )
+        np.testing.assert_array_equal(merged.sequence_index, np.asarray([0, 1, 2], dtype=np.int64))
+        np.testing.assert_array_equal(
+            merged.is_last_context,
+            np.asarray([True, True, True], dtype=np.bool_),
+        )
+        np.testing.assert_array_equal(
+            merged.sampling_succeeded,
+            np.asarray([True, False, True], dtype=np.bool_),
+        )
 
 
 if __name__ == "__main__":

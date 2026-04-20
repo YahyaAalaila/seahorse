@@ -8,7 +8,10 @@ from pathlib import Path
 import numpy as np
 
 from unified_stpp.evaluation.surface import SurfaceDiagnosticResult
-from unified_stpp.evaluation.surface_profiles import history_overlay_z_level, representative_indices
+from unified_stpp.evaluation.surface.diagnostics import (
+    history_overlay_z_level,
+    representative_indices,
+)
 from . import plotly_intensity as _plotly_intensity
 
 
@@ -158,7 +161,7 @@ def render_surface_bundle(
     out_dir.mkdir(parents=True, exist_ok=True)
     artifacts: dict[str, Path] = {}
     title_prefix = f"{result.preset} seq={result.seq_idx}"
-    if result.profile == "notebook_faithful":
+    if result.profile == "history_frame":
         frame_index = int(result.extra_metadata.get("frame_index", len(result.t_grid) // 2))
         frame_index = max(0, min(frame_index, len(result.t_grid) - 1))
         frame_values = result.primary_cube[frame_index]
@@ -184,7 +187,7 @@ def render_surface_bundle(
                 result.y_grid,
                 result.t_grid,
                 show=False,
-                master_title=f"{title_prefix} notebook-faithful intensity",
+                master_title=f"{title_prefix} history-frame intensity",
             )
             html_path = out_dir / "intensity_interactive.html"
             fig.write_html(str(html_path), include_plotlyjs="cdn")

@@ -1,12 +1,12 @@
-"""Tests for SurfaceQuery and the new spatial-query model methods.
+"""Tests for SurfaceEvaluator and the spatial-query model methods.
 
 Phased structure mirrors the rollout plan:
 
   Phase 1 unit — temporal intensity_at, spatial log_spatial_density_at
   Phase 2 unit — FactorizedEventModel.intensity() / density()
-  Phase 1 integration — SurfaceQuery for deep_stpp, auto_stpp
-  Phase 2 integration — SurfaceQuery for all 9 factorized presets
-  Phase 3 integration — SurfaceQuery proxy_kde for smash, diffusion_stpp
+  Phase 1 integration — SurfaceEvaluator for deep_stpp, auto_stpp
+  Phase 2 integration — SurfaceEvaluator for all 9 factorized presets
+  Phase 3 integration — SurfaceEvaluator proxy_kde for smash, diffusion_stpp
 """
 
 import unittest
@@ -27,7 +27,7 @@ _LOCS_T  = torch.tensor(
 )
 _LENGTHS_T = torch.tensor([4], dtype=torch.long)
 
-# Original-space arrays for SurfaceQuery (before normalization)
+# Original-space arrays for SurfaceEvaluator (before normalization)
 _TIMES_NP = np.array([0.1, 0.3, 0.6, 0.9], dtype=np.float32)
 _LOCS_NP  = np.array([[0.0, 0.0], [0.3, -0.1], [0.1, 0.2], [-0.2, 0.1]], dtype=np.float32)
 
@@ -39,7 +39,7 @@ _HIST_MK = torch.ones(_M, 4)
 
 
 # ---------------------------------------------------------------------------
-# Mock runner for SurfaceQuery integration tests
+# Mock runner for SurfaceEvaluator integration tests
 # ---------------------------------------------------------------------------
 
 class _MockDataset:
@@ -351,6 +351,27 @@ def _check_surface_result(tc, result, surface_type, comparable, n_grid=_N_GRID):
     tc.assertGreater(len(result.ys), 0)
 
 
+def _evaluate_surface(
+    runner,
+    *,
+    history_times=_TIMES_NP,
+    history_locs=_LOCS_NP,
+    t_query=1.0,
+    n_grid=_N_GRID,
+    n_samples=500,
+):
+    from unified_stpp.evaluation.surface import SurfaceEvaluator
+
+    evaluator = SurfaceEvaluator(runner.model, runner.norm_stats)
+    return evaluator.evaluate_frame(
+        history_times=history_times,
+        history_locs=history_locs,
+        t_query=t_query,
+        n_grid=n_grid,
+        n_samples=n_samples,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Phase 1 integration — deep_stpp, auto_stpp
 # ---------------------------------------------------------------------------
@@ -359,16 +380,8 @@ class TestSurfaceQueryPhase1(unittest.TestCase):
     """deep_stpp and auto_stpp variants return surface_type='intensity'."""
 
     def _check(self, preset):
-        from unified_stpp.evaluation.surface import SurfaceQuery
-
         runner = _MockRunner(preset)
-        sq = SurfaceQuery(runner)
-        result = sq.query(
-            history_times=_TIMES_NP,
-            history_locs=_LOCS_NP,
-            t_query=1.0,
-            n_grid=_N_GRID,
-        )
+        result = _evaluate_surface(runner)
         _check_surface_result(self, result, "intensity", comparable=True)
 
     def test_deep_stpp(self):
@@ -376,9 +389,6 @@ class TestSurfaceQueryPhase1(unittest.TestCase):
 
     def test_auto_stpp(self):
         self._check("auto_stpp")
-
-    def test_auto_stpp_faithful(self):
-        self._check("auto_stpp_faithful")
 
 
 # ---------------------------------------------------------------------------
@@ -389,16 +399,8 @@ class TestSurfaceQueryPhase2GMM(unittest.TestCase):
     """Factorized GMM presets return surface_type='intensity'."""
 
     def _check(self, preset):
-        from unified_stpp.evaluation.surface import SurfaceQuery
-
         runner = _MockRunner(preset)
-        sq = SurfaceQuery(runner)
-        result = sq.query(
-            history_times=_TIMES_NP,
-            history_locs=_LOCS_NP,
-            t_query=1.0,
-            n_grid=_N_GRID,
-        )
+        result = _evaluate_surface(runner)
         _check_surface_result(self, result, "intensity", comparable=True)
 
     def test_poisson_gmm(self):
@@ -415,16 +417,8 @@ class TestSurfaceQueryPhase2CNF(unittest.TestCase):
     """Factorized CNF and TVCNF presets return surface_type='intensity'."""
 
     def _check(self, preset):
-        from unified_stpp.evaluation.surface import SurfaceQuery
-
         runner = _MockRunner(preset, config=_FAST_CNF_CONFIG)
-        sq = SurfaceQuery(runner)
-        result = sq.query(
-            history_times=_TIMES_NP,
-            history_locs=_LOCS_NP,
-            t_query=1.0,
-            n_grid=_N_GRID,
-        )
+        result = _evaluate_surface(runner)
         _check_surface_result(self, result, "intensity", comparable=True)
 
     def test_poisson_cnf(self):
@@ -454,17 +448,8 @@ class TestSurfaceQueryPhase3(unittest.TestCase):
     """smash and diffusion_stpp return surface_type='proxy_kde', comparable=False."""
 
     def _check(self, preset, n_samples=20):
-        from unified_stpp.evaluation.surface import SurfaceQuery
-
         runner = _MockRunner(preset)
-        sq = SurfaceQuery(runner)
-        result = sq.query(
-            history_times=_TIMES_NP,
-            history_locs=_LOCS_NP,
-            t_query=1.0,
-            n_grid=_N_GRID,
-            n_samples=n_samples,
-        )
+        result = _evaluate_surface(runner, n_samples=n_samples)
         _check_surface_result(self, result, "proxy_kde", comparable=False)
         self.assertEqual(result.n_samples, n_samples)
 
@@ -517,9 +502,9 @@ class TestSurfaceResultFields(unittest.TestCase):
         self.assertEqual(r.n_samples, 50)
 
     def test_exported_from_evaluation(self):
-        from unified_stpp.evaluation import SurfaceResult, SurfaceQuery
+        from unified_stpp.evaluation.surface import SurfaceEvaluator, SurfaceResult
         self.assertIsNotNone(SurfaceResult)
-        self.assertIsNotNone(SurfaceQuery)
+        self.assertIsNotNone(SurfaceEvaluator)
 
     def test_history_fields_present(self):
         """SurfaceResult carries history_times and history_locs."""

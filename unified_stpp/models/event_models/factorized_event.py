@@ -278,9 +278,26 @@ class FactorizedEventModel(EventModel):
         tll_seq = self.temporal_model.logprob(
             times_shifted, locations, mask, t0_tensor, t1_tensor
         )
+        event_logprob_fn = getattr(self.temporal_model, "event_logprob_matrix", None)
+        if callable(event_logprob_fn):
+            tll_mat = event_logprob_fn(
+                times_shifted,
+                locations,
+                mask,
+                t0_tensor,
+                t1_tensor,
+            )
+        else:
+            tll_mat = torch.zeros_like(mask)
 
         # Spatial log-prob: (B, T) — uses shifted times (time diffs are shift-invariant)
         sll_mat = self.spatial_model.logprob(times_shifted, locations, mask)
+        temporal_nll_matrix = -tll_mat
+        spatial_nll_matrix = -sll_mat
+        nll_matrix = temporal_nll_matrix + spatial_nll_matrix
+        next_event_mask = mask.clone()
+        if T > 0:
+            next_event_mask[:, 0] = 0.0
 
         n_events_total = mask.sum().clamp(min=1)
         tll = tll_seq.sum() / n_events_total
@@ -299,8 +316,13 @@ class FactorizedEventModel(EventModel):
             "total_events": mask.sum(),
             "tll": tll,
             "sll": sll,
+            "tll_matrix": tll_mat,
             "sll_matrix": sll_mat,
+            "temporal_nll_matrix": temporal_nll_matrix,
+            "spatial_nll_matrix": spatial_nll_matrix,
+            "nll_matrix": nll_matrix,
             "mask": mask,
+            "next_event_mask": next_event_mask,
             "extra_metrics": self.raw_reporting_metrics(
                 state=state,
                 nll=mean_nll,

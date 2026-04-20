@@ -22,6 +22,9 @@ class TestEvaluateCLI(unittest.TestCase):
                 )
                 self.assertEqual(proc.returncode, 0, proc.stderr)
                 self.assertIn(mode, proc.stdout)
+                if mode == "predictive-compare":
+                    self.assertIn("Qualitative future-window comparison", proc.stdout)
+                    self.assertNotIn("Primary benchmark path", proc.stdout)
 
     def test_metrics_cli_core_smoke(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -132,6 +135,8 @@ class TestEvaluateCLI(unittest.TestCase):
             )
             self.assertEqual(ok.returncode, 0, ok.stderr)
             self.assertTrue((out_dir / "metrics.json").exists())
+            self.assertTrue((out_dir / "next_event_benchmark_summary.json").exists())
+            self.assertTrue((out_dir / "next_event_context_index.npz").exists())
 
     def test_metrics_cli_predictive_artifact_reuse(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -185,16 +190,17 @@ class TestEvaluateCLI(unittest.TestCase):
                 first_manifest = json.load(f)
             with open(second_out / "evaluation_manifest.json") as f:
                 second_manifest = json.load(f)
-            self.assertTrue(
-                first_manifest["artifacts"]["events"]["predictive_samples"].startswith(
-                    "computed_written:"
-                )
+            self.assertEqual(
+                first_manifest["artifacts"]["artifact_resolution"]["predictive_samples"]["status"],
+                "computed_and_saved",
             )
-            self.assertTrue(
-                second_manifest["artifacts"]["events"]["predictive_samples"].startswith(
-                    "loaded:"
-                )
+            self.assertEqual(
+                second_manifest["artifacts"]["artifact_resolution"]["predictive_samples"]["status"],
+                "loaded_from_cache",
             )
+            self.assertIn("evaluation_task", first_manifest)
+            self.assertIn("predictive_benchmark_outputs", first_manifest)
+            self.assertIn("value_array_files", first_manifest["metrics"])
 
     def test_predictive_compare_cli_smoke(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -272,7 +278,7 @@ class TestEvaluateCLI(unittest.TestCase):
                     "--seq-idx",
                     "0",
                     "--profile",
-                    "notebook_faithful",
+                    "history_frame",
                     "--x-nstep",
                     "5",
                     "--y-nstep",
@@ -291,7 +297,7 @@ class TestEvaluateCLI(unittest.TestCase):
             )
 
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            out_dir = run_dir / "evaluate" / "surface" / "notebook_faithful_test_seq000"
+            out_dir = run_dir / "evaluate" / "surface" / "history_frame_test_seq000"
             self.assertTrue((out_dir / "summary.json").exists())
             self.assertTrue((out_dir / "artifacts.json").exists())
 

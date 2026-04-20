@@ -3,13 +3,11 @@ model:
   hidden_dim: 128
   spatial_dim: 2
   decoder:
-    type: autoint_faithful
+    type: autoint
     lookback: 20
     lookahead: 1
     # Upstream real-data config used n_prodnet=10 with sliding-window training.
-    # This repo evaluates exact full-sequence terms, so 10 is too memory-heavy
-    # for the current 22 GB cluster GPUs during HPO. Keep the search bounded.
-    n_prodnet: [2, 4]
+    n_prodnet: [2, 4, 6, 10]
     hidden_size: [128]
     num_layers: [2]
     activation: tanh
@@ -29,21 +27,24 @@ training:
   weight_decay: [0.0, 1.0e-5]
   grad_clip: [1.0, 5.0]
   n_epochs: 50
-  # Upstream used batch_size=128 for sliding-window data. The benchmark path
-  # trains on full sequences with exact Auto-STPP terms, so use a GPU-safe HPO
-  # batch size and keep the final benchmark budget explicit in the saved YAML.
-  batch_size: 16
+  # AutoSTPP trains on paper-style fixed windows; keep the paper batch size.
+  batch_size: 128
   lr_step_size: [20, 30]
   lr_step_gamma: [0.3, 0.5]
   test_nll_space: raw
 
 data:
   protocol: raw
-  # Keep HPO on the same raw-input policy as the benchmark path.
+  # Keep HPO on the same raw-input policy as the benchmark path. AutoSTPP then
+  # forms its paper-style fixed windows only for train/validation.
   normalize: false
+  adapter_kwargs:
+    training_view: sliding_window
+    lookback: 20
+    lookahead: 1
 
 tuning:
-  n_trials: 24
+  n_trials: 30
   search_alg: random
   scheduler: asha
   metric: val_objective

@@ -183,6 +183,114 @@ class STPPDataset(Dataset):
         return item
 
 
+class SlidingWindowSTPPDataset(Dataset):
+    """Raw-coordinate fixed-window view over STPP sequences.
+
+    This is a training/validation adapter for models such as AutoSTPP whose
+    paper recipe treats each fixed lookback/lookahead window as one example.
+    It preserves raw locations and encodes times so that per-event deltas inside
+    each window match the original sequence deltas.
+    """
+
+    def __init__(
+        self,
+        sequences: List[Dict],
+        *,
+        lookback: int,
+        lookahead: int = 1,
+    ):
+        self.lookback = int(lookback)
+        self.lookahead = int(lookahead)
+        if self.lookback < 1:
+            raise ValueError(f"lookback must be >= 1, got {lookback!r}.")
+        if self.lookahead < 1:
+            raise ValueError(f"lookahead must be >= 1, got {lookahead!r}.")
+
+        self.window_length = self.lookback + self.lookahead
+        self.coordinate_space = "raw"
+        self.normalize_time = False
+        self.normalize_space = False
+        self.normalize_covariates = False
+        self.time_mean = 0.0
+        self.time_std = 1.0
+        self.cov_mean = None
+        self.cov_std = None
+
+        self.stat_sequences = [
+            {
+                "times": np.asarray(seq["times"], dtype=np.float32).copy(),
+                "locations": np.asarray(seq["locations"], dtype=np.float32).copy(),
+            }
+            for seq in sequences
+            if len(seq["times"]) > 0
+        ]
+        spatial_dim = (
+            int(np.asarray(self.stat_sequences[0]["locations"]).shape[-1])
+            if self.stat_sequences
+            else 2
+        )
+        self.loc_mean = np.zeros(spatial_dim, dtype=np.float32)
+        self.loc_std = np.ones(spatial_dim, dtype=np.float32)
+
+        self.sequences: list[Dict] = []
+        for seq_idx, seq in enumerate(sequences):
+            times = np.asarray(seq["times"], dtype=np.float32)
+            locs = np.asarray(seq["locations"], dtype=np.float32)
+            n_events = int(times.shape[0])
+            if n_events < self.window_length:
+                continue
+
+            delta_t = np.zeros(n_events, dtype=np.float32)
+            delta_t[0] = times[0]
+            if n_events > 1:
+                delta_t[1:] = np.diff(times).astype(np.float32, copy=False)
+
+            for start in range(0, n_events - self.window_length + 1):
+                end = start + self.window_length
+                window = {
+                    "times": np.cumsum(delta_t[start:end]).astype(np.float32, copy=False),
+                    "locations": locs[start:end].astype(np.float32, copy=True),
+                    "source_sequence_index": seq_idx,
+                    "target_event_index": start + self.lookback,
+                    "history_length": self.lookback,
+                }
+                for key in ("event_covariates", "field_covariates", "marks"):
+                    value = seq.get(key)
+                    if value is not None:
+                        window[key] = np.asarray(value)[start:end].copy()
+                self.sequences.append(window)
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def batch_by_size(self, max_events: int) -> list:
+        indices = list(range(len(self.sequences)))
+        if max_events <= 0:
+            return [[i] for i in indices]
+        per_batch = max(1, int(max_events) // max(1, self.window_length))
+        return [indices[i : i + per_batch] for i in range(0, len(indices), per_batch)]
+
+    def __getitem__(self, idx):
+        seq = self.sequences[idx]
+        item = {
+            "times": torch.tensor(seq["times"], dtype=torch.float32),
+            "locations": torch.tensor(seq["locations"], dtype=torch.float32),
+            "length": len(seq["times"]),
+            "coordinate_space": self.coordinate_space,
+        }
+        if "event_covariates" in seq and seq["event_covariates"] is not None:
+            item["event_covariates"] = torch.tensor(
+                seq["event_covariates"], dtype=torch.float32
+            )
+        if "field_covariates" in seq and seq["field_covariates"] is not None:
+            item["field_covariates"] = torch.tensor(
+                seq["field_covariates"], dtype=torch.float32
+            )
+        if "marks" in seq and seq["marks"] is not None:
+            item["marks"] = torch.tensor(seq["marks"], dtype=torch.long)
+        return item
+
+
 class PaperSlidingWindowDataset(Dataset):
     """
     Wraps pre-scaled sliding windows from the AutoSTPP paper pipeline into the

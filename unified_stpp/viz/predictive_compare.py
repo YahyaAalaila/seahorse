@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from unified_stpp.evaluation.predictive_compare import PredictiveComparisonResult
+from unified_stpp.evaluation.predictive import PredictiveComparisonResult
 from unified_stpp.viz.render_common import plot_styles, write_gif_if_requested
 
 

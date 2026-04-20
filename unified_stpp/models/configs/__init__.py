@@ -7,7 +7,7 @@ call cfg.build_model() to get a fully wired UnifiedSTPP.
 
 from .base import BaseModelConfig, ConfigRegistry
 from .auto_stpp import AutoSTPPConfig
-from .auto_stpp_faithful import AutoSTPPFaithfulConfig
+from .auto_stpp_legacy import AutoSTPPLegacyConfig
 from .deep_stpp import DeepSTPPConfig
 from .neural_stpp import (
     NeuralSTPPConfig,
@@ -30,7 +30,7 @@ __all__ = [
     "BaseModelConfig",
     "ConfigRegistry",
     "AutoSTPPConfig",
-    "AutoSTPPFaithfulConfig",
+    "AutoSTPPLegacyConfig",
     "DeepSTPPConfig",
     "NeuralSTPPConfig",
     "NeuralSTPPJumpSCConfig",

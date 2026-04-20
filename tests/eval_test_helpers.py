@@ -76,6 +76,13 @@ MINI_OVERRIDES = {
         "model.decoder.spatial.hidden_dims=8-8",
         "model.decoder.spatial.n_mixtures=2",
     ],
+    "nsmpp": [
+        "model.decoder.n_basis=2",
+        "model.decoder.basis_dim=4",
+        "model.decoder.nn_width=6",
+        "model.decoder.int_res=4",
+        "model.decoder.compensator_chunk_size=8",
+    ],
 }
 
 

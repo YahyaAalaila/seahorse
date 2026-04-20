@@ -243,9 +243,7 @@ class BackgroundTriggerDecomposition(Metric):
             )
 
         # Evaluate model with empty history on the shared grid
-        from unified_stpp.evaluation.evaluation_helpers import (
-            _direct_intensity_grid,
-        )
+        from unified_stpp.evaluation.intensity import _direct_intensity_grid
 
         grid = ctx.intensity_grid
         xs, ys, ts = grid.xs, grid.ys, grid.ts

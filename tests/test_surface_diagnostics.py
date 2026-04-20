@@ -7,13 +7,11 @@ from unittest import mock
 
 import numpy as np
 
-from unified_stpp.evaluation import (
-    HistoryQuery,
-    RunTarget,
+from unified_stpp.evaluation.bundle_io import load_surface_bundle, write_surface_bundle
+from unified_stpp.evaluation.runtime import HistoryQuery, RunTarget
+from unified_stpp.evaluation.surface import (
     SurfaceDiagnosticEvaluator,
     SurfaceDiagnosticSpec,
-    load_surface_bundle,
-    write_surface_bundle,
 )
 from unified_stpp.viz import SurfaceRenderConfig, render_surface_bundle
 
@@ -21,7 +19,7 @@ from tests.eval_test_helpers import assert_finite_array, make_saved_run, write_h
 
 
 class TestSurfaceDiagnostics(unittest.TestCase):
-    def test_notebook_faithful_surface_bundle_and_render(self):
+    def test_history_frame_surface_bundle_and_render(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             history_path = write_history_jsonl(root / "history.jsonl")
@@ -36,7 +34,7 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                     history_length=0,
                 ),
                 SurfaceDiagnosticSpec(
-                    profile="notebook_faithful",
+                    profile="history_frame",
                     x_nstep=5,
                     y_nstep=5,
                     t_nstep=4,
@@ -45,7 +43,7 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                 ),
             )
 
-            self.assertEqual(result.profile, "notebook_faithful")
+            self.assertEqual(result.profile, "history_frame")
             self.assertFalse(result.provisional)
             self.assertEqual(result.primary_cube.shape, (4, 5, 5))
             assert_finite_array(self, result.primary_cube)
@@ -96,7 +94,7 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                 "provisional": True,
             }
             with mock.patch(
-                "unified_stpp.evaluation.surface.evaluate_neural_future_exact",
+                "unified_stpp.evaluation.surface.diagnostics.evaluate_neural_future_exact",
                 return_value=fake_payload,
             ):
                 result = SurfaceDiagnosticEvaluator().evaluate(

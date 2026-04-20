@@ -21,10 +21,12 @@ notebook-state coupling and brittle DataLoader dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 import torch
+
+from unified_stpp.evaluation.context import GenerativeRollouts, GroundTruth, IntensityGrid
 
 if TYPE_CHECKING:
     from unified_stpp.runner.runner import STPPRunner
@@ -420,3 +422,194 @@ def calc_lamb_from_runner(
         device=device,
         output_scale_factor=float(output_scale_factor),
     )
+
+
+_DEFAULT_GRID_SPEC: dict[str, Any] = {
+    "x_range": [0.0, 1.0],
+    "y_range": [0.0, 1.0],
+    "x_resolution": 50,
+    "y_resolution": 50,
+    "t_resolution": 100,
+}
+
+
+def compute_intensity_grid(
+    runner: "STPPRunner",
+    test_seqs: list[dict[str, np.ndarray]],
+    *,
+    grid_spec: dict[str, Any],
+    ground_truth: GroundTruth | None,
+    generative_rollouts: GenerativeRollouts | None,
+    device: torch.device,
+) -> IntensityGrid:
+    """Compute a spatiotemporal intensity surface on the shared grid."""
+    spec = dict(_DEFAULT_GRID_SPEC)
+    spec.update(grid_spec)
+
+    caps = runner.model.event_model.capabilities
+    x_range = spec.get("x_range", [0.0, 1.0])
+    y_range = spec.get("y_range", [0.0, 1.0])
+    xs = np.linspace(
+        float(x_range[0]),
+        float(x_range[1]),
+        int(spec["x_resolution"]),
+        dtype=np.float32,
+    )
+    ys = np.linspace(
+        float(y_range[0]),
+        float(y_range[1]),
+        int(spec["y_resolution"]),
+        dtype=np.float32,
+    )
+
+    if test_seqs:
+        t0 = float(test_seqs[0]["times"][0])
+        t1 = float(test_seqs[0]["times"][-1])
+    else:
+        t0, t1 = 0.0, 1.0
+    ts = np.linspace(t0, t1, int(spec["t_resolution"]), dtype=np.float32)
+
+    if caps.has_intensity:
+        lambda_hat = _direct_intensity_grid(runner, test_seqs, xs, ys, ts, device)
+        method = "direct"
+    elif generative_rollouts is not None:
+        lambda_hat = _kde_intensity_grid(generative_rollouts, xs, ys, ts)
+        method = "kde"
+    else:
+        lambda_hat = np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+        method = "unavailable"
+
+    lambda_true = None
+    if ground_truth is not None and ground_truth.intensity_grid is not None:
+        lambda_true = np.asarray(ground_truth.intensity_grid, dtype=np.float32)
+
+    return IntensityGrid(
+        lambda_hat=lambda_hat,
+        lambda_true=lambda_true,
+        xs=xs,
+        ys=ys,
+        ts=ts,
+        method=method,
+    )
+
+
+def _direct_intensity_grid(
+    runner: "STPPRunner",
+    test_seqs: list[dict[str, np.ndarray]],
+    xs: np.ndarray,
+    ys: np.ndarray,
+    ts: np.ndarray,
+    device: torch.device,
+    chunk_size: int = 512,
+) -> np.ndarray:
+    """Evaluate intensity on the grid using the first test sequence as conditioning."""
+    del chunk_size
+    if not test_seqs:
+        return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+
+    seq = test_seqs[0]
+    norm_stats = runner.norm_stats
+    normalize = bool(norm_stats.get("normalize", False))
+    t_mean = float(norm_stats.get("time_mean", 0.0)) if normalize else 0.0
+    t_std = max(float(norm_stats.get("time_std", 1.0)), 1e-8) if normalize else 1.0
+    loc_mean = (
+        np.asarray(norm_stats.get("loc_mean", [0.0, 0.0]), dtype=np.float32)
+        if normalize
+        else np.zeros(2, dtype=np.float32)
+    )
+    loc_std = (
+        np.maximum(
+            np.asarray(norm_stats.get("loc_std", [1.0, 1.0]), dtype=np.float32),
+            1e-8,
+        )
+        if normalize
+        else np.ones(2, dtype=np.float32)
+    )
+
+    result = np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+    xx, yy = np.meshgrid(xs, ys, indexing="ij")
+    s_grid = np.stack([xx.ravel(), yy.ravel()], axis=1).astype(np.float32)
+
+    runner.model.eval()
+    with torch.no_grad():
+        for ti, t_query in enumerate(ts):
+            times = np.asarray(seq["times"], dtype=np.float32)
+            hist_mask = times <= float(t_query)
+            if not hist_mask.any():
+                continue
+            locs_full = np.asarray(seq["locations"], dtype=np.float32)
+            history = {
+                "times": times[hist_mask].copy(),
+                "locations": locs_full[hist_mask].copy(),
+            }
+            intensity_vals = eval_intensity(
+                model=runner.model,
+                t_query=float(t_query),
+                s_grid=s_grid,
+                history_times=history["times"],
+                history_locs=history["locations"],
+                t_bias=t_mean,
+                t_scale=t_std,
+                s_bias=loc_mean,
+                s_scale=loc_std,
+                device=device,
+                correct_for_normalization=normalize,
+            )
+            result[ti] = intensity_vals.reshape(len(xs), len(ys))
+
+    return result
+
+
+def _kde_intensity_grid(
+    rollouts: GenerativeRollouts,
+    xs: np.ndarray,
+    ys: np.ndarray,
+    ts: np.ndarray,
+) -> np.ndarray:
+    """Estimate intensity on the grid from generative rollout events via 3D KDE."""
+    try:
+        from scipy.stats import gaussian_kde
+    except ImportError:
+        return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+
+    points: list[np.ndarray] = []
+    for seq_rollouts_t, seq_rollouts_s in zip(rollouts.rollout_times, rollouts.rollout_locs):
+        for rollout_t, rollout_s in zip(seq_rollouts_t, seq_rollouts_s):
+            if rollout_t.size > 0 and rollout_s.shape[0] > 0:
+                points.append(np.column_stack([rollout_t, rollout_s[:, 0], rollout_s[:, 1]]))
+
+    if not points:
+        return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+
+    all_pts = np.concatenate(points, axis=0).astype(np.float64)
+    n_pts = all_pts.shape[0]
+
+    d = 3
+    scott_bw = n_pts ** (-1.0 / (d + 4))
+    t_range = float(ts[-1] - ts[0]) if len(ts) > 1 else 1.0
+    x_range = float(xs[-1] - xs[0]) if len(xs) > 1 else 1.0
+    y_range = float(ys[-1] - ys[0]) if len(ys) > 1 else 1.0
+    bw = max(scott_bw, 0.02)
+
+    pts_norm = all_pts.copy()
+    pts_norm[:, 0] = (all_pts[:, 0] - float(ts[0])) / max(t_range, 1e-8)
+    pts_norm[:, 1] = (all_pts[:, 1] - float(xs[0])) / max(x_range, 1e-8)
+    pts_norm[:, 2] = (all_pts[:, 2] - float(ys[0])) / max(y_range, 1e-8)
+
+    try:
+        kde = gaussian_kde(pts_norm.T, bw_method=bw)
+    except Exception:
+        return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+
+    tt, xx, yy = np.meshgrid(
+        (ts - float(ts[0])) / max(t_range, 1e-8),
+        (xs - float(xs[0])) / max(x_range, 1e-8),
+        (ys - float(ys[0])) / max(y_range, 1e-8),
+        indexing="ij",
+    )
+    grid_pts = np.stack([tt.ravel(), xx.ravel(), yy.ravel()], axis=0)
+    density = kde(grid_pts).reshape(len(ts), len(xs), len(ys)).astype(np.float32)
+
+    total_rollouts = sum(len(r) for r in rollouts.rollout_times)
+    scale = float(n_pts) / max(float(total_rollouts), 1.0)
+    return density * scale

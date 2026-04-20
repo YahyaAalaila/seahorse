@@ -118,6 +118,8 @@ def write_bench_meta(
             "normalize": benchmark_config.normalize,
             "checkpoint_select": benchmark_config.checkpoint_select,
             "test_nll_space": benchmark_config.test_nll_space,
+            "predictive_test_nll_samples": benchmark_config.predictive_test_nll_samples,
+            "test_nll_definition": "held_out_next_event_over_teacher_forced_test_prefixes",
             "allow_mixed_hpo_provenance": benchmark_config.allow_mixed_hpo_provenance,
         },
         "overrides":       overrides,

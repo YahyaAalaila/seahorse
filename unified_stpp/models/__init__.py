@@ -2,14 +2,14 @@ from .state_models import (
     NeuralSTPPStateModel,
     DeepSTPPStateModel,
     AutoSTPPStateModel,
-    AutoSTPPFaithfulStateModel,
+    AutoSTPPLegacyStateModel,
     SMASHStateModel,
 )
 from .event_models import (
     NeuralSTPPEventModel,
     DeepSTPPEventModel,
     AutoSTPPEventModel,
-    AutoSTPPFaithfulEventModel,
+    AutoSTPPLegacyEventModel,
     SMASHEventModel,
 )
 from .abstractions import (
@@ -25,9 +25,9 @@ from .sampling import thinning_sample
 __all__ = [
     "StateModel", "EventModel", "StateContext", "StateCapabilities", "EventCapabilities",
     "NeuralSTPPStateModel",
-    "DeepSTPPStateModel", "AutoSTPPStateModel", "AutoSTPPFaithfulStateModel", "SMASHStateModel",
+    "DeepSTPPStateModel", "AutoSTPPStateModel", "AutoSTPPLegacyStateModel", "SMASHStateModel",
     "NeuralSTPPEventModel",
-    "DeepSTPPEventModel", "AutoSTPPEventModel", "AutoSTPPFaithfulEventModel", "SMASHEventModel",
+    "DeepSTPPEventModel", "AutoSTPPEventModel", "AutoSTPPLegacyEventModel", "SMASHEventModel",
     "UnifiedSTPP",
     "thinning_sample",
 ]

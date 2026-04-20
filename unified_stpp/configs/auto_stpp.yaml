@@ -1,8 +1,7 @@
 # Canonical AutoSTPP preset.
 #
-# This is the upstream-faithful AutoSTPP configuration. The older coarse
-# implementation remains available only as the legacy preset
-# `auto_stpp_legacy`.
+# This is the canonical AutoSTPP configuration. The older coarse implementation
+# remains available only as the legacy preset `auto_stpp_legacy`.
 
 model:
   preset: auto_stpp
@@ -12,7 +11,7 @@ model:
   event_cov_dim: 0
   field_cov_dim: 0
   decoder:
-    type: autoint_faithful
+    type: autoint
     lookback: 20
     lookahead: 1
     activation: tanh
@@ -48,4 +47,8 @@ training:
 
 data:
   protocol: raw
-  normalize: true
+  normalize: false
+  adapter_kwargs:
+    training_view: sliding_window
+    lookback: 20
+    lookahead: 1
