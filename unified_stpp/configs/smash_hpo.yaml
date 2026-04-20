@@ -1,0 +1,69 @@
+# Bounded real-data HPO config for SMASH.
+#
+# SMASH is a generative/surrogate family. Keep sampling-heavy knobs modest in
+# HPO and tune only stable architecture, score-scale, and optimizer parameters.
+
+model:
+  preset: smash
+  hidden_dim: 128
+  spatial_dim: 2
+  n_marks: 0
+  encoder:
+    type: smash_transformer
+    d_model: [64, 128]
+    d_rnn: [128, 256]
+    d_inner: [128, 256]
+    n_layers: [2, 4]
+    n_head: [2, 4]
+    d_k: 16
+    d_v: 16
+    dropout: [0.05, 0.1]
+    CosSin: true
+  decoder:
+    type: smash
+    sigma_time: [0.03, 0.05, 0.1]
+    sigma_loc: [0.03, 0.05, 0.1]
+    num_noise: [25, 50]
+    samplingsteps: 500
+    n_samples: 100
+    langevin_step: [0.002, 0.005]
+    sampling_method: normal
+    loss_lambda: [0.25, 0.5, 1.0]
+    loss_lambda2: [0.5, 1.0]
+    smooth: 0.0
+    log_normalization: true
+    minmax_normalize_time: true
+    minmax_normalize_loc: true
+    mark_shift: 1
+
+training:
+  optimizer: adam
+  lr: {min: 3.0e-4, max: 2.0e-3}
+  weight_decay: [1.0e-3, 1.0e-2]
+  grad_clip: [0.5, 1.0]
+  n_epochs: 200
+  patience: 30
+  adam_beta2: 0.99
+  lr_schedule: linear_decay
+  lr_warmup_epochs: 5
+  lr_final: [2.0e-5, 5.0e-5]
+  batch_size: 64
+  device: cuda
+  test_nll_space: raw
+
+data:
+  protocol: standard
+  normalize: true
+  num_workers: 4
+
+tuning:
+  n_trials: 24
+  search_alg: random
+  scheduler: asha
+  metric: val_objective
+  mode: min
+  n_cpus_per_trial: 8
+  n_gpus_per_trial: 1
+  max_concurrent_trials: 1
+  fail_fast: false
+  verbose: 1

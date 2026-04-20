@@ -118,6 +118,7 @@ class ConfigResolutionTest(unittest.TestCase):
         config_dir = Path("unified_stpp/configs")
         for name in (
             "auto_stpp_hpo.yaml",
+            "neural_cond_gmm_hpo.yaml",
             "neural_attncnf_hpo.yaml",
             "neural_jumpcnf_hpo.yaml",
             "nsmpp_hpo.yaml",
@@ -136,9 +137,28 @@ class ConfigResolutionTest(unittest.TestCase):
                 f"{name} should not rely on the deprecated val_nll label",
             )
 
+    def test_all_bundled_hpo_configs_use_current_objective_label(self):
+        config_dir = Path("unified_stpp/configs")
+        for path in sorted(config_dir.glob("*_hpo.yaml")):
+            raw = STPPConfig.raw_source_dict(config=str(path))
+            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
+            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+
+            self.assertIn("model", cfg_dict, path.name)
+            self.assertIn("preset", cfg_dict["model"], path.name)
+            self.assertEqual(
+                tuning.metric,
+                "val_objective",
+                f"{path.name} should not rely on the deprecated val_nll label",
+            )
+
     def test_slow_neural_hpo_configs_are_gpu_bounded(self):
         config_dir = Path("unified_stpp/configs")
-        for name in ("neural_attncnf_hpo.yaml", "neural_jumpcnf_hpo.yaml"):
+        for name in (
+            "neural_cond_gmm_hpo.yaml",
+            "neural_attncnf_hpo.yaml",
+            "neural_jumpcnf_hpo.yaml",
+        ):
             raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
             cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
             tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
@@ -170,6 +190,17 @@ class ConfigResolutionTest(unittest.TestCase):
                     cfg_dict["model"]["decoder"]["n_prodnet"],
                     [2, 4, 6, 10],
                 )
+
+    def test_temporal_gmm_yaml_fields_are_forwarded_directly(self):
+        for preset in ("rmtpp_gmm", "thp_gmm"):
+            cfg = STPPConfig.from_preset(preset)
+            overrides = cfg.model.build_overrides
+
+            self.assertNotIn("build_overrides", overrides)
+            self.assertEqual(overrides["hidden_size"], 64)
+            self.assertEqual(overrides["sigma_prior"], 1.0)
+            self.assertEqual(overrides["sigma_kernel"], 0.5)
+            self.assertEqual(overrides["tau"], 1.0)
 
     def test_hpo_does_not_pass_seed_to_legacy_tune_run(self):
         captured_kwargs = {}

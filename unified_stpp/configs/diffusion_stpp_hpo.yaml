@@ -1,0 +1,62 @@
+# Bounded real-data HPO config for DiffusionSTPP.
+#
+# Keep the diffusion objective fixed and tune only moderate architecture,
+# diffusion length, and optimizer choices.
+
+model:
+  preset: diffusion_stpp
+  hidden_dim: 128
+  spatial_dim: 2
+  n_marks: 0
+  encoder:
+    type: dstpp_transformer
+    d_model: [64, 128]
+    d_rnn: [128, 256]
+    d_inner: [128, 256]
+    n_layers: [2, 4]
+    n_head: [2, 4]
+    d_k: 16
+    d_v: 16
+    dropout: [0.05, 0.1]
+    CosSin: true
+  decoder:
+    type: diffusion_stpp
+    hidden_units: [64, 128]
+    timesteps: [50, 100]
+    sampling_timesteps: [50, 100]
+    objective: pred_noise
+    beta_schedule: cosine
+    loss_type: l2
+  minmax_normalize_time: true
+
+training:
+  optimizer: adam
+  lr: {min: 3.0e-4, max: 2.0e-3}
+  adam_beta2: 0.99
+  weight_decay: [0.0, 1.0e-5]
+  grad_clip: [0.5, 1.0]
+  n_epochs: 200
+  patience: 30
+  batch_size: 64
+  lr_schedule: linear_decay
+  lr_warmup_epochs: 5
+  lr_final: [2.0e-5, 5.0e-5]
+  device: cuda
+  test_nll_space: raw
+
+data:
+  protocol: standard
+  normalize: true
+  num_workers: 4
+
+tuning:
+  n_trials: 24
+  search_alg: random
+  scheduler: asha
+  metric: val_objective
+  mode: min
+  n_cpus_per_trial: 8
+  n_gpus_per_trial: 1
+  max_concurrent_trials: 1
+  fail_fast: false
+  verbose: 1
