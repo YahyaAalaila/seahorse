@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -19,6 +20,7 @@ from unified_stpp.evaluation.predictive.sampling import compute_predictive_sampl
 from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
 from unified_stpp.evaluation.registry import metric_by_name
 from unified_stpp.evaluation.result import MetricResult, Report
+from unified_stpp.models.abstractions import StateContext
 from unified_stpp.runner.runner import STPPRunner
 
 
@@ -33,6 +35,78 @@ def _toy_sequences() -> list[dict[str, np.ndarray]]:
 
 
 class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
+    def test_native_sampler_batches_prefix_histories_per_sequence(self):
+        class FakeStateModel:
+            def __init__(self, preset: str):
+                self.preset = preset
+                self.calls: list[list[int]] = []
+                self.spatial_dim = 2
+                self.token_loc_min = torch.zeros(2, dtype=torch.float32)
+                self.token_loc_range = torch.ones(2, dtype=torch.float32)
+                self.minmax_normalize_time = False
+                self.log_normalization = False
+                self.token_delta_t_min = torch.tensor(0.0, dtype=torch.float32)
+                self.token_delta_t_range = torch.tensor(1.0, dtype=torch.float32)
+
+            def encode_sampling_history(self, *, times, locations, lengths, **kwargs):
+                del times, locations, kwargs
+                self.calls.append(lengths.detach().cpu().tolist())
+                cond_last = lengths.to(dtype=torch.float32).view(-1, 1, 1)
+                payload_key = "smash_cond_last" if self.preset == "smash" else "diff_cond_last"
+                return StateContext(payload={payload_key: cond_last})
+
+        class FakeEventModel:
+            def __init__(self, preset: str):
+                self.capabilities = SimpleNamespace(has_native_sampler=True)
+                self.score_matching = SimpleNamespace(sampling_timesteps=4)
+                self.preset = preset
+                self.sample_calls: list[int] = []
+
+            def sample_native(self, *, state, batch_size=None, device=None, **kwargs):
+                del kwargs
+                payload_key = "smash_cond_last" if self.preset == "smash" else "diff_cond_last"
+                cond = state.payload[payload_key]
+                self.sample_calls.append(int(cond.shape[0]))
+                samples = torch.zeros((int(batch_size), 1, 3), dtype=torch.float32, device=device)
+                samples[:, 0, 0] = 0.5
+                samples[:, 0, 1] = cond[:, 0, 0]
+                samples[:, 0, 2] = cond[:, 0, 0] + 1.0
+                return {"samples": samples}
+
+        class FakeModel:
+            def __init__(self, preset: str):
+                self.state_model = FakeStateModel(preset)
+                self.event_model = FakeEventModel(preset)
+
+            def eval(self):
+                return self
+
+        seq = _toy_sequences()
+        for preset in ("smash", "diffusion_stpp"):
+            with self.subTest(preset=preset):
+                runner = SimpleNamespace(
+                    model=FakeModel(preset),
+                    norm_stats={"normalize": False},
+                    config=SimpleNamespace(model=SimpleNamespace(preset=preset)),
+                )
+                samples = compute_predictive_samples(
+                    runner,
+                    seq,
+                    k=2,
+                    device=torch.device("cpu"),
+                    seed=0,
+                )
+
+                self.assertEqual(runner.model.state_model.calls, [[1, 2, 3]])
+                self.assertEqual(runner.model.event_model.sample_calls, [6])
+                self.assertEqual(samples.next_times.shape, (3, 2))
+                self.assertEqual(samples.next_locs.shape, (3, 2, 2))
+                np.testing.assert_array_equal(
+                    samples.history_length,
+                    np.asarray([1, 2, 3], dtype=np.int64),
+                )
+                self.assertTrue(bool(samples.sampling_succeeded.all()))
+
     def test_context_indexing_matches_teacher_forced_prefixes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir = make_saved_run(Path(tmpdir), preset="diffusion_stpp", label="diffusion")

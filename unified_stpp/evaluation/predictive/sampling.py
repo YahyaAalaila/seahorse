@@ -7,15 +7,20 @@ from typing import Any
 import numpy as np
 import torch
 
+from unified_stpp.models.abstractions import StateContext
 from unified_stpp.runner.runner import STPPRunner
 
 from ..artifacts import PredictiveSamples
 from .rollout import (
     ExactProposalConfig,
+    _denormalize_spatial_samples,
+    _denormalize_time_samples,
+    _flatten_sample_tensor,
     _build_exact_proposal_cache,
     _thinning_k_chains_batched,
     build_exact_intensity_fn,
     build_state_from_history,
+    normalize_history_for_runner,
     sample_next_events_diffusion_batch,
     sample_next_events_smash_batch,
 )
@@ -137,6 +142,96 @@ def _thinning_next_events_adaptive_batch(
     return result_t, result_s, success
 
 
+def _batched_native_next_events_for_sequence(
+    runner: STPPRunner,
+    *,
+    preset: str,
+    times: np.ndarray,
+    locs: np.ndarray,
+    k: int,
+    device: torch.device,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    n_events = int(times.shape[0])
+    if n_events < 2 or k <= 0:
+        return None
+
+    history_times_norm, history_locs_norm = normalize_history_for_runner(
+        {"times": times, "locations": locs},
+        runner.norm_stats,
+    )
+    prefix_lengths = np.arange(1, n_events, dtype=np.int64)
+    n_contexts = int(prefix_lengths.shape[0])
+    max_prefix_len = int(prefix_lengths[-1])
+    spatial_dim = int(locs.shape[1]) if locs.ndim == 2 else 0
+
+    padded_times = np.zeros((n_contexts, max_prefix_len), dtype=np.float32)
+    padded_locs = np.zeros((n_contexts, max_prefix_len, spatial_dim), dtype=np.float32)
+    for row, prefix_len in enumerate(prefix_lengths.tolist()):
+        padded_times[row, :prefix_len] = history_times_norm[:prefix_len]
+        padded_locs[row, :prefix_len] = history_locs_norm[:prefix_len]
+
+    times_t = torch.tensor(padded_times, dtype=torch.float32, device=device)
+    locs_t = torch.tensor(padded_locs, dtype=torch.float32, device=device)
+    lengths_t = torch.tensor(prefix_lengths, dtype=torch.long, device=device)
+    state_ctx = runner.model.state_model.encode_sampling_history(
+        times=times_t,
+        locations=locs_t,
+        lengths=lengths_t,
+    )
+
+    total_samples = n_contexts * int(k)
+    if preset == "smash":
+        cond_last = state_ctx.payload.get("smash_cond_last")
+        if not isinstance(cond_last, torch.Tensor):
+            return None
+        batched_state = StateContext(
+            payload={"smash_cond_last": cond_last.repeat_interleave(int(k), dim=0)}
+        )
+        event_model = runner.model.event_model
+        with torch.enable_grad():
+            out = event_model.sample_native(
+                state=batched_state,
+                step=int(event_model.score_matching.sampling_timesteps),
+                is_last=True,
+                n_samples=1,
+                batch_size=total_samples,
+                device=device,
+            )
+    elif preset == "diffusion_stpp":
+        cond_last = state_ctx.payload.get("diff_cond_last")
+        if not isinstance(cond_last, torch.Tensor):
+            return None
+        batched_state = StateContext(
+            payload={"diff_cond_last": cond_last.repeat_interleave(int(k), dim=0)}
+        )
+        out = runner.model.event_model.sample_native(
+            state=batched_state,
+            batch_size=total_samples,
+            device=device,
+        )
+    else:
+        return None
+
+    samples = out.get("samples")
+    if not isinstance(samples, torch.Tensor):
+        return None
+    flat = _flatten_sample_tensor(samples)
+    if flat.shape[0] < total_samples:
+        return None
+
+    flat_np = flat[:total_samples].detach().cpu().numpy()
+    sample_dt = _denormalize_time_samples(runner, flat_np).reshape(n_contexts, int(k))
+    sample_locs = _denormalize_spatial_samples(runner, flat_np).reshape(n_contexts, int(k), -1)
+    history_end_times = times[prefix_lengths - 1].astype(np.float32, copy=False)
+    next_times = (
+        history_end_times[:, None]
+        + np.maximum(sample_dt.astype(np.float32, copy=False), 0.0)
+    ).astype(np.float32, copy=False)
+    next_locs = sample_locs.astype(np.float32, copy=False)
+    success = np.isfinite(next_times).all(axis=1) & np.isfinite(next_locs).all(axis=(1, 2))
+    return next_times, next_locs, success
+
+
 def compute_predictive_samples(
     runner: STPPRunner,
     test_seqs: list[dict[str, np.ndarray]],
@@ -181,6 +276,30 @@ def compute_predictive_samples(
             n = times.shape[0]
             if locs.ndim == 2 and locs.shape[1] > 0:
                 loc_dim = int(locs.shape[1])
+            native_batch = None
+            if use_native:
+                native_batch = _batched_native_next_events_for_sequence(
+                    runner,
+                    preset=preset,
+                    times=times,
+                    locs=locs,
+                    k=k,
+                    device=device,
+                )
+            if native_batch is not None:
+                batch_next_t, batch_next_s, batch_success = native_batch
+                for row, i in enumerate(range(1, n)):
+                    all_next_times.append(batch_next_t[row])
+                    all_next_locs.append(batch_next_s[row])
+                    all_true_next_t.append(float(times[i]))
+                    all_true_next_s.append(locs[i].copy())
+                    all_hist_end_t.append(float(times[i - 1]))
+                    all_seq_idx.append(seq_i)
+                    all_target_event_idx.append(i)
+                    all_history_length.append(i)
+                    all_is_last_context.append(i == (n - 1))
+                    all_sampling_succeeded.append(bool(batch_success[row]))
+                continue
             for i in range(1, n):
                 history = {
                     "times": times[:i].copy(),
