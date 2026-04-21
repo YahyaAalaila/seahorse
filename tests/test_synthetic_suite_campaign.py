@@ -73,8 +73,8 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
                 out_path.with_suffix(".trials.csv").write_text("trial_id,val_objective\n")
                 out_path.with_suffix(".hpo_manifest.json").write_text("{}\n")
 
-            def fake_fit(*, suite_name, config, preset, seed, best_yaml, out_root, curve_step, device):
-                del best_yaml, curve_step, device
+            def fake_fit(*, suite_name, config, preset, seed, best_yaml, out_root, curve_step, device, run_batch_size):
+                del best_yaml, curve_step, device, run_batch_size
                 run_dir = out_root / "fit" / suite_name / config.config_id / preset / f"seed_{seed}" / "run_0"
                 run_dir.mkdir(parents=True, exist_ok=True)
                 (run_dir / "run_result.json").write_text(
@@ -244,6 +244,7 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
                     out_root=root / "campaign_out",
                     curve_step=0.1,
                     device="cpu",
+                    run_batch_size=64,
                 )
 
             cfg = captured["config"]
@@ -253,6 +254,7 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
             self.assertEqual(cfg.data.test_path, str(config.test_path))
             self.assertEqual(cfg.training.patience, None)
             self.assertEqual(cfg.training.device, "cpu")
+            self.assertEqual(cfg.training.batch_size, 64)
             self.assertEqual(cfg.training.checkpoint_select, "best")
             self.assertEqual(cfg.training.test_nll_space, "raw")
             self.assertEqual(cfg.logging.experiment_name, "suite4_heterogeneity/H0/poisson_gmm/seed_42")

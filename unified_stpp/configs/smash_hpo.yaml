@@ -23,7 +23,7 @@ model:
     type: smash
     sigma_time: [0.01, 0.05, 0.1]
     sigma_loc: [0.01, 0.05, 0.1]
-    num_noise: 25
+    num_noise: 50
     samplingsteps: 500
     n_samples: 100
     langevin_step: 0.005
@@ -47,7 +47,7 @@ training:
   lr_schedule: linear_decay
   lr_warmup_epochs: 5
   lr_final: 5.0e-5
-  batch_size: 16
+  batch_size: 8
   device: cuda
   test_nll_space: raw
 

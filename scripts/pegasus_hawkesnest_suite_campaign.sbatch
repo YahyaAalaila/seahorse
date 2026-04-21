@@ -26,6 +26,7 @@ SEEDS="${SEEDS:-42}"
 HPO_SEED="${HPO_SEED:-42}"
 HPO_CONFIG_DIR="${HPO_CONFIG_DIR:-unified_stpp/configs}"
 DEVICE="${DEVICE:-cuda}"
+RUN_BATCH_SIZE="${RUN_BATCH_SIZE:-}"
 STAGE="${STAGE:-all}"
 CURVE_STEP="${CURVE_STEP:-0.1}"
 
@@ -62,6 +63,10 @@ srun -K \
       --hpo-seed \"$HPO_SEED\"
       --device \"$DEVICE\"
     )
+
+    if [ -n \"$RUN_BATCH_SIZE\" ]; then
+      CMD+=(--run-batch-size \"$RUN_BATCH_SIZE\")
+    fi
 
     if [ \"\${FORCE_RUN:-0}\" = \"1\" ]; then
       CMD+=(--force)

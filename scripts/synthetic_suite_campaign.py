@@ -104,6 +104,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional training.device override for suite runs. When omitted, use the tuned YAML value.",
     )
+    p.add_argument(
+        "--run-batch-size",
+        type=int,
+        default=None,
+        help="Optional training.batch_size override for suite runs only. Tune stage still uses the HPO YAML.",
+    )
     resume_group = p.add_mutually_exclusive_group()
     resume_group.add_argument("--resume", dest="resume", action="store_true", help="Skip completed tune/run outputs.")
     resume_group.add_argument("--force", dest="resume", action="store_false", help="Re-run tune/run stages and overwrite indexes.")
@@ -220,6 +226,7 @@ def _write_campaign_manifest(
     curve_step: float,
     hpo_seed: int,
     device: str | None,
+    run_batch_size: int | None,
 ) -> None:
     paths = _campaign_paths(out_root)
     paths["manifests"].mkdir(parents=True, exist_ok=True)
@@ -231,6 +238,7 @@ def _write_campaign_manifest(
         "curve_step": curve_step,
         "hpo_seed": hpo_seed,
         "device_override": device,
+        "run_batch_size": run_batch_size,
         "anchor_config_id": anchor.config_id,
         "presets": list(presets),
         "seeds": list(seeds),
@@ -312,6 +320,7 @@ def _fit_campaign_run(
     out_root: Path,
     curve_step: float,
     device: str | None,
+    run_batch_size: int | None,
 ) -> RunIndexRecord:
     cli_values: dict[str, Any] = {
         "data": {
@@ -332,6 +341,8 @@ def _fit_campaign_run(
     }
     if device is not None:
         cli_values["training"]["device"] = device
+    if run_batch_size is not None:
+        cli_values["training"]["batch_size"] = int(run_batch_size)
 
     tuned_cfg = STPPConfig.from_yaml(best_yaml, sanitize=False)
     merged_cfg = tuned_cfg.model_dump(mode="json")
@@ -380,6 +391,7 @@ def _run_suite_stage(
     out_root: Path,
     curve_step: float,
     device: str | None,
+    run_batch_size: int | None,
     resume: bool,
 ) -> dict[tuple[str, str, str, int], RunIndexRecord]:
     paths = _campaign_paths(out_root)
@@ -405,6 +417,7 @@ def _run_suite_stage(
                     out_root=out_root,
                     curve_step=curve_step,
                     device=device,
+                    run_batch_size=run_batch_size,
                 )
                 existing[key] = record
                 _write_run_index(paths["run_index"], existing)
@@ -595,6 +608,7 @@ def main(argv: list[str] | None = None) -> int:
         curve_step=float(args.curve_step),
         hpo_seed=int(args.hpo_seed),
         device=args.device,
+        run_batch_size=args.run_batch_size,
     )
 
     if args.stage in {"tune", "all"}:
@@ -616,6 +630,7 @@ def main(argv: list[str] | None = None) -> int:
             out_root=out_root,
             curve_step=float(args.curve_step),
             device=args.device,
+            run_batch_size=args.run_batch_size,
             resume=bool(args.resume),
         )
     if args.stage in {"plot", "all"}:
