@@ -1,7 +1,7 @@
 # Bounded real-data HPO config for DeepSTPP.
 #
 # Keep the paper identity fixed: seq_len=20, lookahead=1, Adam, raw-space
-# reporting. Search only capacity and optimizer knobs that matter immediately.
+# reporting. Search only the main capacity and optimizer knobs.
 
 model:
   preset: deep_stpp
@@ -10,14 +10,14 @@ model:
   vae: false
   encoder:
     num_heads: [2, 4]
-    num_layers: [2, 3]
+    num_layers: [2, 3, 4]
     dropout: 0.0
   updater:
-    num_heads: [2, 4]
+    num_heads: 2
   decoder:
     seq_len: 20
     lookahead: 1
-    num_points: [10, 20, 40]
+    num_points: [10, 20, 50]
     sigma_min: 1.0e-4
     n_layers: 3
     constrain_b: false
@@ -28,13 +28,13 @@ training:
   optimizer: adam
   lr: {min: 1.0e-4, max: 1.0e-3}
   adam_beta1: 0.9
-  weight_decay: [0.0, 1.0e-6, 1.0e-5]
+  weight_decay: [0.0, 1.0e-5]
   grad_clip: [0.5, 1.0, 5.0]
-  n_epochs: 100
-  patience: 20
+  n_epochs: 50
+  patience: null
   batch_size: 128
-  lr_step_size: [30, 50]
-  lr_step_gamma: [0.2, 0.5]
+  lr_step_size: 50
+  lr_step_gamma: 0.2
   vae_beta: 1.0e-3
   device: cuda
   test_nll_space: raw

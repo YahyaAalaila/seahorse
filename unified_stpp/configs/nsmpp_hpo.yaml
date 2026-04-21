@@ -11,56 +11,41 @@ model:
   decoder:
     type: nsmpp_deepbasis
 
-    # --- Capacity: expressiveness of the kernel ---
-    # Paper appendix real-data setting fixes rank R=5 and basis width p=10.
-    # Keep the search anchored to that point while still covering the current
-    # bundled repo default that tuned better for this implementation.
-    n_basis: [2, 3, 5]
+    # Keep the search anchored to the paper real-data setting while still
+    # covering the current bundled default that worked best in this port.
+    n_basis: [3, 5]
     basis_dim: [7, 10]
-    # This implementation's nn_width is not the same knob as the paper's
-    # shared-network width, so keep it conservative.
-    nn_width: [5, 8]
+    nn_width: 8
 
-    # --- Background intensity ---
-    # mu is the constant additive background rate before softplus
+    # mu is the constant additive background rate before softplus.
     mu: [0.001, 0.01, 0.1]
 
-    # --- Initialization ---
-    # init_std controls initial scale of kernel basis weights (raw_weights ~ N(0, init_std))
-    # Larger init_std → larger initial compensator → harder optimization
-    # Upstream used 1.0 for 1D synthetic; 2D real data needs smaller values
+    # Initialization drives a large fraction of NSMPP stability on 2D data.
     init_std: [0.05, 0.1, 0.2]
-    # init_gain and init_bias are Xavier / bias init for the basis MLPs (upstream: 0.5, 0.001)
     init_gain: 5.0e-1
     init_bias: 1.0e-3
-    # init_weight_mean: mean of raw_weight init; controls initial excitation scale
-    # softplus(-5)≈0.007, softplus(-3)≈0.05, softplus(-1)≈0.31
-    # Start negative so model begins as near-Poisson and learns excitation up
     init_weight_mean: [-5.0, -3.0]
 
-    # --- Compensator (fixed for HPO speed; increase for final run) ---
-    int_res: 20         # 20^2=400 pts — faster trials; use 30-50 in final config
+    # Keep the HPO compensator light; final benchmark configs should raise this.
+    int_res: 20
     numerical_int: true
     intensity_eps: 1.0e-5
     compensator_chunk_size: 256
 
 training:
   optimizer: adadelta
-  # The paper used Adam(1e-2), but this repo's exact-STPP implementation is
-  # more stable with Adadelta on raw 2D data. Search only in the regime that
-  # remains relevant for the current implementation.
-  lr: [0.1, 0.3, 1.0]
+  # Adadelta is the repo-stable choice for this exact 2D port.
+  lr: [0.3, 1.0]
   weight_decay: 0.0
-  # grad_clip: not in upstream; needed for 2D data where compensator can spike
   grad_clip: [0.5, 1.0, 5.0]
   n_epochs: 50
   batch_size: 25
   test_nll_space: raw
 
 tuning:
-  n_trials: 60
+  n_trials: 36
   search_alg: random
-  scheduler: asha          # kills unstable/diverging runs early
+  scheduler: asha
   metric: val_objective
   mode: min
   n_cpus_per_trial: 4

@@ -2,16 +2,16 @@ model:
   preset: rmtpp_gmm
   hidden_dim: 128
   spatial_dim: 2
-  hidden_size: [32, 64, 128]
+  hidden_size: [64, 128]
   sigma_prior: [0.5, 1.0, 2.0]
-  sigma_kernel: [0.1, 0.25, 0.5, 1.0]
+  sigma_kernel: [0.25, 0.5, 1.0]
   tau: [0.25, 0.5, 1.0, 2.0]
 
 training:
   optimizer: adam
-  lr: {min: 3.0e-4, max: 3.0e-3}
-  weight_decay: [0.0, 1.0e-6, 1.0e-5]
-  grad_clip: [0.5, 1.0, 5.0]
+  lr: {min: 5.0e-4, max: 2.0e-3}
+  weight_decay: 0.0
+  grad_clip: 1.0
   n_epochs: 100
   patience: 20
   batch_size: 128
@@ -24,7 +24,7 @@ data:
   num_workers: 4
 
 tuning:
-  n_trials: 30
+  n_trials: 24
   search_alg: random
   scheduler: asha
   metric: val_objective

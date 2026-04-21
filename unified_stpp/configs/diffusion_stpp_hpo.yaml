@@ -1,7 +1,7 @@
-# Bounded real-data HPO config for DiffusionSTPP.
+# Minimal HPO config for Diffusion STPP.
 #
-# Keep the diffusion objective fixed and tune only moderate architecture,
-# diffusion length, and optimizer choices.
+# Keep the diffusion objective and training recipe fixed. Tune only the main
+# model-capacity and optimizer-scale knobs.
 
 model:
   preset: diffusion_stpp
@@ -10,20 +10,20 @@ model:
   n_marks: 0
   encoder:
     type: dstpp_transformer
-    d_model: [64, 128]
-    d_rnn: [128, 256]
-    d_inner: [128, 256]
-    n_layers: [2, 4]
-    n_head: [2, 4]
+    d_model: 64
+    d_rnn: 256
+    d_inner: 128
+    n_layers: 4
+    n_head: 4
     d_k: 16
     d_v: 16
-    dropout: [0.05, 0.1]
+    dropout: 0.1
     CosSin: true
   decoder:
     type: diffusion_stpp
     hidden_units: [64, 128]
-    timesteps: [50, 100]
-    sampling_timesteps: [50, 100]
+    timesteps: 100
+    sampling_timesteps: 100
     objective: pred_noise
     beta_schedule: cosine
     loss_type: l2
@@ -31,16 +31,16 @@ model:
 
 training:
   optimizer: adam
-  lr: {min: 3.0e-4, max: 2.0e-3}
+  lr: {min: 5.0e-4, max: 2.0e-3}
   adam_beta2: 0.99
   weight_decay: [0.0, 1.0e-5]
-  grad_clip: [0.5, 1.0]
+  grad_clip: 1.0
   n_epochs: 200
-  patience: 30
+  patience: null
   batch_size: 64
   lr_schedule: linear_decay
   lr_warmup_epochs: 5
-  lr_final: [2.0e-5, 5.0e-5]
+  lr_final: 5.0e-5
   device: cuda
   test_nll_space: raw
 
@@ -50,7 +50,7 @@ data:
   num_workers: 4
 
 tuning:
-  n_trials: 24
+  n_trials: 16
   search_alg: random
   scheduler: asha
   metric: val_objective

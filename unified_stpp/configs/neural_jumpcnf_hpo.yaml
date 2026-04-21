@@ -1,7 +1,7 @@
-# Bounded real-data HPO config for the shared-hidden Neural STPP JumpCNF preset.
+# Minimal HPO config for the shared-hidden Neural STPP JumpCNF preset.
 #
-# This preset is expensive. Keep the search small, GPU-backed, and aligned with
-# the benchmark path: raw input policy, fixed training budget, one trial per GPU.
+# Keep the paper-style architecture and regularization fixed. Tune only the
+# optimizer scale for this expensive provisional model.
 
 model:
   preset: neural_jumpcnf
@@ -18,25 +18,25 @@ model:
     solver: dopri5
     atol: 1.0e-4
     rtol: 1.0e-4
-    energy_regularization: [0.0, 1.0e-5, 1.0e-4]
+    energy_regularization: 1.0e-4
   decoder:
     spatial:
-      hidden_dims: ["64-64", "64-64-64"]
+      hidden_dims: "64-64-64"
       layer_type: concat
       actfn: swish
       zero_init: true
       tol: 1.0e-4
-      otreg_strength: [1.0e-5, 1.0e-4]
+      otreg_strength: 1.0e-4
       use_adjoint: true
       solve_reverse: true
-      n_flows: [2, 4]
+      n_flows: 4
 
 training:
   optimizer: adamw
-  lr: {min: 3.0e-4, max: 2.0e-3}
-  weight_decay: [0.0, 1.0e-6, 1.0e-5]
+  lr: {min: 5.0e-4, max: 2.0e-3}
+  weight_decay: [1.0e-6, 1.0e-5]
   adam_beta2: 0.98
-  grad_clip: [0.0, 1.0]
+  grad_clip: 0.0
   n_epochs: 200
   patience: 30
   batch_size: 64
@@ -51,7 +51,7 @@ data:
     max_events: 4000
 
 tuning:
-  n_trials: 24
+  n_trials: 12
   search_alg: random
   scheduler: asha
   metric: val_objective

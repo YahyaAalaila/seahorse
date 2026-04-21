@@ -6,10 +6,11 @@ model:
     type: autoint
     lookback: 20
     lookahead: 1
-    # Upstream real-data config used n_prodnet=10 with sliding-window training.
-    n_prodnet: [2, 4, 6, 10]
-    hidden_size: [128]
-    num_layers: [2]
+    # Keep the paper windowing fixed. Tune only the main integration-capacity
+    # knob rather than reopening the full decoder architecture.
+    n_prodnet: [2, 6, 10]
+    hidden_size: 128
+    num_layers: 2
     activation: tanh
     bias: true
     trunc: false
@@ -21,8 +22,8 @@ model:
 training:
   optimizer: adam
   adam_beta1: 0.9
-  # Upstream real-data config uses lr=0.004; the bundled benchmark default is
-  # also in the same regime, so keep the search narrow enough to be efficient.
+  # Upstream real-data config uses lr=0.004; keep the search narrow around that
+  # regime and preserve the StepLR recipe.
   lr: {min: 2.0e-3, max: 1.0e-2}
   weight_decay: [0.0, 1.0e-5]
   grad_clip: [1.0, 5.0]

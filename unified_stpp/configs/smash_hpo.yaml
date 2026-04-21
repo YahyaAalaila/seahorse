@@ -1,7 +1,7 @@
-# Bounded real-data HPO config for SMASH.
+# Minimal HPO config for SMASH.
 #
-# SMASH is a generative/surrogate family. Keep sampling-heavy knobs modest in
-# HPO and tune only stable architecture, score-scale, and optimizer parameters.
+# Keep the denoising architecture and training recipe fixed. Tune only the
+# score-scale knobs and optimizer scale that materially change behavior.
 
 model:
   preset: smash
@@ -10,26 +10,26 @@ model:
   n_marks: 0
   encoder:
     type: smash_transformer
-    d_model: [64, 128]
-    d_rnn: [128, 256]
-    d_inner: [128, 256]
-    n_layers: [2, 4]
-    n_head: [2, 4]
+    d_model: 64
+    d_rnn: 256
+    d_inner: 128
+    n_layers: 4
+    n_head: 4
     d_k: 16
     d_v: 16
-    dropout: [0.05, 0.1]
+    dropout: 0.1
     CosSin: true
   decoder:
     type: smash
-    sigma_time: [0.03, 0.05, 0.1]
-    sigma_loc: [0.03, 0.05, 0.1]
-    num_noise: [25, 50]
+    sigma_time: [0.01, 0.05, 0.1]
+    sigma_loc: [0.01, 0.05, 0.1]
+    num_noise: 50
     samplingsteps: 500
     n_samples: 100
-    langevin_step: [0.002, 0.005]
+    langevin_step: 0.005
     sampling_method: normal
-    loss_lambda: [0.25, 0.5, 1.0]
-    loss_lambda2: [0.5, 1.0]
+    loss_lambda: [0.25, 0.5, 0.75]
+    loss_lambda2: 1.0
     smooth: 0.0
     log_normalization: true
     minmax_normalize_time: true
@@ -37,16 +37,16 @@ model:
     mark_shift: 1
 
 training:
-  optimizer: adam
-  lr: {min: 3.0e-4, max: 2.0e-3}
+  optimizer: adamw
+  lr: {min: 5.0e-4, max: 2.0e-3}
   weight_decay: [1.0e-3, 1.0e-2]
-  grad_clip: [0.5, 1.0]
+  grad_clip: 1.0
   n_epochs: 200
-  patience: 30
+  patience: null
   adam_beta2: 0.99
   lr_schedule: linear_decay
   lr_warmup_epochs: 5
-  lr_final: [2.0e-5, 5.0e-5]
+  lr_final: 5.0e-5
   batch_size: 64
   device: cuda
   test_nll_space: raw
@@ -57,7 +57,7 @@ data:
   num_workers: 4
 
 tuning:
-  n_trials: 24
+  n_trials: 16
   search_alg: random
   scheduler: asha
   metric: val_objective
