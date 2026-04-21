@@ -205,6 +205,10 @@ class STPPRunner:
         _seed_fit(self.config.data.seed)
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
         run_dir = self._prepare_run_dir(self.config.model.preset)
+        for callback in extra_callbacks or []:
+            bind = getattr(callback, "bind_run_context", None)
+            if callable(bind):
+                bind(run_dir=run_dir)
         with _quiet_lightning():
             model, lm, trainer = self._build_training_stack(
                 dm,
