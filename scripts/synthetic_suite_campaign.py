@@ -27,6 +27,15 @@ from unified_stpp.training.callbacks import PeriodicTestNLLCallback
 from unified_stpp.utils import load_jsonl
 from unified_stpp.utils import deep_update
 
+NO_HPO_SUITE_PRESETS = frozenset(
+    {
+        "smash",
+        "diffusion_stpp",
+        "neural_attncnf",
+        "neural_jumpcnf",
+    }
+)
+
 
 @dataclass(frozen=True)
 class SuiteConfig:
@@ -164,11 +173,29 @@ def _safe_name(value: str) -> str:
 
 
 def _ensure_hpo_configs(presets: list[str], hpo_config_dir: Path) -> None:
-    missing = [preset for preset in presets if not (hpo_config_dir / f"{preset}_hpo.yaml").exists()]
+    missing = [
+        preset
+        for preset in presets
+        if preset not in NO_HPO_SUITE_PRESETS and not (hpo_config_dir / f"{preset}_hpo.yaml").exists()
+    ]
     if missing:
         raise FileNotFoundError(
             f"Missing preset HPO YAML(s) in {hpo_config_dir}: {', '.join(sorted(missing))}"
         )
+
+
+def _bundled_yaml_path_for_preset(preset: str) -> Path:
+    yaml_path = STPPConfig.yaml_path_for_source(preset=preset, config=None)
+    return yaml_path.resolve()
+
+
+def _materialize_suite_base_yaml(*, preset: str, out_path: Path) -> None:
+    if preset in NO_HPO_SUITE_PRESETS:
+        source = _bundled_yaml_path_for_preset(preset)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(source.read_text())
+        return
+    raise ValueError(f"Preset {preset!r} is not configured to bypass HPO.")
 
 
 def _load_run_index(path: Path) -> dict[tuple[str, str, str, int], RunIndexRecord]:
@@ -299,6 +326,9 @@ def _run_tune_stage(
     for preset in presets:
         best_yaml = tune_dir / f"{preset}_best.yaml"
         if resume and best_yaml.exists():
+            continue
+        if preset in NO_HPO_SUITE_PRESETS:
+            _materialize_suite_base_yaml(preset=preset, out_path=best_yaml)
             continue
         _run_tune_subprocess(
             preset=preset,

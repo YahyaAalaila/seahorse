@@ -55,6 +55,33 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
             self.assertEqual([cfg.config_id for cfg in configs], ["H0", "H1"])
             self.assertEqual(module._anchor_config(configs).config_id, "H0")
 
+    def test_no_hpo_suite_preset_uses_bundled_yaml(self):
+        module = _load_campaign_module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            suite = self._make_suite(root)
+            anchor = module._anchor_config(module._discover_suite_configs(suite))
+            out_root = root / "campaign_out"
+            with patch.object(
+                module,
+                "_run_tune_subprocess",
+                side_effect=AssertionError("no-HPO preset should not launch tune subprocess"),
+            ):
+                module._run_tune_stage(
+                    suite_name="suite4_heterogeneity",
+                    anchor=anchor,
+                    presets=["smash"],
+                    hpo_config_dir=root / "unused_hpo",
+                    out_root=out_root,
+                    hpo_seed=42,
+                    resume=False,
+                )
+            best_yaml = out_root / "tune" / "smash_best.yaml"
+            self.assertTrue(best_yaml.exists())
+            payload = yaml.safe_load(best_yaml.read_text())
+            self.assertEqual(payload["model"]["preset"], "smash")
+            self.assertIn("encoder", payload["model"])
+
     def test_campaign_all_stage_writes_outputs_and_resume_skips_completed_runs(self):
         module = _load_campaign_module()
         with tempfile.TemporaryDirectory() as td:
