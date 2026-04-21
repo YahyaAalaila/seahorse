@@ -1,0 +1,120 @@
+{
+  "suite": "suite4_heterogeneity",
+  "theta": "background_complexity",
+  "kernel": {
+    "type": "separable",
+    "temporal_decay": 0.3,
+    "spatial_sigma": 0.15
+  },
+  "levels": [
+    {
+      "label": "H0",
+      "bg": {
+        "type": "constant",
+        "rate": 2.4
+      },
+      "adj": 9.43140457999812,
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H1",
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.25,
+            0.25
+          ],
+          [
+            0.75,
+            0.25
+          ],
+          [
+            0.75,
+            0.75
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 2.5
+      },
+      "adj": 9.43140457999812,
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H2",
+      "bg": {
+        "type": "function",
+        "name": "moving_hotspots",
+        "start": [
+          0.5,
+          0.5
+        ],
+        "v": [
+          0.0003,
+          0.0002
+        ],
+        "sigma": 0.08,
+        "a0": 2.0,
+        "amp": 1.0
+      },
+      "adj": 9.43140457999812,
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H3",
+      "bg": {
+        "type": "function",
+        "name": "gabor_travel",
+        "a0": 1.0,
+        "amp": 2.0,
+        "freq": 1.5,
+        "freq_t": 0.003,
+        "sigma": 0.4,
+        "start": [
+          0.5,
+          0.5
+        ]
+      },
+      "adj": 9.43140457999812,
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    }
+  ]
+}
