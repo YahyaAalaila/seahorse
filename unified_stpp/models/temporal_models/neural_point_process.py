@@ -157,8 +157,16 @@ class ActNorm(nn.Module):
             with torch.no_grad():
                 x_ = x.reshape(-1, x.shape[-1])
                 batch_mean = torch.mean(x_, dim=0)
-                batch_var = torch.var(x_, dim=0)
-                batch_var = torch.max(batch_var, torch.tensor(0.2, device=x.device, dtype=x.dtype))
+                if x_.shape[0] <= 1:
+                    # The upstream ActNorm path uses torch.var(...), which is
+                    # undefined for a singleton init batch under PyTorch's
+                    # default correction and yields NaNs. Preserve upstream
+                    # behavior for normal batches and guard only the singleton
+                    # initialization edge case.
+                    batch_var = torch.full_like(batch_mean, 0.2)
+                else:
+                    batch_var = torch.var(x_, dim=0)
+                    batch_var = torch.max(batch_var, torch.tensor(0.2, device=x.device, dtype=x.dtype))
                 self.bias.data.copy_(-batch_mean)
                 self.weight.data.copy_(-0.5 * torch.log(batch_var) + math.log(self.init_scale))
                 self.initialized.fill_(1)

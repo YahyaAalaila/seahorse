@@ -255,6 +255,22 @@ From upstream NeuralSTPP repo and `original_models_manifesto.md`:
 | EMA | used at training time | upstream code (EMA commented-out at test) |
 | param groups | separate group for `self_attns` | upstream code |
 
+#### A.1 Singleton-safe ActNorm initialization note
+
+The upstream temporal `ActNorm` implementation computes `torch.var(x_, dim=0)` at
+initialization time. Under modern PyTorch defaults this is undefined for a
+singleton init batch and can yield `NaN`, which then propagates into the neural
+ODE hidden state and crashes training. The repo therefore includes a **narrow
+guard only for the singleton init case** in the temporal ActNorm path:
+
+- if the flattened init batch has more than one row, keep the upstream code path
+- if it has exactly one row, use the same numerical floor (`0.2`) directly for
+  the variance term instead of calling `torch.var(...)`
+
+This is an implementation-stability guard, not a modeling change. It preserves
+upstream behavior for non-singleton batches and only patches the undefined edge
+case so campaign runs do not fail on particular batch realizations.
+
 #### B. Repo current state
 
 File: `unified_stpp/configs/neural_stpp_attn_sc.yaml`

@@ -22,7 +22,7 @@ from unified_stpp.models.configs.neural_stpp import NeuralSTPPConfig
 from unified_stpp.models.event_models.neural_stpp_event import NeuralSTPPEventModel
 from unified_stpp.models.model_registry import register_spatial
 from unified_stpp.models.state_models.neural_stpp_state import NeuralSTPPStateModel
-from unified_stpp.models.temporal_models.neural_point_process import NeuralPointProcess
+from unified_stpp.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess
 
 
 class _CaptureTemporalCore(nn.Module):
@@ -118,6 +118,14 @@ def _normalized_batch():
 
 
 class TestNeuralSTPPSharedFoundation(unittest.TestCase):
+    def test_temporal_actnorm_singleton_init_stays_finite(self):
+        layer = ActNorm(num_features=4)
+        x = torch.tensor([[0.0, 1.0, -2.0, 3.0]], dtype=torch.float32)
+        y = layer(x)
+        self.assertTrue(torch.isfinite(y).all())
+        self.assertTrue(torch.isfinite(layer.weight).all())
+        self.assertTrue(torch.isfinite(layer.bias).all())
+
     def test_config_data_init_overrides_and_hidden_dim_parsing(self):
         dm = SimpleNamespace(
             train_dataset=SimpleNamespace(
