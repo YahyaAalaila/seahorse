@@ -22,6 +22,7 @@ Useful environment overrides:
   MEM=32G
   TIME_LIMIT=24:00:00
   SEEDS="42 3 555"
+  HPO_POLICY=skip-heavy|generative-thin|all-thin
   STAGE=all
   RUN_BATCH_SIZE=...
   DEVICE=cuda|cpu
@@ -33,6 +34,8 @@ Useful environment overrides:
 
 Examples:
   scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity neural
+  HPO_POLICY=all-thin TIME_LIMIT=48:00:00 scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity neural
+  HPO_POLICY=generative-thin TIME_LIMIT=48:00:00 scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity gen
   PARTITION=A100-80GB scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity gen
   GPUS=0 DEVICE=cpu scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity factorized
 EOF
@@ -114,6 +117,7 @@ JOB_NAME="${JOB_NAME:-${SUITE_TAG}__${FAMILY_TAG}__${TAG_SUFFIX}}"
 SEEDS="${SEEDS:-42 3 555}"
 HPO_SEED="${HPO_SEED:-42}"
 HPO_CONFIG_DIR="${HPO_CONFIG_DIR:-unified_stpp/configs}"
+HPO_POLICY="${HPO_POLICY:-skip-heavy}"
 SUITE_ROOT="${SUITE_ROOT:-$ROOT/data/hawkesnest_suitesv2}"
 RUN_BATCH_SIZE="${RUN_BATCH_SIZE:-}"
 STAGE="${STAGE:-all}"
@@ -152,6 +156,7 @@ fi
 
 printf '[submit] suite=%s family=%s job=%s\n' "$SUITE_NAME" "$FAMILY" "$JOB_NAME"
 printf '[submit] presets=%s\n' "${PRESETS[*]}"
+printf '[submit] hpo_policy=%s\n' "$HPO_POLICY"
 printf '[submit] out_root=%s\n' "$OUT_ROOT"
 
 sbatch_output="$(
@@ -159,6 +164,7 @@ sbatch_output="$(
     SEEDS="$SEEDS" \
     HPO_SEED="$HPO_SEED" \
     HPO_CONFIG_DIR="$HPO_CONFIG_DIR" \
+    HPO_POLICY="$HPO_POLICY" \
     SUITE_ROOT="$SUITE_ROOT" \
     DEVICE="$DEVICE" \
     RUN_BATCH_SIZE="$RUN_BATCH_SIZE" \
