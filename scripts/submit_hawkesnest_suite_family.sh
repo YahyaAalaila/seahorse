@@ -111,7 +111,7 @@ FAMILY_TAG="$(family_alias "$FAMILY")"
 TAG_SUFFIX="${TAG_SUFFIX:-$(date +%m%d%H%M)}"
 JOB_NAME="${JOB_NAME:-${SUITE_TAG}__${FAMILY_TAG}__${TAG_SUFFIX}}"
 
-SEEDS="${SEEDS:-42}"
+SEEDS="${SEEDS:-42 3 555}"
 HPO_SEED="${HPO_SEED:-42}"
 HPO_CONFIG_DIR="${HPO_CONFIG_DIR:-unified_stpp/configs}"
 SUITE_ROOT="${SUITE_ROOT:-$ROOT/data/hawkesnest_suitesv2}"
