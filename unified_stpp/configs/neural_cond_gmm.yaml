@@ -29,9 +29,12 @@ training:
   adam_beta2: 0.98
   grad_clip: 0.0
   n_epochs: 200
+  batch_size: 32
   patience: 30
 
 data:
-  normalize: true
+  protocol: raw
+  normalize: false
+  num_workers: 0
   adapter_kwargs:
     max_events: 4000
