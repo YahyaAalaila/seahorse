@@ -47,9 +47,11 @@ fi
 read -r -a SEED_ARRAY <<< "${SEEDS:-42}"
 CMD+=( --seeds "${SEED_ARRAY[@]}" )
 
-HPO_DIR="${HPO_CONFIGS_DIR:-$(campaign_hpo_dir)}"
-if [[ -d "${HPO_DIR}" ]]; then
-  CMD+=( --hpo_configs_dir "${HPO_DIR}" )
+if [[ "${USE_HPO:-0}" == "1" ]]; then
+  HPO_DIR="${HPO_CONFIGS_DIR:-$(campaign_hpo_dir)}"
+  if [[ -d "${HPO_DIR}" ]]; then
+    CMD+=( --hpo_configs_dir "${HPO_DIR}" )
+  fi
 fi
 
 if [[ -n "${OVERRIDES:-}" ]]; then

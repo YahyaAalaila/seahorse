@@ -10,8 +10,8 @@
 # constant across all factorized presets, isolating temporal modeling.
 # Label as "RMTPP-GMM (extended)" in paper tables.
 #
-# NOTE: hidden_size=64 and lr=1e-3 are provisional starting points.
-# Run a sweep before reporting final benchmark numbers.
+# NOTE: this remains an exploratory fixed repo-default baseline for real-data
+# runs, not a paper-faithful spatialized RMTPP benchmark.
 
 model:
   preset: rmtpp_gmm
@@ -29,7 +29,9 @@ training:
   grad_clip: 1.0
   n_epochs: 100
   batch_size: 128
+  test_nll_space: raw
 
 data:
   protocol: raw
   normalize: true
+  num_workers: 0

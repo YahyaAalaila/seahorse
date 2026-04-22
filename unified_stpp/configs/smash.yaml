@@ -1,3 +1,7 @@
+# Canonical SMASH preset.
+#
+# Use this as a fixed no-HPO baseline only in the sampling-metrics lane.
+
 model:
   preset: smash
   hidden_dim: 128
@@ -37,6 +41,7 @@ model:
     mark_shift: 1
 
 training:
+  optimizer: adamw
   lr: 1.0e-3
   weight_decay: 1.0e-2
   grad_clip: 1.0
@@ -46,8 +51,10 @@ training:
   lr_warmup_epochs: 5
   lr_final: 5.0e-5
   batch_size: 64
+  test_nll_space: raw
 
 # Keep the repository-wide data contract unchanged.
 data:
   protocol: standard
   normalize: true
+  num_workers: 0

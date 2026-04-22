@@ -29,6 +29,7 @@ Useful environment overrides:
   TIME_LIMIT=24:00:00
   SEEDS="42 3 555"
   N_WORKERS=1
+  USE_HPO=0|1        (default: 0)
   RUN_ROOT=/home/aalaila/projects/uni-stpp/runs/exp1
   DATASET_REVISION=...
   OVERRIDES="training.device=cuda data.num_workers=0"
@@ -41,6 +42,7 @@ Useful environment overrides:
 Examples:
   scripts/submit_realdata_family.sh covid neural
   PARTITION=A100-80GB scripts/submit_realdata_family.sh yahya021/earthquake-stpp gen
+  USE_HPO=1 scripts/submit_realdata_family.sh covid rest
   GPUS=0 OVERRIDES=\"training.device=cpu\" scripts/submit_realdata_family.sh crime factorized
 EOF
 }
@@ -126,6 +128,7 @@ MEM="${MEM:-32G}"
 TIME_LIMIT="${TIME_LIMIT:-24:00:00}"
 SEEDS="${SEEDS:-42 3 555}"
 N_WORKERS="${N_WORKERS:-1}"
+USE_HPO="${USE_HPO:-0}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/runs/exp1}"
 CAMPAIGN_ID="${CAMPAIGN_ID:-$DATASET_SLUG}"
 GROUP_NAME="${GROUP_NAME:-$JOB_NAME}"
@@ -157,6 +160,7 @@ fi
 printf '[submit] dataset=%s family=%s job=%s\n' "$DATASET" "$FAMILY" "$JOB_NAME"
 printf '[submit] presets=%s\n' "${PRESETS[*]}"
 printf '[submit] bench_out=%s\n' "$BENCH_OUT"
+printf '[submit] use_hpo=%s\n' "$USE_HPO"
 
 sbatch_output="$(
   env \
@@ -170,6 +174,7 @@ sbatch_output="$(
     DATASET_REVISION="${DATASET_REVISION:-}" \
     SEEDS="$SEEDS" \
     N_WORKERS="$N_WORKERS" \
+    USE_HPO="$USE_HPO" \
     HPO_CONFIGS_DIR="$HPO_CONFIGS_DIR" \
     BENCH_OUT="$BENCH_OUT" \
     OVERRIDES="${OVERRIDES:-}" \

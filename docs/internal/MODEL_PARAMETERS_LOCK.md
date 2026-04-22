@@ -587,17 +587,18 @@ three buckets:
 | `neural_cond_gmm` | Yes, provisional | Cheapest Neural STPP variant; canonical YAML is a reasonable fixed upstream-style baseline. |
 | `smash` | Yes, but sampling lane only | Use canonical YAML only for sampling-based metrics. Do not present as an exact-NLL comparator. |
 | `diffusion_stpp` | Yes, but sampling lane only | Use canonical YAML for sampling/surrogate metrics only. Treat as a generative baseline, not an exact-NLL one. |
-| `auto_stpp` | No | `auto_stpp.yaml` still contains a stale tuned LR and should not be used as a final no-HPO real-data config. |
-| `nsmpp` | No | Current YAML is sweep-derived rather than a clean paper/default lock; acceptable for exploratory use, not for a "paper/repo default" claim. |
-| `rmtpp_gmm` | No | File comments explicitly say the hyperparameters are provisional and should be swept. |
-| `thp_gmm` | No | File comments explicitly say the hyperparameters are provisional and should be swept. |
+| `auto_stpp` | Yes | Canonical YAML now uses the upstream paper/code defaults (`lr=4e-3`, StepLR `20/0.5`, `n_prodnet=10`) rather than a stale dataset-specific tuned result. |
+| `nsmpp` | Yes, exploratory | Canonical YAML remains repo-default rather than paper-locked, but benchmark-time integration resolution is now raised to a final-run value (`int_res=40`). |
+| `rmtpp_gmm` | Yes, exploratory | Still not a paper-faithful spatialized baseline, but the canonical YAML is now an explicit fixed repo-default exploratory config with raw-space reporting. |
+| `thp_gmm` | Yes, exploratory | Same as `rmtpp_gmm`: fixed repo-default exploratory config, not a paper-faithful spatialized THP result. |
 
 Operational policy for real-data no-HPO runs:
 
 - disable `--hpo_configs_dir` rather than silently reusing old tune outputs
+- the real-data submit helper now defaults to `USE_HPO=0`, so canonical YAMLs are used unless HPO reuse is explicitly requested
 - use the canonical YAMLs directly only for the models marked `Yes` above
 - keep `smash` and `diffusion_stpp` in a separate sampling-metric lane
-- do not claim `auto_stpp`, `nsmpp`, `rmtpp_gmm`, or `thp_gmm` are "paper/repo default" real-data baselines until their canonical YAMLs are explicitly audited and locked
+- do not claim `nsmpp`, `rmtpp_gmm`, or `thp_gmm` are paper-faithful real-data baselines; they are launchable fixed repo defaults, not faithful reproductions of a cited spatial upstream
 
 ---
 

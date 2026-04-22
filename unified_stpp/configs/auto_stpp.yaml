@@ -2,6 +2,9 @@
 #
 # This is the canonical AutoSTPP configuration. The older coarse implementation
 # remains available only as the legacy preset `auto_stpp_legacy`.
+#
+# Real-data no-HPO runs should use the upstream paper/code defaults here rather
+# than an old dataset-specific tuned result.
 
 model:
   preset: auto_stpp
@@ -21,14 +24,14 @@ model:
     temporal_diag_mode: exact
     temporal_mc_samples: 10
     report_orig_space_metrics: true
-    n_prodnet: 2
+    n_prodnet: 10
     hidden_size: 128
     num_layers: 2
 
 training:
-  lr: 0.008149663367631796
+  lr: 4.0e-3
   optimizer: adam
-  weight_decay: 1.0e-05
+  weight_decay: 0.0
   grad_clip: 1.0
   n_epochs: 50
   batch_size: 128
@@ -36,11 +39,11 @@ training:
   adam_beta1: 0.9
   adam_beta2: 0.999
   device: auto
-  lr_schedule: constant
+  lr_schedule: step
   lr_warmup_epochs: 0
   lr_final: null
-  lr_step_size: 30
-  lr_step_gamma: 0.3
+  lr_step_size: 20
+  lr_step_gamma: 0.5
   checkpoint_select: best
   test_nll_space: raw
   vae_beta: 0.0
