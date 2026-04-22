@@ -11,8 +11,9 @@ Usage:
 Datasets:
   pass a full HF dataset id (e.g. yahya021/covid-stpp), or one of:
     covid        -> yahya021/covid-stpp
-    earthquake   -> yahya021/earthquake-stpp
-    crime        -> yahya021/crime-stpp
+    earthquake   -> yahya021/earthquakes-stpp
+    bold         -> yahya021/bold5000-stpp
+    citibike     -> yahya021/citibike-stpp
 
 Families:
   neural      -> neural_attncnf neural_jumpcnf neural_cond_gmm
@@ -41,9 +42,9 @@ Useful environment overrides:
 
 Examples:
   scripts/submit_realdata_family.sh covid neural
-  PARTITION=A100-80GB scripts/submit_realdata_family.sh yahya021/earthquake-stpp gen
+  PARTITION=A100-80GB scripts/submit_realdata_family.sh yahya021/earthquakes-stpp gen
   USE_HPO=1 scripts/submit_realdata_family.sh covid rest
-  GPUS=0 OVERRIDES=\"training.device=cpu\" scripts/submit_realdata_family.sh crime factorized
+  GPUS=0 OVERRIDES=\"training.device=cpu\" scripts/submit_realdata_family.sh citibike factorized
 EOF
 }
 
@@ -59,8 +60,9 @@ shift 2
 dataset_id() {
   case "$1" in
     covid) echo "yahya021/covid-stpp" ;;
-    earthquake) echo "yahya021/earthquake-stpp" ;;
-    crime) echo "yahya021/crime-stpp" ;;
+    earthquake) echo "yahya021/earthquakes-stpp" ;;
+    bold) echo "yahya021/bold5000-stpp" ;;
+    citibike) echo "yahya021/citibike-stpp" ;;
     *) echo "$1" ;;
   esac
 }
