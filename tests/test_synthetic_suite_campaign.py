@@ -75,12 +75,44 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
                     out_root=out_root,
                     hpo_seed=42,
                     resume=False,
+                    no_hpo_suite_presets=module._no_hpo_suite_presets("skip-heavy"),
                 )
             best_yaml = out_root / "tune" / "smash_best.yaml"
             self.assertTrue(best_yaml.exists())
             payload = yaml.safe_load(best_yaml.read_text())
             self.assertEqual(payload["model"]["preset"], "smash")
             self.assertIn("encoder", payload["model"])
+
+    def test_generative_thin_policy_runs_smash_hpo_instead_of_bundled_yaml(self):
+        module = _load_campaign_module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            suite = self._make_suite(root)
+            anchor = module._anchor_config(module._discover_suite_configs(suite))
+            out_root = root / "campaign_out"
+            hpo_dir = root / "hpo"
+            hpo_dir.mkdir(parents=True, exist_ok=True)
+            (hpo_dir / "smash_hpo.yaml").write_text("model:\n  preset: smash\n")
+
+            calls = []
+
+            def fake_tune(**kwargs):
+                calls.append(kwargs["preset"])
+                kwargs["out_path"].parent.mkdir(parents=True, exist_ok=True)
+                kwargs["out_path"].write_text("model:\n  preset: smash\n")
+
+            with patch.object(module, "_run_tune_subprocess", side_effect=fake_tune):
+                module._run_tune_stage(
+                    suite_name="suite4_heterogeneity",
+                    anchor=anchor,
+                    presets=["smash"],
+                    hpo_config_dir=hpo_dir,
+                    out_root=out_root,
+                    hpo_seed=42,
+                    resume=False,
+                    no_hpo_suite_presets=module._no_hpo_suite_presets("generative-thin"),
+                )
+            self.assertEqual(calls, ["smash"])
 
     def test_campaign_all_stage_writes_outputs_and_resume_skips_completed_runs(self):
         module = _load_campaign_module()
@@ -207,6 +239,9 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
             self.assertEqual(len(targets), 2)
             self.assertEqual(sorted(row["config_id"] for row in targets), ["H0", "H1"])
             self.assertTrue(all(Path(row["test_path"]).exists() for row in targets))
+
+            manifest = json.loads((out_root / "manifests" / "campaign_manifest.json").read_text())
+            self.assertEqual(manifest["hpo_policy"], "skip-heavy")
 
             with patch.object(module, "_run_tune_subprocess", side_effect=AssertionError("tune should skip")), patch.object(
                 module,

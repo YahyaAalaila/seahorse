@@ -27,14 +27,18 @@ from unified_stpp.training.callbacks import PeriodicTestNLLCallback
 from unified_stpp.utils import load_jsonl
 from unified_stpp.utils import deep_update
 
-NO_HPO_SUITE_PRESETS = frozenset(
-    {
-        "smash",
-        "diffusion_stpp",
-        "neural_attncnf",
-        "neural_jumpcnf",
-    }
-)
+HEAVY_GENERATIVE_PRESETS = frozenset({"smash", "diffusion_stpp"})
+HEAVY_NEURAL_CNF_PRESETS = frozenset({"neural_attncnf", "neural_jumpcnf"})
+
+
+def _no_hpo_suite_presets(hpo_policy: str) -> frozenset[str]:
+    if hpo_policy == "skip-heavy":
+        return HEAVY_GENERATIVE_PRESETS | HEAVY_NEURAL_CNF_PRESETS
+    if hpo_policy == "generative-thin":
+        return HEAVY_NEURAL_CNF_PRESETS
+    if hpo_policy == "all-thin":
+        return frozenset()
+    raise ValueError(f"Unknown HPO policy: {hpo_policy!r}")
 
 
 @dataclass(frozen=True)
@@ -106,6 +110,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--out", required=True, help="Campaign output root.")
     p.add_argument("--stage", default="all", choices=("tune", "run", "plot", "all"))
     p.add_argument("--hpo-config-dir", default="unified_stpp/configs")
+    p.add_argument(
+        "--hpo-policy",
+        default="skip-heavy",
+        choices=("skip-heavy", "generative-thin", "all-thin"),
+        help=(
+            "How to treat expensive synthetic-suite presets: "
+            "'skip-heavy' keeps bundled YAMLs for smash/diffusion and neural CNFs; "
+            "'generative-thin' re-enables thin HPO for smash/diffusion only; "
+            "'all-thin' re-enables thin HPO for smash/diffusion and neural CNFs."
+        ),
+    )
     p.add_argument("--curve-step", type=float, default=0.1)
     p.add_argument("--hpo-seed", type=int, default=42)
     p.add_argument(
@@ -172,11 +187,16 @@ def _safe_name(value: str) -> str:
     return text or "item"
 
 
-def _ensure_hpo_configs(presets: list[str], hpo_config_dir: Path) -> None:
+def _ensure_hpo_configs(
+    presets: list[str],
+    hpo_config_dir: Path,
+    *,
+    no_hpo_suite_presets: frozenset[str],
+) -> None:
     missing = [
         preset
         for preset in presets
-        if preset not in NO_HPO_SUITE_PRESETS and not (hpo_config_dir / f"{preset}_hpo.yaml").exists()
+        if preset not in no_hpo_suite_presets and not (hpo_config_dir / f"{preset}_hpo.yaml").exists()
     ]
     if missing:
         raise FileNotFoundError(
@@ -189,8 +209,13 @@ def _bundled_yaml_path_for_preset(preset: str) -> Path:
     return yaml_path.resolve()
 
 
-def _materialize_suite_base_yaml(*, preset: str, out_path: Path) -> None:
-    if preset in NO_HPO_SUITE_PRESETS:
+def _materialize_suite_base_yaml(
+    *,
+    preset: str,
+    out_path: Path,
+    no_hpo_suite_presets: frozenset[str],
+) -> None:
+    if preset in no_hpo_suite_presets:
         source = _bundled_yaml_path_for_preset(preset)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(source.read_text())
@@ -254,6 +279,7 @@ def _write_campaign_manifest(
     hpo_seed: int,
     device: str | None,
     run_batch_size: int | None,
+    hpo_policy: str,
 ) -> None:
     paths = _campaign_paths(out_root)
     paths["manifests"].mkdir(parents=True, exist_ok=True)
@@ -264,6 +290,7 @@ def _write_campaign_manifest(
         "stage": stage,
         "curve_step": curve_step,
         "hpo_seed": hpo_seed,
+        "hpo_policy": hpo_policy,
         "device_override": device,
         "run_batch_size": run_batch_size,
         "anchor_config_id": anchor.config_id,
@@ -320,6 +347,7 @@ def _run_tune_stage(
     out_root: Path,
     hpo_seed: int,
     resume: bool,
+    no_hpo_suite_presets: frozenset[str],
 ) -> None:
     tune_dir = _campaign_paths(out_root)["tune"]
     tune_dir.mkdir(parents=True, exist_ok=True)
@@ -327,8 +355,12 @@ def _run_tune_stage(
         best_yaml = tune_dir / f"{preset}_best.yaml"
         if resume and best_yaml.exists():
             continue
-        if preset in NO_HPO_SUITE_PRESETS:
-            _materialize_suite_base_yaml(preset=preset, out_path=best_yaml)
+        if preset in no_hpo_suite_presets:
+            _materialize_suite_base_yaml(
+                preset=preset,
+                out_path=best_yaml,
+                no_hpo_suite_presets=no_hpo_suite_presets,
+            )
             continue
         _run_tune_subprocess(
             preset=preset,
@@ -617,6 +649,7 @@ def main(argv: list[str] | None = None) -> int:
     suite_name = suite_path.name
     out_root = Path(args.out).expanduser().resolve()
     paths = _campaign_paths(out_root)
+    no_hpo_suite_presets = _no_hpo_suite_presets(args.hpo_policy)
     for key in ("tune", "manifests", "plots", "tables"):
         paths[key].mkdir(parents=True, exist_ok=True)
 
@@ -624,7 +657,11 @@ def main(argv: list[str] | None = None) -> int:
     anchor = _anchor_config(configs)
     hpo_config_dir = Path(args.hpo_config_dir).expanduser().resolve()
     if args.stage in {"tune", "all"}:
-        _ensure_hpo_configs(args.presets, hpo_config_dir)
+        _ensure_hpo_configs(
+            args.presets,
+            hpo_config_dir,
+            no_hpo_suite_presets=no_hpo_suite_presets,
+        )
 
     _write_campaign_manifest(
         out_root=out_root,
@@ -639,6 +676,7 @@ def main(argv: list[str] | None = None) -> int:
         hpo_seed=int(args.hpo_seed),
         device=args.device,
         run_batch_size=args.run_batch_size,
+        hpo_policy=args.hpo_policy,
     )
 
     if args.stage in {"tune", "all"}:
@@ -650,6 +688,7 @@ def main(argv: list[str] | None = None) -> int:
             out_root=out_root,
             hpo_seed=int(args.hpo_seed),
             resume=bool(args.resume),
+            no_hpo_suite_presets=no_hpo_suite_presets,
         )
     if args.stage in {"run", "all"}:
         _run_suite_stage(
