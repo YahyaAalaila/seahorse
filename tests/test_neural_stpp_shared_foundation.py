@@ -17,12 +17,13 @@ import unittest
 import torch
 import torch.nn as nn
 
+import unified_stpp.models.temporal_models.neural_point_process as neural_point_process_module
 from unified_stpp.models.base import Decoder
 from unified_stpp.models.configs.neural_stpp import NeuralSTPPConfig
 from unified_stpp.models.event_models.neural_stpp_event import NeuralSTPPEventModel
 from unified_stpp.models.model_registry import register_spatial
 from unified_stpp.models.state_models.neural_stpp_state import NeuralSTPPStateModel
-from unified_stpp.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess
+from unified_stpp.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess, TimeVariableODE
 
 
 class _CaptureTemporalCore(nn.Module):
@@ -125,6 +126,44 @@ class TestNeuralSTPPSharedFoundation(unittest.TestCase):
         self.assertTrue(torch.isfinite(y).all())
         self.assertTrue(torch.isfinite(layer.weight).all())
         self.assertTrue(torch.isfinite(layer.bias).all())
+
+    def test_temporal_ode_underflow_re_raises_with_diagnostics(self):
+        class _ZeroDrift(nn.Module):
+            def forward(self, t, state):
+                del t
+                lambda_state, hidden_state = state
+                return torch.zeros_like(lambda_state), torch.zeros_like(hidden_state)
+
+        solver = TimeVariableODE(_ZeroDrift(), use_adjoint=False)
+        original_odeint_std = neural_point_process_module._odeint_std
+
+        def _raise_underflow(*args, **kwargs):
+            del args, kwargs
+            raise AssertionError("underflow in dt 0.0")
+
+        neural_point_process_module._odeint_std = _raise_underflow
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Neural STPP temporal ODE underflow in dt") as ctx:
+                solver.integrate(
+                    torch.tensor([1.0], dtype=torch.float32),
+                    torch.tensor([1.0 + 1e-8], dtype=torch.float32),
+                    (
+                        torch.zeros(1, dtype=torch.float32),
+                        torch.zeros(1, 4, dtype=torch.float32),
+                    ),
+                )
+        finally:
+            neural_point_process_module._odeint_std = original_odeint_std
+
+        msg = str(ctx.exception)
+        self.assertIn("min_raw_dt=", msg)
+        self.assertIn("max_raw_dt=", msg)
+        self.assertIn("mean_raw_dt=", msg)
+        self.assertIn("non_increasing_count=", msg)
+        self.assertIn("tiny_interval_count=", msg)
+        self.assertIn("use_adjoint=False", msg)
+        self.assertIn("method=dopri5", msg)
+        self.assertIn("nfe=", msg)
 
     def test_config_data_init_overrides_and_hidden_dim_parsing(self):
         dm = SimpleNamespace(
@@ -272,6 +311,36 @@ class TestNeuralSTPPSharedFoundation(unittest.TestCase):
         self.assertEqual(event_hidden.shape, (2, 4, 6))
         self.assertEqual(h_final.shape, (2, 6))
         self.assertTrue(torch.isfinite(reg))
+
+    def test_integrate_lambda_raises_on_non_increasing_active_event_times(self):
+        model = NeuralPointProcess(
+            cond_dim=2,
+            hidden_dims=[6, 6],
+            cond=True,
+            hdim=3,
+            separate=1,
+        )
+        event_times = torch.tensor([[0.2, 0.6, 0.6]], dtype=torch.float32)
+        locations = torch.tensor([[[0.0, 0.0], [0.1, 0.2], [0.3, -0.1]]], dtype=torch.float32)
+        mask = torch.tensor([[True, True, True]])
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Neural STPP temporal integrate_lambda received non-increasing active event times",
+        ) as ctx:
+            model.integrate_lambda(
+                event_times,
+                locations,
+                mask,
+                t0=0.0,
+                t1=None,
+                nlinspace=1,
+            )
+
+        msg = str(ctx.exception)
+        self.assertIn("event_index=2", msg)
+        self.assertIn("bad_count=1", msg)
+        self.assertIn("min_raw_dt=0.000000e+00", msg)
 
     def test_event_contract_passes_full_hidden_and_raw_time(self):
         times_norm, _, locations_norm, lengths, time_mean, time_std = _normalized_batch()

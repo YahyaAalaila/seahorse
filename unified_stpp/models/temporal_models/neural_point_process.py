@@ -78,6 +78,15 @@ def _euler_tuple_solve(func, y0, t_span, n_steps: int = 50):
     return tuple(torch.stack(bucket, dim=0) for bucket in traj)
 
 
+def _repair_strictly_increasing_endpoint(t0: Tensor, t1: Tensor) -> Tensor:
+    if hasattr(torch, "nextafter"):
+        next_up = torch.nextafter(t0, torch.full_like(t0, float("inf")))
+    else:  # pragma: no cover - torch.nextafter exists in supported runtimes
+        scale = torch.maximum(torch.maximum(t0.abs(), t1.abs()), torch.ones_like(t0))
+        next_up = t0 + torch.finfo(t0.dtype).eps * scale
+    return torch.where(t1 > t0, t1, next_up)
+
+
 class DiffEqWrapper(nn.Module):
     def __init__(self, module: nn.Module):
         super().__init__()
@@ -346,7 +355,17 @@ class TimeVariableODE(nn.Module):
         method = method or self.method
         t0 = t0.reshape(-1)
         t1 = t1.reshape(-1)
-        t1 = torch.where(t1 > t0, t1, t0 + 1e-6)
+        raw_dt = t1 - t0
+        dt_abs = raw_dt.abs()
+        dt_scale = torch.maximum(torch.maximum(t0.abs(), t1.abs()), torch.ones_like(t0))
+        tiny_threshold = torch.finfo(t0.dtype).eps * dt_scale
+        non_increasing = raw_dt <= 0
+        t1 = _repair_strictly_increasing_endpoint(t0, t1)
+        if not bool(torch.all(t1 > t0).item()):
+            raise RuntimeError(
+                "Neural STPP temporal ODE interval repair failed; "
+                f"non_increasing_count={int(non_increasing.sum().item())}, dtype={t0.dtype}"
+            )
         energy0 = torch.zeros(1, device=x0[0].device, dtype=x0[0].dtype)
         init_state = (t0, t1, energy0, *x0)
         eval_grid = torch.linspace(
@@ -359,15 +378,30 @@ class TimeVariableODE(nn.Module):
 
         if HAS_TORCHDIFFEQ:
             odeint_fn = _odeint_adj if self.use_adjoint else _odeint_std
-            solution = odeint_fn(
-                self,
-                init_state,
-                eval_grid,
-                rtol=self.rtol,
-                atol=self.atol,
-                method=method,
-                options={"dtype": t0.dtype},
-            )
+            try:
+                solution = odeint_fn(
+                    self,
+                    init_state,
+                    eval_grid,
+                    rtol=self.rtol,
+                    atol=self.atol,
+                    method=method,
+                    options={"dtype": t0.dtype},
+                )
+            except AssertionError as exc:
+                if "underflow in dt" not in str(exc):
+                    raise
+                min_raw_dt = float(raw_dt.min().item()) if raw_dt.numel() else 0.0
+                max_raw_dt = float(raw_dt.max().item()) if raw_dt.numel() else 0.0
+                mean_raw_dt = float(raw_dt.mean().item()) if raw_dt.numel() else 0.0
+                tiny_count = int((dt_abs <= tiny_threshold).sum().item()) if dt_abs.numel() else 0
+                raise RuntimeError(
+                    "Neural STPP temporal ODE underflow in dt; "
+                    f"min_raw_dt={min_raw_dt:.6e}, max_raw_dt={max_raw_dt:.6e}, mean_raw_dt={mean_raw_dt:.6e}, "
+                    f"non_increasing_count={int(non_increasing.sum().item())}, tiny_interval_count={tiny_count}, "
+                    f"use_adjoint={self.use_adjoint}, training={self.training}, method={method}, "
+                    f"rtol={self.rtol:.1e}, atol={self.atol:.1e}, nfe={self.nfe}"
+                ) from exc
         else:  # pragma: no cover - exercised only without torchdiffeq
             solution = _euler_tuple_solve(self, init_state, eval_grid, n_steps=max(50, nlinspace * 10))
 
@@ -535,6 +569,19 @@ class NeuralPointProcess(nn.Module):
         final_postjump_state = init_state
 
         for i in range(T):
+            active = input_mask[:, i]
+            if bool(active.any().item()):
+                raw_dt_i = event_times[:, i][active] - t0_tensor[active]
+                if bool((raw_dt_i <= 0).any().item()):
+                    raise RuntimeError(
+                        "Neural STPP temporal integrate_lambda received non-increasing active event times; "
+                        f"event_index={i}, bad_count={int((raw_dt_i <= 0).sum().item())}, "
+                        f"min_raw_dt={float(raw_dt_i.min().item()):.6e}, "
+                        f"prev_t_min={float(t0_tensor[active].min().item()):.6e}, "
+                        f"prev_t_max={float(t0_tensor[active].max().item()):.6e}, "
+                        f"curr_t_min={float(event_times[:, i][active].min().item()):.6e}, "
+                        f"curr_t_max={float(event_times[:, i][active].max().item()):.6e}"
+                    )
             t1_i = torch.where(input_mask[:, i], event_times[:, i], t0_tensor)
             state_traj, reg_i = self.ode_solver.integrate(
                 t0_tensor,
@@ -582,6 +629,17 @@ class NeuralPointProcess(nn.Module):
         if t1 is not None:
             t1_tensor = t1 if torch.is_tensor(t1) else torch.tensor(t1, device=event_times.device, dtype=event_times.dtype)
             t1_tensor = t1_tensor.expand(N).to(event_times)
+            raw_dt_tail = t1_tensor - t0_tensor
+            if bool((raw_dt_tail <= 0).any().item()):
+                raise RuntimeError(
+                    "Neural STPP temporal integrate_lambda received a non-increasing tail interval; "
+                    f"bad_count={int((raw_dt_tail <= 0).sum().item())}, "
+                    f"min_raw_dt={float(raw_dt_tail.min().item()):.6e}, "
+                    f"t_last_min={float(t0_tensor.min().item()):.6e}, "
+                    f"t_last_max={float(t0_tensor.max().item()):.6e}, "
+                    f"t1_min={float(t1_tensor.min().item()):.6e}, "
+                    f"t1_max={float(t1_tensor.max().item()):.6e}"
+                )
             state_traj, reg_tail = self.ode_solver.integrate(
                 t0_tensor,
                 t1_tensor,

@@ -271,6 +271,26 @@ This is an implementation-stability guard, not a modeling change. It preserves
 upstream behavior for non-singleton batches and only patches the undefined edge
 case so campaign runs do not fail on particular batch realizations.
 
+#### A.2 Temporal ODE interval diagnostics note
+
+The temporal NeuralSTPP ODE path now includes a narrow diagnostic guard around
+the upstream `odeint` call:
+
+- active event times passed into `integrate_lambda(...)` must be strictly
+  increasing relative to the previous accepted event time; if not, the code now
+  raises an explicit runtime error before the solver call with the offending
+  event index and interval stats
+- solver endpoints that are theoretically positive but too small to survive
+  float32 rounding are repaired with the next representable float above `t0`
+  instead of a fixed `t0 + 1e-6` offset
+- if torchdiffeq still raises `"underflow in dt"`, the repo now re-raises with
+  temporal interval diagnostics (`min/max/mean_raw_dt`,
+  `non_increasing_count`, `tiny_interval_count`, solver settings, `nfe`)
+
+This is a debugging and numerical-stability guard for pathological or
+effectively zero temporal intervals. It does not alter the model path for
+ordinary strictly increasing event sequences.
+
 #### B. Repo current state
 
 File: `unified_stpp/configs/neural_stpp_attn_sc.yaml`
