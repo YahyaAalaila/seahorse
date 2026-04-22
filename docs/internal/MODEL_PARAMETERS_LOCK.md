@@ -556,10 +556,11 @@ This is intentionally model-specific — each schedule matches what the upstream
 | Model | HPO config | Status |
 |---|---|---|
 | auto_stpp | `auto_stpp_hpo.yaml` | exists, correct |
-| deep_stpp | **missing** | needs `deep_stpp_hpo.yaml` |
-| neural_attncnf | **missing** | model is provisional; defer |
-| neural_jumpcnf | **missing** | model is provisional; defer |
-| smash | **missing** | recommend no HPO for first round |
+| deep_stpp | `deep_stpp_hpo.yaml` | exists, bounded and usable |
+| neural_attncnf | `neural_attncnf_hpo.yaml` | exists; keep thin and provisional |
+| neural_jumpcnf | `neural_jumpcnf_hpo.yaml` | exists; keep thin and provisional |
+| neural_cond_gmm | `neural_cond_gmm_hpo.yaml` | exists; usable as the cheapest neural sweep |
+| smash | `smash_hpo.yaml` | exists; use only on sequence-chunked synthetic suites |
 | nsmpp | `nsmpp_hpo.yaml` | exists, correct; bump int_res for final run |
 
 ### 5.4 Still unresolved
@@ -567,11 +568,36 @@ This is intentionally model-specific — each schedule matches what the upstream
 | Issue | Impact | Recommended action |
 |---|---|---|
 | `auto_stpp.yaml` has stale lr (0.00815) | Misleading default if used without HPO | Always run HPO for auto_stpp; never use YAML lr as benchmark default |
-| `neural_attncnf` atol/rtol=1e-5 (10× paper) | Slower training for no documented benefit | Revert to 1e-4 before any benchmark run |
 | SMASH paper citation missing | Cannot fully verify upstream defaults | Document as "unverifiable against paper" in any publication |
 | `nsmpp` val_objective vs val_nll | May not align with val/nll used by other models | Verify that HPO metric (val_objective) and checkpoint monitor are equivalent for this model |
-| `deep_stpp_hpo.yaml` does not exist | DeepSTPP results will be based on paper defaults, not tuned | Create HPO config before final benchmark |
+| `rmtpp_gmm.yaml` is explicitly provisional | Unsafe to treat as final no-HPO real-data default | Do not use no-HPO as a final real-data benchmark config |
+| `thp_gmm.yaml` is explicitly provisional | Unsafe to treat as final no-HPO real-data default | Do not use no-HPO as a final real-data benchmark config |
 | Neural preset activation: softplus vs paper swish | Minor architecture difference; lower expressiveness | Acceptable for provisional; not paper-faithful |
+
+### 5.5 Real-data no-HPO launch policy
+
+If real-data runs must proceed without any HPO, treat the current canonical YAMLs in
+three buckets:
+
+| Model | No-HPO on real data? | Rationale |
+|---|---|---|
+| `deep_stpp` | Yes | Canonical YAML matches the intended paper-style training recipe closely enough for a no-HPO baseline. |
+| `neural_attncnf` | Yes, provisional | Canonical YAML now uses raw-input ownership, `atol/rtol=1e-4`, event-budget batching, val/test `batch_size=32`, and `num_workers=0`. Still provisional, but acceptable as a fixed upstream-style baseline. |
+| `neural_jumpcnf` | Yes, provisional | Same argument as `neural_attncnf`; use as a fixed provisional baseline, not a headline faithful result. |
+| `neural_cond_gmm` | Yes, provisional | Cheapest Neural STPP variant; canonical YAML is a reasonable fixed upstream-style baseline. |
+| `smash` | Yes, but sampling lane only | Use canonical YAML only for sampling-based metrics. Do not present as an exact-NLL comparator. |
+| `diffusion_stpp` | Yes, but sampling lane only | Use canonical YAML for sampling/surrogate metrics only. Treat as a generative baseline, not an exact-NLL one. |
+| `auto_stpp` | No | `auto_stpp.yaml` still contains a stale tuned LR and should not be used as a final no-HPO real-data config. |
+| `nsmpp` | No | Current YAML is sweep-derived rather than a clean paper/default lock; acceptable for exploratory use, not for a "paper/repo default" claim. |
+| `rmtpp_gmm` | No | File comments explicitly say the hyperparameters are provisional and should be swept. |
+| `thp_gmm` | No | File comments explicitly say the hyperparameters are provisional and should be swept. |
+
+Operational policy for real-data no-HPO runs:
+
+- disable `--hpo_configs_dir` rather than silently reusing old tune outputs
+- use the canonical YAMLs directly only for the models marked `Yes` above
+- keep `smash` and `diffusion_stpp` in a separate sampling-metric lane
+- do not claim `auto_stpp`, `nsmpp`, `rmtpp_gmm`, or `thp_gmm` are "paper/repo default" real-data baselines until their canonical YAMLs are explicitly audited and locked
 
 ---
 
@@ -579,10 +605,10 @@ This is intentionally model-specific — each schedule matches what the upstream
 
 1. **Should SMASH use `lr_schedule: cosine` instead of `linear_decay`?** Score-matching literature sometimes favors cosine. No paper citation to validate current choice.
 
-2. **Should all models use the same number of HPO trials (40)?** Currently auto_stpp uses 40 and nsmpp uses 60. For fair comparison, either standardize or document the difference.
+2. **Should all models use the same number of HPO trials (40)?** Current configs intentionally differ by cost class. For expensive provisional models, a smaller thin-HPO budget may be the only practical option, but that must be documented clearly.
 
 3. **What is the correct `int_res` for NSMPP final runs?** The HPO config says "use 30-50 in final config" but does not commit to a value. Recommend: lock to `int_res: 40` for final benchmark configs.
 
-4. **Should neural presets use event-budget batching (`max_events: 4000`) in the benchmark?** The original NeuralSTPP uses it. The current YAML does not set it for benchmark runs. This may affect both memory use and gradient signal quality.
+4. **Should neural presets use event-budget batching (`max_events: 4000`) in the benchmark?** The original NeuralSTPP uses it, and the current canonical neural YAMLs now set it. Keep this locked unless a dataset-specific memory failure forces a documented change.
 
 5. **Is there a target dataset on which to validate the HPO results?** The stale `auto_stpp.yaml` lr was tuned on an unspecified Hawkes dataset. New HPO should target the canonical benchmark split (HawkesNest hard or similar) to avoid dataset-specific overfitting.
