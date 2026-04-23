@@ -34,6 +34,7 @@ Useful environment overrides:
   RUN_ROOT=/home/aalaila/projects/uni-stpp/runs/exp1
   DATASET_REVISION=...
   OVERRIDES="training.device=cuda data.num_workers=0"
+  EXCLUDE=serv-3307
   HPO_CONFIGS_DIR=...
   CAMPAIGN_ID=...
   GROUP_NAME=...
@@ -121,6 +122,9 @@ SBATCH_SCRIPT="$ROOT/scripts/pegasus_bench_group.sbatch"
 DATASET="$(dataset_id "$DATASET_INPUT")"
 DATASET_SLUG="$(dataset_slug "$DATASET")"
 FAMILY_TAG="$(family_alias "$FAMILY")"
+if [ "$FAMILY_TAG" = "custom" ] && [ "${#PRESETS[@]}" -eq 1 ]; then
+  FAMILY_TAG="${PRESETS[0]}"
+fi
 TAG_SUFFIX="${TAG_SUFFIX:-$(date +%m%d%H%M)}"
 JOB_NAME="${JOB_NAME:-${DATASET_SLUG}__${FAMILY_TAG}__${TAG_SUFFIX}}"
 
@@ -151,6 +155,9 @@ SBATCH_ARGS+=(--time="$TIME_LIMIT")
 SBATCH_ARGS+=(--output="$ROOT/logs/%x_%j.out")
 if [ -n "${PARTITION:-}" ]; then
   SBATCH_ARGS+=(--partition="$PARTITION")
+fi
+if [ -n "${EXCLUDE:-}" ]; then
+  SBATCH_ARGS+=(--exclude="$EXCLUDE")
 fi
 
 mkdir -p "$ROOT/logs" "$RUN_ROOT/${DATASET_SLUG}/bench"

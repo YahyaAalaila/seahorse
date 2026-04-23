@@ -44,13 +44,24 @@ run_cmd() {
   local -a cmd=( "$@" )
   if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
     local -a srun_cmd=( srun "--container-image=${CONTAINER_IMAGE}" )
+    local quoted_cmd
+    printf -v quoted_cmd '%q ' "${cmd[@]}"
+    local setup_cmd=""
+    if [[ "${INSTALL_PROJECT:-1}" == "1" ]]; then
+      local python_bin="${UNIFIED_STPP_PYTHON:-python}"
+      local quoted_root
+      local quoted_python
+      printf -v quoted_root '%q' "${REPO_ROOT}"
+      printf -v quoted_python '%q' "${python_bin}"
+      setup_cmd="cd ${quoted_root} && ${quoted_python} -m pip install -e '.[hpo]' && "
+    fi
     if [[ -n "${CONTAINER_MOUNTS:-}" ]]; then
       srun_cmd+=( "--container-mounts=${CONTAINER_MOUNTS}" )
     fi
     if [[ -n "${CONTAINER_WORKDIR:-}" ]]; then
       srun_cmd+=( "--container-workdir=${CONTAINER_WORKDIR}" )
     fi
-    "${srun_cmd[@]}" "${cmd[@]}"
+    "${srun_cmd[@]}" bash -lc "${setup_cmd}${quoted_cmd}"
     return
   fi
   "${cmd[@]}"
