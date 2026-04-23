@@ -49,3 +49,4 @@ scripts/debug_neural_stpp_surface.py
 data/sthp0/dataset_meta.json
 data/sthp0/intensity_surface.html
 data/sthp1/
+data/hawkesnest_suitesv2_faulted/

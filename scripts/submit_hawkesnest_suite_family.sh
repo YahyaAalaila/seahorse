@@ -27,6 +27,7 @@ Useful environment overrides:
   RUN_BATCH_SIZE=...
   DEVICE=cuda|cpu
   SUITE_ROOT=...
+  EXCLUDE=serv-3307
   TAG_SUFFIX=...
   CAMPAIGN_TAG=...
   OUT_ROOT=...
@@ -111,6 +112,9 @@ esac
 
 SUITE_TAG="$(suite_alias "$SUITE_NAME")"
 FAMILY_TAG="$(family_alias "$FAMILY")"
+if [ "$FAMILY_TAG" = "custom" ] && [ "${#PRESETS[@]}" -eq 1 ]; then
+  FAMILY_TAG="${PRESETS[0]}"
+fi
 TAG_SUFFIX="${TAG_SUFFIX:-$(date +%m%d%H%M)}"
 JOB_NAME="${JOB_NAME:-${SUITE_TAG}__${FAMILY_TAG}__${TAG_SUFFIX}}"
 
@@ -146,6 +150,9 @@ SBATCH_ARGS+=(--mem="$MEM")
 SBATCH_ARGS+=(--time="$TIME_LIMIT")
 if [ -n "${PARTITION:-}" ]; then
   SBATCH_ARGS+=(--partition="$PARTITION")
+fi
+if [ -n "${EXCLUDE:-}" ]; then
+  SBATCH_ARGS+=(--exclude="$EXCLUDE")
 fi
 
 mkdir -p "$ROOT/runs/hawkesnest_campaigns"

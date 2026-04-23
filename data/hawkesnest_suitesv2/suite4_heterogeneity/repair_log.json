@@ -1,0 +1,170 @@
+{
+  "H0": [
+    {
+      "seed": 0,
+      "source_npz": "H0_r0.npz",
+      "n_time_ties_repaired": 1,
+      "min_original_dt": 3.0517578125e-05,
+      "min_repaired_dt": 2.2737367544323206e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 1,
+      "source_npz": "H0_r1.npz",
+      "n_time_ties_repaired": 1,
+      "min_original_dt": 0.0001220703125,
+      "min_repaired_dt": 2.2737367544323206e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 2,
+      "source_npz": "H0_r2.npz",
+      "n_time_ties_repaired": 4,
+      "min_original_dt": 6.103515625e-05,
+      "min_repaired_dt": 1.1368683772161603e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 3,
+      "source_npz": "H0_r3.npz",
+      "n_time_ties_repaired": 5,
+      "min_original_dt": 3.0517578125e-05,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 4,
+      "source_npz": "H0_r4.npz",
+      "n_time_ties_repaired": 1,
+      "min_original_dt": 6.103515625e-05,
+      "min_repaired_dt": 1.1368683772161603e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    }
+  ],
+  "H1": [
+    {
+      "seed": 0,
+      "source_npz": "H1_r0.npz",
+      "n_time_ties_repaired": 0,
+      "min_original_dt": 3.0517578125e-05,
+      "min_repaired_dt": 3.0517578125e-05,
+      "time_repair_policy": "none"
+    },
+    {
+      "seed": 1,
+      "source_npz": "H1_r1.npz",
+      "n_time_ties_repaired": 4,
+      "min_original_dt": 1.9073486328125e-06,
+      "min_repaired_dt": 2.842170943040401e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 2,
+      "source_npz": "H1_r2.npz",
+      "n_time_ties_repaired": 1,
+      "min_original_dt": 1.52587890625e-05,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 3,
+      "source_npz": "H1_r3.npz",
+      "n_time_ties_repaired": 4,
+      "min_original_dt": 7.62939453125e-06,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 4,
+      "source_npz": "H1_r4.npz",
+      "n_time_ties_repaired": 2,
+      "min_original_dt": 5.7220458984375e-06,
+      "min_repaired_dt": 2.842170943040401e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    }
+  ],
+  "H2": [
+    {
+      "seed": 0,
+      "source_npz": "H2_r0.npz",
+      "n_time_ties_repaired": 2,
+      "min_original_dt": 0.0001220703125,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 1,
+      "source_npz": "H2_r1.npz",
+      "n_time_ties_repaired": 2,
+      "min_original_dt": 0.0001220703125,
+      "min_repaired_dt": 2.2737367544323206e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 2,
+      "source_npz": "H2_r2.npz",
+      "n_time_ties_repaired": 1,
+      "min_original_dt": 6.103515625e-05,
+      "min_repaired_dt": 2.2737367544323206e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 3,
+      "source_npz": "H2_r3.npz",
+      "n_time_ties_repaired": 6,
+      "min_original_dt": 0.0001220703125,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 4,
+      "source_npz": "H2_r4.npz",
+      "n_time_ties_repaired": 3,
+      "min_original_dt": 6.103515625e-05,
+      "min_repaired_dt": 1.1368683772161603e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    }
+  ],
+  "H3": [
+    {
+      "seed": 0,
+      "source_npz": "H3_r0.npz",
+      "n_time_ties_repaired": 0,
+      "min_original_dt": 0.0001220703125,
+      "min_repaired_dt": 0.0001220703125,
+      "time_repair_policy": "none"
+    },
+    {
+      "seed": 1,
+      "source_npz": "H3_r1.npz",
+      "n_time_ties_repaired": 2,
+      "min_original_dt": 3.0517578125e-05,
+      "min_repaired_dt": 1.1368683772161603e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 2,
+      "source_npz": "H3_r2.npz",
+      "n_time_ties_repaired": 5,
+      "min_original_dt": 3.0517578125e-05,
+      "min_repaired_dt": 1.1368683772161603e-13,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 3,
+      "source_npz": "H3_r3.npz",
+      "n_time_ties_repaired": 5,
+      "min_original_dt": 4.57763671875e-05,
+      "min_repaired_dt": 5.684341886080802e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    },
+    {
+      "seed": 4,
+      "source_npz": "H3_r4.npz",
+      "n_time_ties_repaired": 3,
+      "min_original_dt": 5.7220458984375e-06,
+      "min_repaired_dt": 2.842170943040401e-14,
+      "time_repair_policy": "nextafter_forward_pass"
+    }
+  ]
+}
