@@ -204,6 +204,7 @@ class STPPRunner:
         """
         _seed_fit(self.config.data.seed)
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
+        self._sync_model_spatial_dim_from_data(dm)
         run_dir = self._prepare_run_dir(self.config.model.preset)
         for callback in extra_callbacks or []:
             bind = getattr(callback, "bind_run_context", None)
@@ -310,6 +311,26 @@ class STPPRunner:
         data_overrides = ConfigRegistry.data_init_overrides(self.config.model.preset, dm)
         self._effective_model_overrides = data_overrides or {}
         return self.config.model.build_model(extra_overrides=data_overrides or None)
+
+    def _sync_model_spatial_dim_from_data(self, dm: STPPDataModule) -> None:
+        """Make model construction follow the loaded dataset location dimension."""
+        inferred = self._infer_spatial_dim(dm)
+        if inferred is None:
+            return
+        configured = int(self.config.model.spatial_dim)
+        if configured != inferred:
+            self.config.model.spatial_dim = inferred
+
+    @staticmethod
+    def _infer_spatial_dim(dm: STPPDataModule) -> Optional[int]:
+        dataset = getattr(dm, "train_dataset", None)
+        sequences = getattr(dataset, "sequences", None)
+        if not sequences:
+            return None
+        locations = np.asarray(sequences[0].get("locations"))
+        if locations.ndim < 2:
+            return None
+        return int(locations.shape[-1])
 
     def _extract_fit_metrics(
         self,

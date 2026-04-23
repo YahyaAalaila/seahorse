@@ -11,10 +11,12 @@ from unittest.mock import patch
 
 import yaml
 
+from unified_stpp.data.registry import DataBundle
 from unified_stpp.benchmark.hpo import RayTuneValidationReportCallback, run_hpo
 from unified_stpp.config.schema import STPPConfig
 from unified_stpp.config.tuning import TuningConfig
 from unified_stpp.runner import STPPRunner
+from unified_stpp.training.data_module import STPPDataModule
 
 
 class ConfigResolutionTest(unittest.TestCase):
@@ -98,6 +100,34 @@ class ConfigResolutionTest(unittest.TestCase):
             override_list=["logging.out_dir=override_out"],
         )
         self.assertEqual(runner.config.logging.out_dir, "override_out")
+
+    def test_runner_uses_dataset_spatial_dim_for_model_construction(self):
+        cfg = STPPConfig.from_source(
+            preset="neural_cond_gmm",
+            override_list=["model.spatial_dim=2"],
+        )
+        runner = STPPRunner(cfg)
+        dataset = types.SimpleNamespace(
+            sequences=[
+                {
+                    "times": [0.0, 1.0],
+                    "locations": [[0.0, 0.1, 0.2], [1.0, 1.1, 1.2]],
+                }
+            ]
+        )
+        dm = STPPDataModule(
+            DataBundle(
+                train_dataset=dataset,
+                val_dataset=dataset,
+                test_dataset=None,
+                collate_fn=lambda batch: batch,
+                train_batch_sampler=None,
+            )
+        )
+
+        runner._sync_model_spatial_dim_from_data(dm)
+
+        self.assertEqual(runner.config.model.spatial_dim, 3)
 
     def test_tuning_from_sources_uses_yaml_base_and_cli_override(self):
         tuning = TuningConfig.from_sources(
