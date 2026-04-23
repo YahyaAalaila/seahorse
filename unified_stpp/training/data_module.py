@@ -82,7 +82,7 @@ class STPPDataModule(pl.LightningDataModule):
                 batch_sampler=self._bundle.train_batch_sampler,
                 collate_fn=self._bundle.collate_fn,
                 num_workers=self.num_workers,
-                persistent_workers=True,
+                persistent_workers=self.num_workers > 0,
             )
         return DataLoader(
             self._bundle.train_dataset,
