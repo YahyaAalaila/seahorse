@@ -3,8 +3,14 @@
 #SBATCH --output=%x-%j.out
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/pegasus_campaign_env.sh"
+if [[ -n "${REPO_ROOT:-}" && -f "${REPO_ROOT}/scripts/pegasus_campaign_env.sh" ]]; then
+  source "${REPO_ROOT}/scripts/pegasus_campaign_env.sh"
+elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/scripts/pegasus_campaign_env.sh" ]]; then
+  source "${SLURM_SUBMIT_DIR}/scripts/pegasus_campaign_env.sh"
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  source "${SCRIPT_DIR}/pegasus_campaign_env.sh"
+fi
 
 for name in REPO_ROOT RUN_DIR HISTORY_PATH OUT_DIR; do
   require_var "$name"
