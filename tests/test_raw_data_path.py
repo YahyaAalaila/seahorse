@@ -100,6 +100,33 @@ class TestRawDatasetContract(unittest.TestCase):
             torch.tensor([2.0, 5.0, 9.0, 14.0]),
         )
 
+    def test_raw_dataset_repairs_float32_precision_collapse(self):
+        seqs = [
+            {
+                "times": np.array([100.0, 100.0 + 5.684341886080802e-14, 101.0], dtype=np.float64),
+                "locations": np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]], dtype=np.float32),
+            }
+        ]
+        self.assertEqual(np.diff(seqs[0]["times"].astype(np.float32))[0], 0.0)
+
+        ds = STPPDataset(seqs, normalize_time=False, normalize_space=False, min_length=1)
+        item = ds[0]
+
+        self.assertTrue(bool(torch.all(torch.diff(item["times"]) > 0)))
+        self.assertAlmostEqual(float(item["times"][0]), 100.0, places=5)
+        self.assertAlmostEqual(float(item["times"][-1]), 101.0, places=5)
+
+    def test_raw_dataset_still_rejects_truly_non_increasing_source_times(self):
+        seqs = [
+            {
+                "times": np.array([1.0, 1.0, 2.0], dtype=np.float64),
+                "locations": np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]], dtype=np.float32),
+            }
+        ]
+        ds = STPPDataset(seqs, normalize_time=False, normalize_space=False, min_length=1)
+        with self.assertRaisesRegex(ValueError, "Non-increasing source event times"):
+            _ = ds[0]
+
 
 class TestRawTransformFitting(unittest.TestCase):
     def test_neural_transform_fits_spatial_zscore_from_raw_sequences(self):

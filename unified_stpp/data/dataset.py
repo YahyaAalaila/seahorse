@@ -10,6 +10,49 @@ from typing import List, Dict, Optional
 import numpy as np
 
 
+def _strict_float32_times(times, *, context: str) -> np.ndarray:
+    """Return float32 event times that remain strictly increasing.
+
+    The source sequence is first checked in float64. If it is already
+    non-increasing there, we raise and preserve that data bug. If strictness is
+    lost only because of the float32 cast, we repair it with a forward
+    ``nextafter`` pass.
+    """
+    times64 = np.asarray(times, dtype=np.float64).reshape(-1)
+    if times64.size <= 1:
+        return times64.astype(np.float32, copy=True)
+
+    raw_dt64 = np.diff(times64)
+    if (raw_dt64 <= 0).any():
+        bad = raw_dt64 <= 0
+        first_bad = int(np.flatnonzero(bad)[0] + 1)
+        raise ValueError(
+            f"Non-increasing source event times in {context}; "
+            f"event_index={first_bad}, bad_count={int(bad.sum())}, "
+            f"min_raw_dt={float(raw_dt64.min()):.6e}"
+        )
+
+    times32 = times64.astype(np.float32, copy=True)
+    if (np.diff(times32) > 0).all():
+        return times32
+
+    for i in range(1, times32.size):
+        if not (times32[i] > times32[i - 1]):
+            times32[i] = np.nextafter(times32[i - 1], np.float32(np.inf))
+
+    raw_dt32 = np.diff(times32)
+    if (raw_dt32 <= 0).any():
+        bad = raw_dt32 <= 0
+        first_bad = int(np.flatnonzero(bad)[0] + 1)
+        raise ValueError(
+            f"float32 time repair failed in {context}; "
+            f"event_index={first_bad}, bad_count={int(bad.sum())}, "
+            f"min_raw_dt={float(raw_dt32.min()):.6e}"
+        )
+
+    return times32
+
+
 class STPPDataset(Dataset):
     """
     Dataset for STPP sequences.
@@ -151,13 +194,15 @@ class STPPDataset(Dataset):
 
     def __getitem__(self, idx):
         seq = self.sequences[idx]
-        times = seq["times"].copy()
-        locs = seq["locations"].copy()
+        times = np.asarray(seq["times"], dtype=np.float64).copy()
+        locs = np.asarray(seq["locations"], dtype=np.float32).copy()
 
         if self.normalize_time:
             times = (times - self.time_mean) / self.time_std
         if self.normalize_space:
             locs = (locs - self.loc_mean) / self.loc_std
+
+        times = _strict_float32_times(times, context=f"STPPDataset[idx={idx}]")
 
         item = {
             "times": torch.tensor(times, dtype=torch.float32),
@@ -234,7 +279,10 @@ class SlidingWindowSTPPDataset(Dataset):
 
         self.sequences: list[Dict] = []
         for seq_idx, seq in enumerate(sequences):
-            times = np.asarray(seq["times"], dtype=np.float32)
+            times = _strict_float32_times(
+                seq["times"],
+                context=f"SlidingWindowSTPPDataset[source_sequence_index={seq_idx}]",
+            )
             locs = np.asarray(seq["locations"], dtype=np.float32)
             n_events = int(times.shape[0])
             if n_events < self.window_length:
