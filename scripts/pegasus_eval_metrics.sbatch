@@ -12,9 +12,13 @@ else
   source "${SCRIPT_DIR}/pegasus_campaign_env.sh"
 fi
 
-for name in REPO_ROOT RUN_DIR DATA_PATH OUT_DIR; do
+for name in REPO_ROOT RUN_DIR OUT_DIR; do
   require_var "$name"
 done
+if [[ -z "${DATA_PATH:-}" && -z "${DATASET:-}" ]]; then
+  echo "Missing required environment variable: DATA_PATH or DATASET" >&2
+  exit 2
+fi
 
 PYTHON_BIN="${UNIFIED_STPP_PYTHON:-python}"
 mkdir -p "${OUT_DIR}"
@@ -25,9 +29,8 @@ if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "${OUT_DIR}" metrics.json eval
 fi
 
 CMD=(
-  "${PYTHON_BIN}" -m unified_stpp evaluate metrics
+  "${PYTHON_BIN}" scripts/run_eval_metrics.py
   --run "${RUN_DIR}"
-  --data "${DATA_PATH}"
   --metric-profile "${METRIC_PROFILE:-core}"
   --artifact-mode "${ARTIFACT_MODE:-load_or_compute}"
   --device "${DEVICE:-cpu}"
@@ -38,6 +41,15 @@ CMD=(
   --exact-spatial-bins "${EXACT_SPATIAL_BINS:-8}"
   --out "${OUT_DIR}"
 )
+
+if [[ -n "${DATA_PATH:-}" ]]; then
+  CMD+=( --data "${DATA_PATH}" )
+else
+  CMD+=( --dataset "${DATASET}" )
+  if [[ -n "${DATASET_REVISION:-}" ]]; then
+    CMD+=( --dataset-revision "${DATASET_REVISION}" )
+  fi
+fi
 
 if [[ -n "${SPLIT:-}" ]]; then
   CMD+=( --split "${SPLIT}" )
