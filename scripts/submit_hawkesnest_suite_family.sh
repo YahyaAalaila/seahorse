@@ -27,6 +27,7 @@ Useful environment overrides:
   RUN_BATCH_SIZE=...
   DEVICE=cuda|cpu
   SUITE_ROOT=...
+  SUITE_DATA_TAG=v2
   EXCLUDE=serv-3307
   TAG_SUFFIX=...
   CAMPAIGN_TAG=...
@@ -39,6 +40,7 @@ Examples:
   HPO_POLICY=generative-thin TIME_LIMIT=48:00:00 scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity gen
   PARTITION=A100-80GB scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity gen
   GPUS=0 DEVICE=cpu scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity factorized
+  SUITE_DATA_TAG=v2 scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity neural
 EOF
 }
 
@@ -115,8 +117,10 @@ FAMILY_TAG="$(family_alias "$FAMILY")"
 if [ "$FAMILY_TAG" = "custom" ] && [ "${#PRESETS[@]}" -eq 1 ]; then
   FAMILY_TAG="${PRESETS[0]}"
 fi
+SUITE_DATA_TAG="${SUITE_DATA_TAG:-v2}"
 TAG_SUFFIX="${TAG_SUFFIX:-$(date +%m%d%H%M)}"
-JOB_NAME="${JOB_NAME:-${SUITE_TAG}__${FAMILY_TAG}__${TAG_SUFFIX}}"
+JOB_STEM="${SUITE_TAG}_${SUITE_DATA_TAG}__${FAMILY_TAG}"
+JOB_NAME="${JOB_NAME:-${JOB_STEM}__${TAG_SUFFIX}}"
 
 SEEDS="${SEEDS:-42 3 555}"
 HPO_SEED="${HPO_SEED:-42}"
@@ -162,6 +166,7 @@ if [ ! -f "$LEDGER" ]; then
 fi
 
 printf '[submit] suite=%s family=%s job=%s\n' "$SUITE_NAME" "$FAMILY" "$JOB_NAME"
+printf '[submit] suite_data_tag=%s\n' "$SUITE_DATA_TAG"
 printf '[submit] presets=%s\n' "${PRESETS[*]}"
 printf '[submit] hpo_policy=%s\n' "$HPO_POLICY"
 printf '[submit] out_root=%s\n' "$OUT_ROOT"
@@ -173,6 +178,7 @@ sbatch_output="$(
     HPO_CONFIG_DIR="$HPO_CONFIG_DIR" \
     HPO_POLICY="$HPO_POLICY" \
     SUITE_ROOT="$SUITE_ROOT" \
+    SUITE_DATA_TAG="$SUITE_DATA_TAG" \
     DEVICE="$DEVICE" \
     RUN_BATCH_SIZE="$RUN_BATCH_SIZE" \
     STAGE="$STAGE" \
