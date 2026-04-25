@@ -8,18 +8,20 @@ from typing import Any
 import numpy as np
 import torch
 
+from unified_stpp.data.dataset import _strict_float32_times
 from unified_stpp.runner.runner import STPPRunner
 
 from .predictive.sampling import compute_predictive_samples
 
 
-def _build_single_seq_batch(
+def _prepare_eval_sequence_arrays(
     seq: dict[str, np.ndarray],
     norm_stats: dict[str, Any],
-    device: torch.device,
-) -> dict[str, torch.Tensor]:
-    """Turn one raw sequence into a single-item padded batch for model.eval_forward."""
-    times = np.asarray(seq["times"], dtype=np.float32)
+    *,
+    context: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Normalize one evaluation sequence and preserve strict time ordering."""
+    times = np.asarray(seq["times"], dtype=np.float64)
     locs = np.asarray(seq["locations"], dtype=np.float32)
     normalize = bool(norm_stats.get("normalize", False))
     if normalize:
@@ -31,6 +33,21 @@ def _build_single_seq_batch(
         )
         times = (times - t_mean) / t_std
         locs = (locs - loc_mean) / loc_std
+    times = _strict_float32_times(times, context=context)
+    return times, locs
+
+
+def _build_single_seq_batch(
+    seq: dict[str, np.ndarray],
+    norm_stats: dict[str, Any],
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    """Turn one raw sequence into a single-item padded batch for model.eval_forward."""
+    times, locs = _prepare_eval_sequence_arrays(
+        seq,
+        norm_stats,
+        context="likelihood single-sequence eval batch",
+    )
     n = times.shape[0]
     return {
         "times": torch.tensor(times, dtype=torch.float32, device=device).unsqueeze(0),
@@ -238,7 +255,7 @@ def _prefix_difference_next_event_nlls(
     *,
     device: torch.device,
 ) -> np.ndarray:
-    times = np.asarray(seq["times"], dtype=np.float32)
+    times = np.asarray(seq["times"], dtype=np.float64).reshape(-1)
     n_prefixes = int(times.shape[0])
     if n_prefixes < 2:
         return np.zeros((0,), dtype=np.float64)
@@ -281,8 +298,11 @@ def _prefix_difference_next_event_nlls_unbatched(
     device: torch.device,
 ) -> np.ndarray:
     prefix_totals: list[float] = []
-    times = np.asarray(seq["times"], dtype=np.float32)
-    locs = np.asarray(seq["locations"], dtype=np.float32)
+    times, locs = _prepare_eval_sequence_arrays(
+        seq,
+        runner.norm_stats,
+        context="likelihood unbatched prefix eval",
+    )
     for prefix_len in range(1, int(times.shape[0]) + 1):
         prefix = {
             "times": times[:prefix_len],
@@ -330,19 +350,11 @@ def _build_multi_prefix_batch(
     norm_stats: dict[str, Any],
     device: torch.device,
 ) -> dict[str, torch.Tensor]:
-    times = np.asarray(seq["times"], dtype=np.float32)
-    locs = np.asarray(seq["locations"], dtype=np.float32)
-    normalize = bool(norm_stats.get("normalize", False))
-    if normalize:
-        t_mean = float(norm_stats.get("time_mean", 0.0))
-        t_std = max(float(norm_stats.get("time_std", 1.0)), 1e-8)
-        loc_mean = np.asarray(norm_stats.get("loc_mean", [0.0, 0.0]), dtype=np.float32)
-        loc_std = np.maximum(
-            np.asarray(norm_stats.get("loc_std", [1.0, 1.0]), dtype=np.float32),
-            1e-8,
-        )
-        times = (times - t_mean) / t_std
-        locs = (locs - loc_mean) / loc_std
+    times, locs = _prepare_eval_sequence_arrays(
+        seq,
+        norm_stats,
+        context="likelihood multi-prefix eval batch",
+    )
 
     lengths = np.asarray(prefix_lengths, dtype=np.int64).reshape(-1)
     batch_size = int(lengths.shape[0])

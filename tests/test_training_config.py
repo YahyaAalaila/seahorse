@@ -269,9 +269,11 @@ class _DummyStructuredEvalModel:
 
 
 class _DummyPrefixFallbackModel:
-    def __init__(self, correction: float = 0.25):
+    def __init__(self, correction: float = 0.25, *, require_strict_times: bool = False):
         self.correction = float(correction)
+        self.require_strict_times = bool(require_strict_times)
         self.forward_calls = 0
+        self.seen_batches = []
         self.event_model = SimpleNamespace(
             capabilities=SimpleNamespace(metric_key="nll", nll_kind="exact")
         )
@@ -280,8 +282,19 @@ class _DummyPrefixFallbackModel:
         return self
 
     def eval_forward(self, *, times, locations, lengths, **kwargs):
-        del times, locations, kwargs
+        del locations, kwargs
         self.forward_calls += 1
+        self.seen_batches.append(
+            (
+                times.detach().cpu().numpy().copy(),
+                lengths.detach().cpu().numpy().copy(),
+            )
+        )
+        if self.require_strict_times:
+            for row, length in enumerate(lengths.tolist()):
+                active = times[row, :length]
+                if length > 1 and not bool(torch.all(active[1:] > active[:-1]).item()):
+                    raise RuntimeError("non-increasing eval times")
         max_len = int(lengths.max().item()) if lengths.numel() else 0
         idx = torch.arange(max_len, device=lengths.device).unsqueeze(0)
         mask = (idx < lengths.unsqueeze(1)).to(torch.float64)
@@ -304,6 +317,52 @@ class _DummyPrefixFallbackModel:
             extra_metrics={
                 "raw_space_nll": float(native_nll.detach().item() + self.correction)
             },
+        )
+
+
+class _StrictMonotoneEventwiseModel:
+    def __init__(self):
+        self.seen_times = []
+        self.event_model = SimpleNamespace(
+            capabilities=SimpleNamespace(
+                metric_key="nll",
+                nll_kind="exact",
+                has_native_sampler=False,
+                nll_footnote="",
+            )
+        )
+
+    def eval(self):
+        return self
+
+    def eval_forward(self, *, times, locations, lengths, **kwargs):
+        del locations, kwargs
+        self.seen_times.append(times.detach().cpu().numpy().copy())
+        for row, length in enumerate(lengths.tolist()):
+            active = times[row, :length]
+            if length > 1 and not bool(torch.all(active[1:] > active[:-1]).item()):
+                raise RuntimeError("non-increasing eval times")
+        max_len = int(times.shape[1])
+        idx = torch.arange(max_len, device=times.device).unsqueeze(0)
+        mask = (idx < lengths.unsqueeze(1)).to(torch.float32)
+        return {
+            "nll_matrix": torch.ones(
+                (times.shape[0], max_len),
+                dtype=torch.float32,
+                device=times.device,
+            ),
+            "mask": mask,
+        }
+
+    def compute_loss(self, output):
+        total_events = output["mask"].sum()
+        one = torch.tensor(1.0, dtype=torch.float32)
+        return LossResult(
+            loss=one,
+            nll=one,
+            total_events=total_events,
+            kl=None,
+            aux_terms={},
         )
 
 
@@ -416,6 +475,51 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertEqual(summary["n_contexts"], 3)
         self.assertEqual(summary["n_scored_contexts"], 3)
         self.assertEqual(summary["n_missing_contexts"], 0)
+
+    def test_compute_next_event_test_nll_repairs_float32_collapsed_times(self):
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
+        seq = {
+            "times": np.array(
+                [
+                    15.686068725585983,
+                    15.686068725586097,
+                    15.8,
+                ],
+                dtype=np.float64,
+            ),
+            "locations": np.array(
+                [[0.0, 0.0], [0.2, 0.1], [0.4, 0.2]],
+                dtype=np.float32,
+            ),
+        }
+        self.assertEqual(
+            int((np.diff(np.asarray(seq["times"], dtype=np.float32)) <= 0).sum()),
+            1,
+        )
+
+        model = _StrictMonotoneEventwiseModel()
+        runner = SimpleNamespace(
+            model=model,
+            norm_stats={
+                "normalize": True,
+                "time_mean": 0.0,
+                "time_std": 100.0,
+                "loc_mean": np.zeros(2, dtype=np.float32),
+                "loc_std": np.ones(2, dtype=np.float32),
+            },
+            config=SimpleNamespace(
+                training=TrainingConfig(test_nll_space="native"),
+                data=SimpleNamespace(seed=0),
+            ),
+        )
+
+        summary = compute_next_event_test_nll(runner, [seq], device=torch.device("cpu"))
+
+        repaired = model.seen_times[0][0, :3]
+        self.assertTrue(np.all(np.diff(repaired) > 0.0))
+        self.assertEqual(summary["method"], "exact_next_event_from_eventwise_terms")
+        self.assertEqual(summary["n_contexts"], 2)
 
     def test_compute_next_event_test_nll_approx_tracks_missing_contexts(self):
         from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
@@ -557,6 +661,43 @@ class TestTestNLLReporting(unittest.TestCase):
         np.testing.assert_allclose(batched, baseline, rtol=1e-8, atol=1e-8)
         self.assertGreater(batched_runner.model.forward_calls, 1)
         self.assertLess(batched_runner.model.forward_calls, len(seq["times"]))
+
+    def test_batched_prefix_fallback_repairs_float32_collapsed_times(self):
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
+        seq = {
+            "times": np.array(
+                [
+                    15.686068725585983,
+                    15.686068725586097,
+                    15.8,
+                ],
+                dtype=np.float64,
+            ),
+            "locations": np.array(
+                [[0.0, 0.0], [0.2, 0.1], [0.4, 0.2]],
+                dtype=np.float32,
+            ),
+        }
+        runner = SimpleNamespace(
+            model=_DummyPrefixFallbackModel(require_strict_times=True),
+            norm_stats={
+                "normalize": True,
+                "time_mean": 0.0,
+                "time_std": 100.0,
+                "loc_mean": np.zeros(2, dtype=np.float32),
+                "loc_std": np.ones(2, dtype=np.float32),
+            },
+            config=SimpleNamespace(
+                training=TrainingConfig(test_nll_space="native"),
+                data=SimpleNamespace(seed=0),
+            ),
+        )
+
+        summary = compute_next_event_test_nll(runner, [seq], device=torch.device("cpu"))
+
+        self.assertEqual(summary["method"], "exact_next_event_from_prefix_differences")
+        self.assertEqual(summary["n_contexts"], 2)
 
 
 if __name__ == "__main__":
