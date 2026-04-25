@@ -167,6 +167,23 @@ def _parse_args() -> argparse.Namespace:
         action="store_false",
         help="Skip writing rmse_mae_by_level.png.",
     )
+    p.add_argument(
+        "--with-renders",
+        action="store_true",
+        help="Write optional predictive 2D/3D render artifacts for each cached bundle.",
+    )
+    p.add_argument(
+        "--plot-style",
+        default="both",
+        choices=("2d", "3d", "both"),
+        help="Render style used when --with-renders is enabled.",
+    )
+    p.add_argument(
+        "--gif",
+        action="store_true",
+        help="Also render predictive panel GIFs when --with-renders is enabled.",
+    )
+    p.add_argument("--fps", type=float, default=2.0)
     p.set_defaults(plot=True, isolate_process=True)
     return p.parse_args()
 
@@ -258,6 +275,43 @@ def _bundle_dir(out_dir: Path, record: RunRecord, args: argparse.Namespace) -> P
     return out_dir / "bundles" / _safe_name(name)
 
 
+def _render_dir(bundle_dir: Path) -> Path:
+    return bundle_dir / "renders"
+
+
+def _surface_rmse(reference_surfaces: np.ndarray, predicted_surfaces: np.ndarray) -> np.ndarray:
+    reference = np.asarray(reference_surfaces, dtype=np.float32)
+    predicted = np.asarray(predicted_surfaces, dtype=np.float32)
+    if reference.shape != predicted.shape:
+        raise ValueError(
+            f"reference/predicted surface shape mismatch: {reference.shape} vs {predicted.shape}"
+        )
+    diff = predicted - reference
+    return np.sqrt(np.mean(np.square(diff), axis=(1, 2))).astype(np.float32)
+
+
+def _surface_mae(reference_surfaces: np.ndarray, predicted_surfaces: np.ndarray) -> np.ndarray:
+    reference = np.asarray(reference_surfaces, dtype=np.float32)
+    predicted = np.asarray(predicted_surfaces, dtype=np.float32)
+    if reference.shape != predicted.shape:
+        raise ValueError(
+            f"reference/predicted surface shape mismatch: {reference.shape} vs {predicted.shape}"
+        )
+    return np.mean(np.abs(predicted - reference), axis=(1, 2)).astype(np.float32)
+
+
+def _count_error_metrics(true_counts: list[int], pred_mean_counts: list[float]) -> tuple[np.ndarray, np.ndarray]:
+    true_arr = np.asarray(true_counts, dtype=np.float32)
+    pred_arr = np.asarray(pred_mean_counts, dtype=np.float32)
+    if true_arr.shape != pred_arr.shape:
+        raise ValueError(
+            f"true/predicted count shape mismatch: {true_arr.shape} vs {pred_arr.shape}"
+        )
+    abs_err = np.abs(pred_arr - true_arr).astype(np.float32)
+    signed_err = (pred_arr - true_arr).astype(np.float32)
+    return abs_err, signed_err
+
+
 def _run_or_load_bundle(
     record: RunRecord,
     args: argparse.Namespace,
@@ -265,63 +319,78 @@ def _run_or_load_bundle(
     splits_dir: Path,
     out_dir: Path,
 ):
-    from unified_stpp.evaluation.common import HistoryQuery, RunTarget
-    from unified_stpp.evaluation.io import load_predictive_bundle, write_predictive_bundle
-    from unified_stpp.evaluation.predictive_compare import (
+    from unified_stpp.evaluation.bundle_io import load_predictive_bundle, write_predictive_bundle
+    from unified_stpp.evaluation.predictive import (
+        ExactProposalConfig,
         PredictiveComparator,
         PredictiveCompareSpec,
     )
-    from unified_stpp.evaluation.predictive_sampling import ExactProposalConfig
+    from unified_stpp.evaluation.runtime import HistoryQuery, RunTarget
+    from unified_stpp.viz import PredictiveRenderConfig, render_predictive_bundle
 
     bundle_dir = _bundle_dir(out_dir, record, args)
-    if (bundle_dir / "summary.json").exists() and not args.force:
-        return load_predictive_bundle(bundle_dir), bundle_dir, True
+    reused = (bundle_dir / "summary.json").exists() and not args.force
+    if reused:
+        bundle = load_predictive_bundle(bundle_dir)
+    else:
+        history_path = splits_dir / record.dataset_id / f"{args.split}.jsonl"
+        if not history_path.exists():
+            raise FileNotFoundError(f"Missing history split for {record.dataset_id}: {history_path}")
 
-    history_path = splits_dir / record.dataset_id / f"{args.split}.jsonl"
-    if not history_path.exists():
-        raise FileNotFoundError(f"Missing history split for {record.dataset_id}: {history_path}")
+        label = f"{record.preset}_{record.dataset_id}_seed{record.seed}"
+        query = HistoryQuery(
+            history_path=history_path,
+            split=args.split,
+            seq_idx=int(args.seq_idx),
+            start_event_idx=int(args.start_event_idx),
+            history_length=int(args.history_length),
+        )
+        spec = PredictiveCompareSpec(
+            rollout_mode=args.rollout_mode,
+            n_frames=int(args.n_frames),
+            horizon=float(args.horizon),
+            step_size=float(args.step_size),
+            n_rollouts=int(args.n_rollouts),
+            grid_size=int(args.grid_size),
+            bandwidth=args.bandwidth,
+            lambda_bar=float(args.lambda_bar),
+            max_events_per_window=int(args.max_events_per_window),
+            bridge_retries=int(args.bridge_retries),
+            adaptive_thinning=bool(args.adaptive_thinning),
+            exact_proposal=ExactProposalConfig(
+                mode=args.exact_proposal,
+                time_bins=int(args.exact_time_bins),
+                spatial_bins=int(args.exact_spatial_bins),
+                safety=float(args.exact_safety),
+            ),
+            color_percentile=float(args.color_percentile),
+            seed=int(args.eval_seed),
+            device=str(args.device),
+        )
+        bundle = PredictiveComparator().compare(
+            [RunTarget(run=record.run_dir, label=label)],
+            query,
+            spec,
+        )
+        write_predictive_bundle(bundle_dir, bundle)
 
-    label = f"{record.preset}_{record.dataset_id}_seed{record.seed}"
-    query = HistoryQuery(
-        history_path=history_path,
-        split=args.split,
-        seq_idx=int(args.seq_idx),
-        start_event_idx=int(args.start_event_idx),
-        history_length=int(args.history_length),
-    )
-    spec = PredictiveCompareSpec(
-        rollout_mode=args.rollout_mode,
-        n_frames=int(args.n_frames),
-        horizon=float(args.horizon),
-        step_size=float(args.step_size),
-        n_rollouts=int(args.n_rollouts),
-        grid_size=int(args.grid_size),
-        bandwidth=args.bandwidth,
-        lambda_bar=float(args.lambda_bar),
-        max_events_per_window=int(args.max_events_per_window),
-        bridge_retries=int(args.bridge_retries),
-        adaptive_thinning=bool(args.adaptive_thinning),
-        exact_proposal=ExactProposalConfig(
-            mode=args.exact_proposal,
-            time_bins=int(args.exact_time_bins),
-            spatial_bins=int(args.exact_spatial_bins),
-            safety=float(args.exact_safety),
-        ),
-        color_percentile=float(args.color_percentile),
-        seed=int(args.eval_seed),
-        device=str(args.device),
-    )
-    result = PredictiveComparator().compare(
-        [RunTarget(run=record.run_dir, label=label)],
-        query,
-        spec,
-    )
-    write_predictive_bundle(bundle_dir, result)
-    return result, bundle_dir, False
+    render_dir = None
+    if args.with_renders:
+        render_dir = _render_dir(bundle_dir)
+        render_predictive_bundle(
+            bundle,
+            render_dir,
+            PredictiveRenderConfig(
+                plot_style=str(args.plot_style),
+                fps=float(args.fps),
+                write_gif=bool(args.gif),
+            ),
+        )
+    return bundle, bundle_dir, reused, render_dir
 
 
 def _reference_surfaces(bundle, model) -> np.ndarray:
-    from unified_stpp.evaluation.predictive_compare import kde_rate_surface
+    from unified_stpp.evaluation.predictive.compare import kde_rate_surface
 
     surfaces = []
     for frame in model.frames:
@@ -339,26 +408,41 @@ def _reference_surfaces(bundle, model) -> np.ndarray:
     return np.stack(surfaces, axis=0).astype(np.float32)
 
 
-def _metric_row(record: RunRecord, bundle, bundle_dir: Path, reused: bool) -> dict[str, Any]:
-    from unified_stpp.evaluation.surface_metrics import (
-        predictive_surface_mae,
-        predictive_surface_rmse,
-    )
-
+def _metric_row(
+    record: RunRecord,
+    bundle,
+    bundle_dir: Path,
+    reused: bool,
+    render_dir: Path | None,
+) -> dict[str, Any]:
     if not bundle.models:
         raise ValueError(f"No models stored in bundle: {bundle_dir}")
     model = bundle.models[0]
     reference = _reference_surfaces(bundle, model)
-    rmse = predictive_surface_rmse(bundle, model_label=model.label, reference_surfaces=reference)
-    mae = predictive_surface_mae(bundle, model_label=model.label, reference_surfaces=reference)
+    predicted = np.stack(
+        [frame.derived_kde_rate_surface for frame in model.frames],
+        axis=0,
+    ).astype(np.float32)
+    rmse = _surface_rmse(reference, predicted)
+    mae = _surface_mae(reference, predicted)
     true_counts = [int(frame.true_event_locs.shape[0]) for frame in model.frames]
     pred_mean_counts = [float(frame.mean_events_per_rollout) for frame in model.frames]
+    count_abs_err, count_signed_err = _count_error_metrics(true_counts, pred_mean_counts)
     elapsed_sec = [
         _as_float(frame.diagnostics.get("elapsed_sec"))
         for frame in model.frames
         if isinstance(frame.diagnostics, dict)
     ]
     elapsed_total = float(np.nansum([v for v in elapsed_sec if v is not None])) if elapsed_sec else 0.0
+    render_path_2d = None
+    render_path_3d = None
+    if render_dir is not None:
+        panel_2d = render_dir / "panels" / "frame_000.png"
+        panel_3d = render_dir / "panels" / "frame_000_3d.png"
+        if panel_2d.exists():
+            render_path_2d = str(panel_2d)
+        if panel_3d.exists():
+            render_path_3d = str(panel_3d)
     return {
         "family": record.family,
         "level": record.level,
@@ -368,6 +452,9 @@ def _metric_row(record: RunRecord, bundle, bundle_dir: Path, reused: bool) -> di
         "run_dir": str(record.run_dir),
         "bundle_dir": str(bundle_dir),
         "bundle_reused": bool(reused),
+        "render_dir": None if render_dir is None else str(render_dir),
+        "panel_frame0_2d": render_path_2d,
+        "panel_frame0_3d": render_path_3d,
         "model_label": model.label,
         "split": bundle.split,
         "seq_idx": bundle.seq_idx,
@@ -382,8 +469,12 @@ def _metric_row(record: RunRecord, bundle, bundle_dir: Path, reused: bool) -> di
         "val_objective": record.val_objective,
         "rmse_mean": float(np.mean(rmse)),
         "mae_mean": float(np.mean(mae)),
+        "count_mae_mean": float(np.mean(count_abs_err)),
+        "count_bias_mean": float(np.mean(count_signed_err)),
         "rmse_per_frame": [float(v) for v in rmse],
         "mae_per_frame": [float(v) for v in mae],
+        "count_mae_per_frame": [float(v) for v in count_abs_err],
+        "count_bias_per_frame": [float(v) for v in count_signed_err],
         "true_event_counts": true_counts,
         "pred_mean_event_counts": pred_mean_counts,
         "eval_elapsed_sec": elapsed_total,
@@ -418,13 +509,13 @@ def _compute_metric_for_record(
 ) -> dict[str, Any]:
     bundle = None
     try:
-        bundle, bundle_dir, reused = _run_or_load_bundle(
+        bundle, bundle_dir, reused, render_dir = _run_or_load_bundle(
             record,
             args,
             splits_dir=splits_dir,
             out_dir=out_dir,
         )
-        return _metric_row(record, bundle, bundle_dir, reused)
+        return _metric_row(record, bundle, bundle_dir, reused, render_dir)
     finally:
         del bundle
         _clear_backend_caches()
@@ -550,6 +641,8 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for (family, level, dataset_id, preset), group in sorted(groups.items()):
         rmse = np.asarray([row["rmse_mean"] for row in group], dtype=np.float64)
         mae = np.asarray([row["mae_mean"] for row in group], dtype=np.float64)
+        count_mae = np.asarray([row["count_mae_mean"] for row in group], dtype=np.float64)
+        count_bias = np.asarray([row["count_bias_mean"] for row in group], dtype=np.float64)
         test_nll_values = [row["test_nll"] for row in group if row["test_nll"] is not None]
         test_nll = np.asarray(test_nll_values, dtype=np.float64) if test_nll_values else np.asarray([])
         out.append(
@@ -564,6 +657,10 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "rmse_std": float(np.std(rmse, ddof=1)) if len(rmse) > 1 else 0.0,
                 "mae_mean": float(np.mean(mae)),
                 "mae_std": float(np.std(mae, ddof=1)) if len(mae) > 1 else 0.0,
+                "count_mae_mean": float(np.mean(count_mae)),
+                "count_mae_std": float(np.std(count_mae, ddof=1)) if len(count_mae) > 1 else 0.0,
+                "count_bias_mean": float(np.mean(count_bias)),
+                "count_bias_std": float(np.std(count_bias, ddof=1)) if len(count_bias) > 1 else 0.0,
                 "test_nll_mean": float(np.mean(test_nll)) if test_nll.size else None,
                 "test_nll_std": (
                     float(np.std(test_nll, ddof=1))
@@ -588,20 +685,23 @@ def _write_plot(path: Path, aggregate_rows: list[dict[str, Any]]) -> None:
     if not by_family:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharex=True)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharex=True)
     for family, rows in sorted(by_family.items()):
         rows = sorted(rows, key=lambda r: int(r["level"]))
         levels = [int(row["level"]) for row in rows]
         axes[0].plot(levels, [float(row["rmse_mean"]) for row in rows], marker="o", label=family)
         axes[1].plot(levels, [float(row["mae_mean"]) for row in rows], marker="o", label=family)
+        axes[2].plot(levels, [float(row["count_mae_mean"]) for row in rows], marker="o", label=family)
     axes[0].set_title("Predictive Surface RMSE")
     axes[1].set_title("Predictive Surface MAE")
+    axes[2].set_title("Predictive Count MAE")
     for ax in axes:
         ax.set_xlabel("complexity level")
         ax.grid(True, alpha=0.3)
     axes[0].set_ylabel("RMSE")
     axes[1].set_ylabel("MAE")
-    axes[1].legend(title="family", loc="best")
+    axes[2].set_ylabel("count MAE")
+    axes[2].legend(title="family", loc="best")
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=160)
@@ -612,7 +712,10 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
     if not rows:
         print("No metric rows produced.")
         return
-    header = f"{'family':<10} {'lvl':>3} {'n':>2} {'rmse':>10} {'mae':>10} {'test_nll':>10}"
+    header = (
+        f"{'family':<10} {'lvl':>3} {'n':>2} "
+        f"{'rmse':>10} {'mae':>10} {'cnt_mae':>10} {'test_nll':>10}"
+    )
     print(header)
     print("-" * len(header))
     for row in rows:
@@ -620,7 +723,8 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         test_text = "" if test_nll is None else f"{float(test_nll):10.4f}"
         print(
             f"{row['family']:<10} {int(row['level']):>3} {int(row['n_runs']):>2} "
-            f"{float(row['rmse_mean']):10.4f} {float(row['mae_mean']):10.4f} {test_text:>10}"
+            f"{float(row['rmse_mean']):10.4f} {float(row['mae_mean']):10.4f} "
+            f"{float(row['count_mae_mean']):10.4f} {test_text:>10}"
         )
 
 
