@@ -12,6 +12,42 @@ from ..abstractions import StateCapabilities, StateContext, StateModel
 from ..model_registry import register_state
 
 
+def _repair_strictly_increasing_times(times: Tensor, lengths: Tensor) -> Tensor:
+    """Preserve strict monotonicity after model-side time reconstruction."""
+    if times.ndim != 2:
+        raise ValueError(f"expected times shape (B, T); got {tuple(times.shape)}")
+
+    repaired = times.clone()
+    inf = None
+    eps = torch.finfo(repaired.dtype).eps
+    for row in range(repaired.shape[0]):
+        seq_len = int(lengths[row].item())
+        if seq_len <= 1:
+            continue
+        seq = repaired[row, :seq_len]
+        if bool(torch.all(seq[1:] > seq[:-1]).item()):
+            continue
+        for i in range(1, seq_len):
+            if not bool((seq[i] > seq[i - 1]).item()):
+                if hasattr(torch, "nextafter"):
+                    if inf is None:
+                        inf = torch.full((), float("inf"), device=seq.device, dtype=seq.dtype)
+                    seq[i] = torch.nextafter(seq[i - 1], inf)
+                else:  # pragma: no cover - torch.nextafter exists in supported runtimes
+                    scale = torch.maximum(seq[i - 1].abs(), torch.ones_like(seq[i - 1]))
+                    seq[i] = seq[i - 1] + eps * scale
+        if not bool(torch.all(seq[1:] > seq[:-1]).item()):
+            raw_dt = seq[1:] - seq[:-1]
+            bad = raw_dt <= 0
+            first_bad = int(torch.nonzero(bad, as_tuple=False)[0].item() + 1)
+            raise RuntimeError(
+                "Neural STPP state raw-time reconstruction failed to preserve strict monotonicity; "
+                f"batch_index={row}, event_index={first_bad}, bad_count={int(bad.sum().item())}, "
+                f"min_raw_dt={float(raw_dt.min().item()):.6e}"
+            )
+    return repaired
+
+
 @register_state("neural_stpp")
 class NeuralSTPPStateModel(StateModel):
     """Neural STPP state model with local raw-time reconstruction."""
@@ -140,19 +176,22 @@ class NeuralSTPPStateModel(StateModel):
             )
 
         if self._input_transform is not None:
-            times_raw = times
+            times_raw = self._input_transform.inverse_times(times.to(torch.float64), lengths).to(times.dtype)
             locations_norm = self._input_transform.forward_locations(locations, lengths)
         elif self.normalize_time_inputs:
-            times_raw = times * self.time_std + self.time_mean
+            times_raw = (
+                times.to(torch.float64) * float(self.time_std) + float(self.time_mean)
+            ).to(times.dtype)
             locations_norm = locations
         else:
             times_raw = times
             locations_norm = locations
+        times_raw = _repair_strictly_increasing_times(times_raw[:, :max_len], lengths)
         event_mask = (
             torch.arange(max_len, device=times.device).unsqueeze(0) < lengths.unsqueeze(1)
         )
         temporal_nll, h_seq_pre, energy_reg, h_final = self.temporal_core.sequence_nll_and_states(
-            times_raw[:, :max_len],
+            times_raw,
             locations_norm[:, :max_len, :],
             event_mask,
             t0=torch.zeros(bsz, device=times.device, dtype=times.dtype),

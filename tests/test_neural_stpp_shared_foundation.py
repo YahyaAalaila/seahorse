@@ -234,6 +234,36 @@ class TestNeuralSTPPSharedFoundation(unittest.TestCase):
             payload["temporal_hidden_seq"][..., 3:],
         )
 
+    def test_state_model_repairs_denormalized_time_collapse_before_temporal_core(self):
+        tiny = torch.nextafter(torch.tensor(0.0, dtype=torch.float32), torch.tensor(float("inf")))
+        times_norm = torch.tensor([[0.0, tiny.item(), 1.0]], dtype=torch.float32)
+        locations = torch.zeros(1, 3, 2, dtype=torch.float32)
+        lengths = torch.tensor([3], dtype=torch.long)
+        time_mean = 5.009698
+        time_std = 1.0
+
+        model = NeuralSTPPStateModel(
+            hidden_dim=6,
+            spatial_dim=2,
+            tpp_hidden_dims=[6, 6],
+            normalize_time_inputs=True,
+            normalize_space_inputs=False,
+            time_mean=time_mean,
+            time_std=time_std,
+        )
+        capture = _CaptureTemporalCore(hidden_dim=6)
+        model.temporal_core = capture
+
+        naive_raw = times_norm * time_std + time_mean
+        self.assertFalse(bool((naive_raw[:, 1] > naive_raw[:, 0]).all()))
+
+        state = model.encode_history(times=times_norm, locations=locations, lengths=lengths)
+        repaired_raw = capture.captured_event_times
+
+        self.assertTrue(bool((repaired_raw[:, 1] > repaired_raw[:, 0]).all()))
+        self.assertTrue(bool((repaired_raw[:, 2] > repaired_raw[:, 1]).all()))
+        self.assertTrue(bool((state.payload["times_raw"][:, 1] > state.payload["times_raw"][:, 0]).all()))
+
     def test_temporal_intensity_depends_only_on_intensity_slice(self):
         model = NeuralPointProcess(
             cond_dim=2,
