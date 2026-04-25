@@ -8,7 +8,7 @@ Usage:
   scripts/print_hawkesnest_easy_hard_submit_commands.sh [suite1 suite2 ...]
 
 Print copy-pasteable cluster submission commands for the HawkesNest easy-hard
-suite folders under data/hawkesnest_easy_hard.
+suite folders under data/hawkesnest_easy_hard_v2.
 
 Defaults:
   suites: combined sweep_E sweep_H
@@ -17,15 +17,17 @@ The commands reuse scripts/submit_hawkesnest_suite_family.sh and are intended
 to be run one by one on the cluster, mirroring the v2 workflow.
 
 Environment knobs baked into the printed commands:
-  SUITE_ROOT=/home/aalaila/projects/uni-stpp/data/hawkesnest_easy_hard
-  SUITE_DATA_TAG=easyhard
+  SUITE_ROOT=/home/aalaila/projects/uni-stpp/data/hawkesnest_easy_hard_v2
+  SUITE_DATA_TAG=easyhard_v2
   EXCLUDE=serv-3307
 
 Family resources:
   factorized: CPU, 24h
-  rest:       CPU, 24h
+  auto_stpp:  CPU, 24h
+  deep_stpp:  CPU, 24h
+  light rest: CPU, 24h (nsmpp rmtpp_gmm thp_gmm)
   gen:        GPU, 48h
-  neural:     GPU, 72h
+  neural:     GPU, 72h each, printed as separate custom commands
 
 Example:
   scripts/print_hawkesnest_easy_hard_submit_commands.sh
@@ -39,7 +41,7 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SUITE_ROOT_CLUSTER="/home/aalaila/projects/uni-stpp/data/hawkesnest_easy_hard"
+SUITE_ROOT_CLUSTER="/home/aalaila/projects/uni-stpp/data/hawkesnest_easy_hard_v2"
 SUBMIT_SCRIPT="scripts/submit_hawkesnest_suite_family.sh"
 
 if [ "$#" -gt 0 ]; then
@@ -49,16 +51,20 @@ else
 fi
 
 for suite in "${SUITES[@]}"; do
-  if [ ! -d "$ROOT/data/hawkesnest_easy_hard/$suite/jsonl" ]; then
+  if [ ! -d "$ROOT/data/hawkesnest_easy_hard_v2/$suite/jsonl" ]; then
     echo "# skipping unknown suite: $suite" >&2
     continue
   fi
 
   echo "# $suite"
   echo "cd ~/projects/uni-stpp"
-  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite factorized"
-  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite rest"
-  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard GPUS=1 DEVICE=cuda TIME_LIMIT=48:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite gen"
-  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard GPUS=1 DEVICE=cuda TIME_LIMIT=72:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite neural"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite factorized"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom auto_stpp"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom deep_stpp"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=0 DEVICE=cpu TIME_LIMIT=24:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom nsmpp rmtpp_gmm thp_gmm"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=1 DEVICE=cuda TIME_LIMIT=48:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite gen"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=1 DEVICE=cuda TIME_LIMIT=72:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom neural_attncnf"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=1 DEVICE=cuda TIME_LIMIT=72:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom neural_jumpcnf"
+  echo "SUITE_ROOT=$SUITE_ROOT_CLUSTER SUITE_DATA_TAG=easyhard_v2 GPUS=1 DEVICE=cuda TIME_LIMIT=72:00:00 EXCLUDE=serv-3307 $SUBMIT_SCRIPT $suite custom neural_cond_gmm"
   echo
 done

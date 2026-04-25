@@ -1,0 +1,164 @@
+{
+  "suite": "combined",
+  "description": "gen_easy_hard.py",
+  "n_events_target": 8000,
+  "n_seeds": 5,
+  "beta": 0.3,
+  "sigma": 0.15,
+  "tau_max": 5.0,
+  "domain": [
+    [
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "levels": [
+    {
+      "label": "C0",
+      "description": "flat bg + \u03b7=0.0 \u2192 pure Poisson baseline",
+      "target_eta": 0.0,
+      "adj": 0.0,
+      "lambda_max": 2.4,
+      "bg": {
+        "type": "constant",
+        "rate": 2.4
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "C1",
+      "description": "1-hotspot + \u03b7=0.2 separable \u2192 single cluster, mild",
+      "target_eta": 0.2,
+      "adj": 4.71570228999906,
+      "lambda_max": 129.06881231965332,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "C2",
+      "description": "3-hotspots + \u03b7=0.4 separable \u2192 three dense clusters",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 215.9012099646484,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.25,
+            0.25
+          ],
+          [
+            0.75,
+            0.25
+          ],
+          [
+            0.75,
+            0.75
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 2.5
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "C3",
+      "description": "moving + \u03b7=0.4 wave v=0.25 \u2192 drift + directional elongation",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 200.62809159996237,
+      "bg": {
+        "type": "function",
+        "name": "moving_hotspots",
+        "start": [
+          0.5,
+          0.5
+        ],
+        "v": [
+          0.0002,
+          0.0001
+        ],
+        "sigma": 0.08,
+        "a0": 2.0,
+        "amp": 1.0
+      },
+      "kernel": {
+        "type": "traveling_wave",
+        "v": 0.25,
+        "theta_wave": 0.7853981633974483,
+        "sigma": 0.15,
+        "temporal_scale": 0.3
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    }
+  ]
+}
