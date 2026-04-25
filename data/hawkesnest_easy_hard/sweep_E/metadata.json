@@ -1,0 +1,163 @@
+{
+  "suite": "sweep_E",
+  "description": "gen_easy_hard.py",
+  "n_events_target": 8000,
+  "n_seeds": 5,
+  "beta": 0.3,
+  "sigma": 0.15,
+  "tau_max": 5.0,
+  "domain": [
+    [
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "levels": [
+    {
+      "label": "E0",
+      "description": "1-centred hotspot + \u03b7=0.0 \u2192 pure Poisson Gaussian blob",
+      "target_eta": 0.0,
+      "adj": 0.0,
+      "lambda_max": 34.75476651967213,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "E1",
+      "description": "1-centred hotspot + \u03b7=0.2 separable \u2192 tighter blob",
+      "target_eta": 0.2,
+      "adj": 4.71570228999906,
+      "lambda_max": 129.06881231965332,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "E2",
+      "description": "1-centred hotspot + \u03b7=0.4 separable \u2192 dense cluster",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 223.3828581196345,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "E3",
+      "description": "1-centred hotspot + \u03b7=0.4 wave v=0.25 \u2192 elongated streak",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 223.3828581196345,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "traveling_wave",
+        "v": 0.25,
+        "theta_wave": 0.7853981633974483,
+        "sigma": 0.15,
+        "temporal_scale": 0.3
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    }
+  ]
+}

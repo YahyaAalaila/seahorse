@@ -1,0 +1,162 @@
+{
+  "suite": "sweep_H",
+  "description": "gen_easy_hard.py",
+  "n_events_target": 8000,
+  "n_seeds": 5,
+  "beta": 0.3,
+  "sigma": 0.15,
+  "tau_max": 5.0,
+  "domain": [
+    [
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "levels": [
+    {
+      "label": "H0",
+      "description": "flat background + \u03b7=0.4 separable \u2192 unstructured Hawkes blobs",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 191.02809159996238,
+      "bg": {
+        "type": "constant",
+        "rate": 2.4
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H1",
+      "description": "1-centred hotspot + \u03b7=0.4 separable \u2192 single cluster",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 223.3828581196345,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 3.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H2",
+      "description": "3-corner hotspots + \u03b7=0.4 separable \u2192 multimodal clusters",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 215.9012099646484,
+      "bg": {
+        "type": "function",
+        "name": "cluster_mix",
+        "centers": [
+          [
+            0.25,
+            0.25
+          ],
+          [
+            0.75,
+            0.25
+          ],
+          [
+            0.75,
+            0.75
+          ]
+        ],
+        "sigma": 0.2,
+        "a0": 0.5,
+        "amp": 2.5
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    },
+    {
+      "label": "H3",
+      "description": "drifting hotspot + \u03b7=0.4 separable \u2192 temporally non-stationary",
+      "target_eta": 0.4,
+      "adj": 9.43140457999812,
+      "lambda_max": 200.62809159996237,
+      "bg": {
+        "type": "function",
+        "name": "moving_hotspots",
+        "start": [
+          0.5,
+          0.5
+        ],
+        "v": [
+          0.0002,
+          0.0001
+        ],
+        "sigma": 0.08,
+        "a0": 2.0,
+        "amp": 1.0
+      },
+      "kernel": {
+        "type": "separable",
+        "temporal_decay": 0.3,
+        "spatial_sigma": 0.15
+      },
+      "n_seeds": 5,
+      "stats": {
+        "n": 5,
+        "mean": 8000.0,
+        "std": 0.0,
+        "min": 8000,
+        "p50": 8000.0,
+        "p95": 8000.0,
+        "max": 8000
+      }
+    }
+  ]
+}
