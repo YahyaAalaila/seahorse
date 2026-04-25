@@ -117,6 +117,14 @@ def build_targets(
 
 
 def _emit_tsv(rows: list[dict[str, Any]]) -> None:
+    _emit_delimited(rows, "\t")
+
+
+def _emit_usv(rows: list[dict[str, Any]]) -> None:
+    _emit_delimited(rows, "\x1f")
+
+
+def _emit_delimited(rows: list[dict[str, Any]], delimiter: str) -> None:
     for row in rows:
         fields = (
             row["bench_id"],
@@ -130,7 +138,7 @@ def _emit_tsv(rows: list[dict[str, Any]]) -> None:
             row["dataset_ref"] or "",
             row["dataset_revision"] or "",
         )
-        print("\t".join(fields))
+        print(delimiter.join(fields))
 
 
 def main() -> int:
@@ -145,7 +153,7 @@ def main() -> int:
     parser.add_argument(
         "--format",
         default="tsv",
-        choices=("tsv", "json"),
+        choices=("tsv", "json", "usv"),
         help="Output format.",
     )
     args = parser.parse_args()
@@ -157,6 +165,8 @@ def main() -> int:
     if args.format == "json":
         json.dump(targets, sys.stdout, indent=2)
         sys.stdout.write("\n")
+    elif args.format == "usv":
+        _emit_usv(targets)
     else:
         _emit_tsv(targets)
     return 0

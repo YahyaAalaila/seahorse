@@ -145,6 +145,42 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
             self.assertIsNone(target["data_path"])
             self.assertIsNone(target["train_data"])
 
+    def test_usv_emission_preserves_empty_dataset_backed_fields(self):
+        module = _load_module()
+        rows = [
+            {
+                "bench_id": "covid-stpp__gen__04231151",
+                "dataset_id": "covid-stpp",
+                "preset": "smash",
+                "seed": 42,
+                "run_dir": "/tmp/run",
+                "data_path": None,
+                "train_data": None,
+                "split": "test",
+                "dataset_ref": "yahya021/covid-stpp",
+                "dataset_revision": "v1",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as td:
+            out_path = Path(td) / "targets.usv"
+            with open(out_path, "w", encoding="utf-8") as f:
+                stdout = sys.stdout
+                sys.stdout = f
+                try:
+                    module._emit_usv(rows)
+                finally:
+                    sys.stdout = stdout
+
+            emitted = out_path.read_text(encoding="utf-8").strip("\n")
+            fields = emitted.split("\x1f")
+            self.assertEqual(len(fields), 10)
+            self.assertEqual(fields[5], "")
+            self.assertEqual(fields[6], "")
+            self.assertEqual(fields[7], "test")
+            self.assertEqual(fields[8], "yahya021/covid-stpp")
+            self.assertEqual(fields[9], "v1")
+
 
 if __name__ == "__main__":
     unittest.main()

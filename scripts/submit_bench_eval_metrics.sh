@@ -99,7 +99,7 @@ fi
 printf '[submit-eval] bench_root=%s\n' "$BENCH_ROOT"
 printf '[submit-eval] metric_profile=%s split=%s device=%s\n' "$METRIC_PROFILE" "$SPLIT" "$DEVICE"
 
-while IFS=$'\t' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAIN_DATA TARGET_SPLIT DATASET_REF DATASET_REVISION; do
+while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAIN_DATA TARGET_SPLIT DATASET_REF DATASET_REVISION; do
   JOB_NAME="${BENCH_ID}__eval__${PRESET}__s${SEED}"
   OUT_DIR="${RUN_DIR}/evaluate/metrics/${METRIC_PROFILE}_${TARGET_SPLIT}"
   CAMPAIGN_ID="${BENCH_ID}__eval_metrics"
@@ -174,4 +174,4 @@ while IFS=$'\t' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAIN_
     "$OUT_DIR" >> "$LEDGER"
 
   printf '[submit-eval] recorded %s in %s\n' "$JOB_ID" "$LEDGER"
-done < <("$PYTHON_BIN_LOCAL" "$TARGET_SCRIPT" --bench-root "$BENCH_ROOT" --split "$SPLIT" --format tsv)
+done < <("$PYTHON_BIN_LOCAL" "$TARGET_SCRIPT" --bench-root "$BENCH_ROOT" --split "$SPLIT" --format usv)
