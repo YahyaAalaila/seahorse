@@ -30,16 +30,16 @@ model:
       zero_init: true
       tol: 1.0e-4
       otreg_strength: 1.0e-4
-      use_adjoint: true
+      use_adjoint: false
       solve_reverse: true
       n_flows: 4
 
 training:
   optimizer: adamw
-  lr: 1.0e-3
+  lr: 5.0e-4
   weight_decay: 1.0e-6
   adam_beta2: 0.98
-  grad_clip: 0.0
+  grad_clip: 1.0
   n_epochs: 200
   patience: 30
   device: auto

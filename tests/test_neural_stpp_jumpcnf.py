@@ -282,6 +282,41 @@ class TestNeuralJumpCNFSpatial(unittest.TestCase):
         self.assertIn("training=True", msg)
         self.assertIn("nfe=", msg)
 
+    def test_integrate_repairs_reverse_endpoint_before_solver(self):
+        decoder = NeuralJumpCNFSpatial(
+            spatial_dim=2,
+            hidden_dim=8,
+            spatial_aux_dim=2,
+            hidden_dims=[],
+            solve_reverse=False,
+            use_adjoint=False,
+            n_flows=2,
+        )
+
+        original_odeint_std = neural_jumpcnf_module._odeint_std
+        captured: dict[str, torch.Tensor] = {}
+
+        def _capture_solver(func, init_state, tt, **kwargs):
+            del func, tt, kwargs
+            captured["t0"] = init_state[0].detach().clone()
+            captured["t1"] = init_state[1].detach().clone()
+            return tuple(torch.stack([s, s], dim=0) for s in init_state)
+
+        neural_jumpcnf_module._odeint_std = _capture_solver
+        try:
+            decoder.cnf.integrate(
+                torch.tensor([3.0], dtype=torch.float32),
+                torch.tensor([3.0], dtype=torch.float32),
+                torch.zeros(1, 4, dtype=torch.float32),
+                torch.zeros(1, dtype=torch.float32),
+            )
+        finally:
+            neural_jumpcnf_module._odeint_std = original_odeint_std
+
+        self.assertIn("t0", captured)
+        self.assertIn("t1", captured)
+        self.assertTrue(bool((captured["t1"] < captured["t0"]).all()))
+
 
 class TestNeuralJumpCNFPreset(unittest.TestCase):
     def test_preset_loads_builds_and_wires_solve_reverse(self):
@@ -293,7 +328,7 @@ class TestNeuralJumpCNFPreset(unittest.TestCase):
         decoder = model.event_model.spatial_decoder
         self.assertEqual(type(decoder).__name__, "NeuralJumpCNFSpatial")
         self.assertTrue(decoder.solve_reverse)
-        self.assertTrue(decoder.cnf.use_adjoint)
+        self.assertFalse(decoder.cnf.use_adjoint)
         self.assertIs(decoder.aux_odefunc, model.state_model.temporal_core.hidden_state_dynamics)
 
         times = torch.tensor([[0.1, 0.4], [0.2, 0.2]], dtype=torch.float32)

@@ -189,6 +189,15 @@ def _euler_cnf_solve(func, y0, t_span, n_steps: int = 50):
     return tuple(torch.stack(bucket, dim=0) for bucket in traj)
 
 
+def _repair_strictly_decreasing_endpoint(t0: Tensor, t1: Tensor) -> Tensor:
+    if hasattr(torch, "nextafter"):
+        next_down = torch.nextafter(t0, torch.full_like(t0, float("-inf")))
+    else:  # pragma: no cover - torch.nextafter exists in supported runtimes
+        scale = torch.maximum(torch.maximum(t0.abs(), t1.abs()), torch.ones_like(t0))
+        next_down = t0 - torch.finfo(t0.dtype).eps * scale
+    return torch.where(t1 < t0, t1, next_down)
+
+
 class TimeVariableCNF(nn.Module):
     start_time = 0.0
     end_time = 1.0
@@ -230,9 +239,19 @@ class TimeVariableCNF(nn.Module):
         self.nfe = 0
         tol = self.tol if tol is None else tol
         method = self.method if method is None else method
+        t0 = t0.reshape(-1)
+        t1 = t1.reshape(-1)
+        raw_dt = t1 - t0
         dt_abs = (t1 - t0).abs()
         dt_scale = torch.maximum(torch.maximum(t0.abs(), t1.abs()), torch.ones_like(t0))
         tiny_threshold = torch.finfo(t0.dtype).eps * dt_scale
+        non_decreasing = raw_dt >= 0
+        t1 = _repair_strictly_decreasing_endpoint(t0, t1)
+        if not bool(torch.all(t1 < t0).item()):
+            raise RuntimeError(
+                "JumpCNF spatial CNF interval repair failed; "
+                f"non_decreasing_count={int(non_decreasing.sum().item())}, dtype={t0.dtype}"
+            )
         e = torch.randn_like(x)[:, : self.dim]
         energy = torch.zeros(1, device=x.device, dtype=x.dtype)
         jacnorm = torch.zeros(1, device=x.device, dtype=x.dtype)
@@ -253,6 +272,7 @@ class TimeVariableCNF(nn.Module):
                     rtol=tol,
                     atol=tol,
                     method=method,
+                    options={"dtype": t0.dtype},
                 )
             except AssertionError as exc:
                 if "underflow in dt" not in str(exc):
@@ -265,8 +285,9 @@ class TimeVariableCNF(nn.Module):
                 raise RuntimeError(
                     "JumpCNF spatial CNF underflow in dt; "
                     f"min_abs_dt={min_dt:.6e}, max_abs_dt={max_dt:.6e}, mean_abs_dt={mean_dt:.6e}, "
-                    f"tiny_interval_count={tiny_count}, use_adjoint={self.use_adjoint}, "
-                    f"solve_reverse={solve_reverse}, training={self.training}, nfe={self.nfe}"
+                    f"non_decreasing_count={int(non_decreasing.sum().item())}, tiny_interval_count={tiny_count}, "
+                    f"use_adjoint={self.use_adjoint}, solve_reverse={solve_reverse}, "
+                    f"training={self.training}, method={method}, tol={tol:.1e}, nfe={self.nfe}"
                 ) from exc
         else:  # pragma: no cover
             solution = _euler_cnf_solve(self, initial_state, tt, n_steps=max(50, intermediate_states * 10 or 50))

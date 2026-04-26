@@ -159,5 +159,14 @@
         "max": 8000
       }
     }
-  ]
+  ],
+  "serialization": {
+    "strategy": "equal_time_windows",
+    "n_windows": 20,
+    "split_windows": {
+      "train": 16,
+      "val": 2,
+      "test": 2
+    }
+  }
 }

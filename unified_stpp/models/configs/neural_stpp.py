@@ -274,7 +274,7 @@ class NeuralSTPPSharedJumpCNFConfig(NeuralSTPPConfig):
         "zero_init": True,
         "tol": 1e-4,
         "otreg_strength": 1e-4,
-        "use_adjoint": True,
+        "use_adjoint": False,
         "solve_reverse": True,
         "n_flows": 4,
     }
