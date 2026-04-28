@@ -168,6 +168,15 @@ submit_metrics_jobs_for_campaign() {
         --time="$time_limit"
         --output="$ROOT/logs/%x_%j.out"
       )
+      local export_spec
+      export_spec="ALL"
+      if [ -n "$GT_INTENSITY_PATH" ]; then
+        export_spec="${export_spec},GROUND_TRUTH_INTENSITY=$GT_INTENSITY_PATH"
+      fi
+      if [ -n "$GT_PARAMS_PATH" ]; then
+        export_spec="${export_spec},GROUND_TRUTH_PARAMS=$GT_PARAMS_PATH"
+      fi
+      SBATCH_ARGS+=( --export="$export_spec" )
       if [ -n "${PARTITION:-}" ]; then
         SBATCH_ARGS+=( --partition="$PARTITION" )
       fi
