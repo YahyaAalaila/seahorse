@@ -314,7 +314,7 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
             self.assertEqual(cfg.data.train_path, str(config.train_path))
             self.assertEqual(cfg.data.val_path, str(config.val_path))
             self.assertEqual(cfg.data.test_path, str(config.test_path))
-            self.assertEqual(cfg.training.patience, None)
+            self.assertEqual(cfg.training.patience, 2)
             self.assertEqual(cfg.training.device, "cpu")
             self.assertEqual(cfg.training.batch_size, 64)
             self.assertEqual(cfg.training.checkpoint_select, "best")

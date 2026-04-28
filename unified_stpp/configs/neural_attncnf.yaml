@@ -32,6 +32,7 @@ model:
 training:
   optimizer: adamw
   lr: 1.0e-3
+  lr_schedule: cosine
   weight_decay: 1.0e-6
   adam_beta2: 0.98
   grad_clip: 0.0

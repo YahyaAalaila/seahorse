@@ -396,7 +396,6 @@ def _fit_campaign_run(
             "experiment_name": f"{suite_name}/{config.config_id}/{preset}/seed_{seed}",
         },
         "training": {
-            "patience": None,
             "checkpoint_select": "best",
             "test_nll_space": "raw",
         },

@@ -14,6 +14,11 @@ from unified_stpp.runner.runner import STPPRunner
 from .predictive.sampling import compute_predictive_samples
 
 
+_NON_INCREASING_ACTIVE_EVENT_TIMES = (
+    "Neural STPP temporal integrate_lambda received non-increasing active event times"
+)
+
+
 def _prepare_eval_sequence_arrays(
     seq: dict[str, np.ndarray],
     norm_stats: dict[str, Any],
@@ -149,34 +154,39 @@ def _compute_exact_next_event_test_nll(
             seq_len = int(np.asarray(seq["times"]).shape[0])
             if seq_len < 2:
                 continue
-            batch = _build_single_seq_batch(seq, runner.norm_stats, device)
-            output = runner.model.eval_forward(
-                times=batch["times"],
-                locations=batch["locations"],
-                lengths=batch["lengths"],
-            )
-            result = runner.model.compute_loss(output)
-            reported_nll, _temporal, _spatial, _extra, report_space = (
-                resolve_loss_result_reporting(
-                    result,
-                    requested_space=requested_space,
+            try:
+                batch = _build_single_seq_batch(seq, runner.norm_stats, device)
+                output = runner.model.eval_forward(
+                    times=batch["times"],
+                    locations=batch["locations"],
+                    lengths=batch["lengths"],
                 )
-            )
-            correction = float(reported_nll - float(result.nll))
-            per_context = _extract_eventwise_next_event_nlls(
-                output,
-                seq_len=seq_len,
-                correction=correction,
-            )
-            if per_context is not None:
-                method = method or "exact_next_event_from_eventwise_terms"
-            else:
-                per_context = _prefix_difference_next_event_nlls(
-                    runner,
-                    seq,
-                    device=device,
+                result = runner.model.compute_loss(output)
+                reported_nll, _temporal, _spatial, _extra, report_space = (
+                    resolve_loss_result_reporting(
+                        result,
+                        requested_space=requested_space,
+                    )
                 )
-                method = "exact_next_event_from_prefix_differences"
+                correction = float(reported_nll - float(result.nll))
+                per_context = _extract_eventwise_next_event_nlls(
+                    output,
+                    seq_len=seq_len,
+                    correction=correction,
+                )
+                if per_context is not None:
+                    method = method or "exact_next_event_from_eventwise_terms"
+                else:
+                    per_context = _prefix_difference_next_event_nlls(
+                        runner,
+                        seq,
+                        device=device,
+                    )
+                    method = "exact_next_event_from_prefix_differences"
+            except RuntimeError as exc:
+                if _NON_INCREASING_ACTIVE_EVENT_TIMES not in str(exc):
+                    raise
+                per_context = np.full((seq_len - 1,), np.nan, dtype=np.float32)
             per_context_chunks.append(per_context.astype(np.float32, copy=False))
 
     per_context_nll = (

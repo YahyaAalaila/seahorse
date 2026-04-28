@@ -366,6 +366,46 @@ class _StrictMonotoneEventwiseModel:
         )
 
 
+class _ExactEvalMonotonicityFailureModel:
+    def __init__(self):
+        self._calls = 0
+        self.event_model = SimpleNamespace(
+            capabilities=SimpleNamespace(
+                metric_key="nll",
+                nll_kind="exact",
+                has_native_sampler=False,
+                nll_footnote="",
+            )
+        )
+
+    def eval(self):
+        return self
+
+    def eval_forward(self, **kwargs):
+        del kwargs
+        self._calls += 1
+        if self._calls == 1:
+            raise RuntimeError(
+                "Neural STPP temporal integrate_lambda received non-increasing active event times; "
+                "event_index=2, bad_count=1, min_raw_dt=0.000000e+00"
+            )
+        return {
+            "nll_matrix": torch.tensor([[0.4, 0.6]], dtype=torch.float32),
+            "mask": torch.tensor([[1.0, 1.0]], dtype=torch.float32),
+        }
+
+    def compute_loss(self, output):
+        del output
+        return LossResult(
+            loss=torch.tensor(0.5),
+            nll=torch.tensor(0.5),
+            total_events=torch.tensor(2.0),
+            kl=None,
+            aux_terms={},
+            extra_metrics={"raw_space_nll": 0.5},
+        )
+
+
 class TestTestNLLReporting(unittest.TestCase):
     def _dummy_batch(self):
         return {
@@ -520,6 +560,42 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertTrue(np.all(np.diff(repaired) > 0.0))
         self.assertEqual(summary["method"], "exact_next_event_from_eventwise_terms")
         self.assertEqual(summary["n_contexts"], 2)
+
+    def test_compute_next_event_test_nll_marks_monotonicity_failures_missing(self):
+        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+
+        runner = SimpleNamespace(
+            model=_ExactEvalMonotonicityFailureModel(),
+            norm_stats={},
+            config=SimpleNamespace(
+                training=TrainingConfig(test_nll_space="raw"),
+                data=SimpleNamespace(seed=0),
+            ),
+        )
+        seqs = [
+            {
+                "times": np.array([0.1, 0.2, 0.3], dtype=np.float32),
+                "locations": np.array([[0.0, 0.0], [0.2, 0.1], [0.4, 0.2]], dtype=np.float32),
+            },
+            {
+                "times": np.array([0.5, 0.8, 1.1], dtype=np.float32),
+                "locations": np.array([[0.1, 0.1], [0.3, 0.2], [0.5, 0.4]], dtype=np.float32),
+            },
+        ]
+
+        summary = compute_next_event_test_nll(runner, seqs, device=torch.device("cpu"))
+
+        self.assertTrue(np.isnan(summary["per_context_nll"][:2]).all())
+        np.testing.assert_allclose(
+            summary["per_context_nll"][2:],
+            np.array([0.4, 0.6], dtype=np.float32),
+            rtol=1e-6,
+            atol=1e-6,
+        )
+        self.assertEqual(summary["n_contexts"], 4)
+        self.assertEqual(summary["n_scored_contexts"], 2)
+        self.assertEqual(summary["n_missing_contexts"], 2)
+        self.assertAlmostEqual(summary["mean_nll"], 0.5, places=6)
 
     def test_compute_next_event_test_nll_approx_tracks_missing_contexts(self):
         from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
