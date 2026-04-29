@@ -38,6 +38,14 @@ def _resolve_split_paths(
     return data_path.resolve(), None if train_path is None else train_path.resolve()
 
 
+def _has_hawkesnest_gt_bundle(dataset_id: str) -> bool:
+    return (
+        len(dataset_id) >= 2
+        and dataset_id[0] in {"L", "H"}
+        and dataset_id[1:].isdigit()
+    )
+
+
 def _resolve_ground_truth_paths(
     *,
     dataset_id: str,
@@ -46,12 +54,22 @@ def _resolve_ground_truth_paths(
     dataset_ref: str | None,
 ) -> tuple[Path | None, Path | None]:
     """Find HawkesNest ground-truth files for bench-style synthetic roots."""
+    if not _has_hawkesnest_gt_bundle(dataset_id):
+        return None, None
+
     candidates: list[Path] = []
-    for raw in (splits_dir, data_path, Path(dataset_ref).expanduser() if dataset_ref else None):
+    for raw in (
+        splits_dir,
+        data_path,
+        Path(dataset_ref).expanduser() if dataset_ref else None,
+    ):
         if raw is None:
             continue
         path = raw.resolve()
-        candidates.append(path if path.is_dir() else path.parent)
+        try:
+            candidates.append(path if path.is_dir() else path.parent)
+        except OSError:
+            continue
         candidates.extend(path.parents)
 
     seen: set[Path] = set()
