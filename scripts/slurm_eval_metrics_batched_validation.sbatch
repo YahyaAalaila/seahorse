@@ -7,7 +7,7 @@
 #SBATCH --error=logs/eval_metrics_batched_%j.err
 
 # Validates the batched-thinning performance-engineering changes:
-#   - _build_exact_proposal_cache: 36 forward passes -> 1 (all queries stacked)
+#   - _build_exact_proposal_cache: one spatial-grid batch per sampled time slice
 #   - _thinning_k_chains_batched: K serial chains -> 1 batched call per round
 #   - New defaults: time_bins=8, spatial_bins=8, k_pred=32
 #

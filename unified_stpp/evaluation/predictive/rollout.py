@@ -573,8 +573,9 @@ def _build_exact_proposal_cache(
     n_spatial = centers.shape[0]
     eps = max(float(t_max - t_start) * 1e-6, 1e-6)
 
-    # Collect all (time_bins * 3) time samples in one list, then issue a single
-    # batched intensity call for all (time_bins * 3 * n_spatial) query points.
+    # Collect all (time_bins * 3) time samples in one list. Query each time
+    # slice separately because NeuralSTPP-style event models build ODE terms for
+    # one fixed query time per call.
     all_t_vals: list[float] = []
     for t_idx in range(int(config.time_bins)):
         lo = float(time_edges[t_idx])
@@ -584,18 +585,15 @@ def _build_exact_proposal_cache(
 
     n_t_samples = len(all_t_vals)  # time_bins * 3
 
-    # Build query tensors: repeat each t_val for every spatial center
-    all_qt = torch.tensor(
-        [t for t in all_t_vals for _ in range(n_spatial)],
-        dtype=torch.float32,
-        device=device,
-    )  # shape (n_t_samples * n_spatial,)
-
     query_locs = torch.as_tensor(centers, dtype=torch.float32, device=device)
-    all_qs = query_locs.repeat(n_t_samples, 1)  # (n_t_samples * n_spatial, 2)
 
+    vals_by_time: list[np.ndarray] = []
     with torch.no_grad():
-        all_vals = intensity_fn(all_qt, all_qs).detach().cpu().numpy().astype(np.float32).reshape(-1)
+        for t_val in all_t_vals:
+            qt = torch.full((n_spatial,), float(t_val), dtype=torch.float32, device=device)
+            vals = intensity_fn(qt, query_locs).detach().cpu().numpy().astype(np.float32).reshape(-1)
+            vals_by_time.append(vals)
+    all_vals = np.concatenate(vals_by_time, axis=0)
 
     # Reshape to (time_bins, 3, n_spatial) and take per-cell max over the 3 time samples
     vals_by_bin = all_vals.reshape(int(config.time_bins), 3, n_spatial)
@@ -608,7 +606,7 @@ def _build_exact_proposal_cache(
         )
 
     point_count = n_t_samples * n_spatial
-    batch_count = 1
+    batch_count = n_t_samples
     cell_area = (
         max(float(xmax) - float(xmin), 1e-8)
         / max(int(config.spatial_bins), 1)

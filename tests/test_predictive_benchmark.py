@@ -14,6 +14,8 @@ from unified_stpp.evaluation import evaluate
 from unified_stpp.evaluation.artifacts import PredictiveSamples
 from unified_stpp.evaluation.predictive.benchmark import write_next_event_benchmark_summary
 from unified_stpp.evaluation.predictive.rollout import (
+    ExactProposalConfig,
+    _build_exact_proposal_cache,
     build_exact_intensity_fn,
 )
 from unified_stpp.evaluation.predictive.sampling import compute_predictive_samples
@@ -280,6 +282,32 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
         self.assertEqual(tuple(values.shape), (1,))
         self.assertTrue(torch.isfinite(values).all())
         self.assertAlmostEqual(float(values.item()), 1.0, places=6)
+
+    def test_exact_proposal_cache_queries_one_time_slice_per_batch(self):
+        seen_unique_times: list[int] = []
+
+        def fixed_time_intensity(query_times, query_locations):
+            unique_times = torch.unique(query_times.detach().cpu())
+            seen_unique_times.append(int(unique_times.numel()))
+            if unique_times.numel() != 1:
+                raise ValueError("expected one fixed query time per call")
+            return torch.ones(query_locations.shape[0], dtype=torch.float32, device=query_locations.device)
+
+        _, meta = _build_exact_proposal_cache(
+            fixed_time_intensity,
+            t_start=0.0,
+            t_max=1.0,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
+            config=ExactProposalConfig(time_bins=2, spatial_bins=3, safety=1.2),
+            device=torch.device("cpu"),
+        )
+
+        self.assertEqual(seen_unique_times, [1, 1, 1, 1, 1, 1])
+        self.assertEqual(meta["proposal_cache_query_batches"], 6)
+        self.assertEqual(meta["proposal_cache_query_points"], 54)
 
 
 if __name__ == "__main__":
