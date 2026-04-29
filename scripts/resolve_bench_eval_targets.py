@@ -119,6 +119,8 @@ def build_targets(
         if not run_dir_raw or not dataset_id or not preset or seed is None:
             continue
         run_dir = Path(str(run_dir_raw)).expanduser().resolve()
+        if not (run_dir / "run_result.json").exists():
+            continue
         if dataset_ref:
             data_path = None
             train_path = None
