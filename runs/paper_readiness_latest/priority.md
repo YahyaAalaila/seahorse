@@ -87,8 +87,8 @@ scripts/submit_hawkesnest_suite_family.sh suite4_heterogeneity factorized
 
 After training outputs exist, evaluate the resulting `s3ent_v2__fact__...` and `s4het_v2__fact__...` campaign roots with `METRIC_PROFILES=predictive,surface`.
 
-## Excluded Or Blocked
+## Partial, Excluded, Or Blocked
 
 - **EXCLUDED: `neural_attncnf` surface/predictive evaluation for suite 3/4.** The failure mode is CUDA OOM inside attention/CNF divergence-style evaluation, not missing GT files.
-- **EXCLUDED: `neural_jumpcnf` suite 3/4 evaluation for now.** The current suite3 JumpCNF eval job had no metric artifacts in the last audit and JumpCNF real/synthetic runs are not on pace for the deadline under the current recipe.
+- `neural_jumpcnf` is **partial, not fully excluded**. Suite3 `L0/seed_42` surface evaluation completed as Slurm job `2861482` in 05:22:35 and wrote numeric `surface_test` metrics. It is still not closed: suite3 has only this one trained/evaluated cell, predictive metrics are missing, and suite4 has no completed JumpCNF cells.
 - `neural_cond_gmm` predictive eval was blocked by multi-time proposal-cache calls into `NeuralSTPPEventModel.intensity()`. The local fix changes the eval caller to query one fixed time-slice per batch; relaunch predictive eval for this preset only after pulling the fix.
