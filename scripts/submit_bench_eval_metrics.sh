@@ -93,13 +93,13 @@ fi
 mkdir -p "$ROOT/logs" "$BENCH_ROOT/evaluate"
 LEDGER="$BENCH_ROOT/evaluate/submissions.csv"
 if [ ! -f "$LEDGER" ]; then
-  printf 'submitted_at,job_id,job_name,bench_root,bench_id,dataset_id,preset,seed,split,metric_profile,partition,gpus,cpus_per_task,mem,time_limit,run_dir,data_path,out_dir\n' > "$LEDGER"
+  printf 'submitted_at,job_id,job_name,bench_root,bench_id,dataset_id,preset,seed,split,metric_profile,partition,gpus,cpus_per_task,mem,time_limit,run_dir,data_path,ground_truth_intensity_path,ground_truth_params_path,out_dir\n' > "$LEDGER"
 fi
 
 printf '[submit-eval] bench_root=%s\n' "$BENCH_ROOT"
 printf '[submit-eval] metric_profile=%s split=%s device=%s\n' "$METRIC_PROFILE" "$SPLIT" "$DEVICE"
 
-while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAIN_DATA TARGET_SPLIT DATASET_REF DATASET_REVISION; do
+while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAIN_DATA TARGET_SPLIT DATASET_REF DATASET_REVISION GT_INTENSITY_PATH GT_PARAMS_PATH; do
   JOB_NAME="${BENCH_ID}__eval__${PRESET}__s${SEED}"
   OUT_DIR="${RUN_DIR}/evaluate/metrics/${METRIC_PROFILE}_${TARGET_SPLIT}"
   CAMPAIGN_ID="${BENCH_ID}__eval_metrics"
@@ -139,11 +139,23 @@ while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAI
   else
     ENV_ARGS+=( DATA_PATH="$DATA_PATH" )
   fi
+  if [ -n "${GT_INTENSITY_PATH:-}" ]; then
+    ENV_ARGS+=( GROUND_TRUTH_INTENSITY="$GT_INTENSITY_PATH" )
+  fi
+  if [ -n "${GT_PARAMS_PATH:-}" ]; then
+    ENV_ARGS+=( GROUND_TRUTH_PARAMS="$GT_PARAMS_PATH" )
+  fi
+
+  declare -a SCRIPT_ARGS
+  SCRIPT_ARGS=(
+    "${GT_INTENSITY_PATH:-}"
+    "${GT_PARAMS_PATH:-}"
+  )
 
   sbatch_output="$(
     env \
       "${ENV_ARGS[@]}" \
-      sbatch --job-name="$JOB_NAME" "${SBATCH_ARGS[@]}" "$SBATCH_SCRIPT"
+      sbatch --job-name="$JOB_NAME" "${SBATCH_ARGS[@]}" "$SBATCH_SCRIPT" "${SCRIPT_ARGS[@]}"
   )"
 
   printf '%s\n' "$sbatch_output"
@@ -153,7 +165,7 @@ while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAI
     exit 1
   fi
 
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$(date '+%Y-%m-%d %H:%M:%S')" \
     "$JOB_ID" \
     "$JOB_NAME" \
@@ -171,6 +183,8 @@ while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAI
     "$TIME_LIMIT" \
     "$RUN_DIR" \
     "$DATA_PATH" \
+    "${GT_INTENSITY_PATH:-}" \
+    "${GT_PARAMS_PATH:-}" \
     "$OUT_DIR" >> "$LEDGER"
 
   printf '[submit-eval] recorded %s in %s\n' "$JOB_ID" "$LEDGER"

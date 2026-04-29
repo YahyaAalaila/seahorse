@@ -38,6 +38,38 @@ def _resolve_split_paths(
     return data_path.resolve(), None if train_path is None else train_path.resolve()
 
 
+def _resolve_ground_truth_paths(
+    *,
+    dataset_id: str,
+    splits_dir: Path,
+    data_path: Path | None,
+    dataset_ref: str | None,
+) -> tuple[Path | None, Path | None]:
+    """Find HawkesNest ground-truth files for bench-style synthetic roots."""
+    candidates: list[Path] = []
+    for raw in (splits_dir, data_path, Path(dataset_ref).expanduser() if dataset_ref else None):
+        if raw is None:
+            continue
+        path = raw.resolve()
+        candidates.append(path if path.is_dir() else path.parent)
+        candidates.extend(path.parents)
+
+    seen: set[Path] = set()
+    for base in candidates:
+        if base in seen:
+            continue
+        seen.add(base)
+        gt_dir = base / "ground_truth"
+        intensity = gt_dir / f"{dataset_id}_intensity_grid_r0.npz"
+        params = gt_dir / f"{dataset_id}_params.json"
+        if intensity.exists() or params.exists():
+            return (
+                intensity.resolve() if intensity.exists() else None,
+                params.resolve() if params.exists() else None,
+            )
+    return None, None
+
+
 def build_targets(
     *,
     bench_root: Path,
@@ -96,6 +128,12 @@ def build_targets(
                 dataset_id=str(dataset_id),
                 split=split,
             )
+        gt_intensity_path, gt_params_path = _resolve_ground_truth_paths(
+            dataset_id=str(dataset_id),
+            splits_dir=splits_dir,
+            data_path=data_path,
+            dataset_ref=None if dataset_ref is None else str(dataset_ref),
+        )
         targets.append(
             {
                 "bench_id": str(bench_id),
@@ -110,6 +148,12 @@ def build_targets(
                 "dataset_ref": None if dataset_ref is None else str(dataset_ref),
                 "dataset_revision": (
                     None if dataset_revision is None else str(dataset_revision)
+                ),
+                "ground_truth_intensity_path": (
+                    None if gt_intensity_path is None else str(gt_intensity_path)
+                ),
+                "ground_truth_params_path": (
+                    None if gt_params_path is None else str(gt_params_path)
                 ),
             }
         )
@@ -137,6 +181,8 @@ def _emit_delimited(rows: list[dict[str, Any]], delimiter: str) -> None:
             row["split"],
             row["dataset_ref"] or "",
             row["dataset_revision"] or "",
+            row["ground_truth_intensity_path"] or "",
+            row["ground_truth_params_path"] or "",
         )
         print(delimiter.join(fields))
 
