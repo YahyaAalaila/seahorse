@@ -283,6 +283,46 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
         self.assertTrue(torch.isfinite(values).all())
         self.assertAlmostEqual(float(values.item()), 1.0, places=6)
 
+    def test_neural_like_exact_intensity_adapter_splits_mixed_query_times(self):
+        class FakeEventModel:
+            def __init__(self):
+                self.calls: list[tuple[float, int]] = []
+
+            def fixed_time_query_terms(self, **kwargs):
+                del kwargs
+                return {}
+
+            def intensity(self, *, state, query_times, query_locations, device=None):
+                del state, device
+                q_flat = query_times.reshape(-1)
+                if not torch.allclose(q_flat, q_flat[0].expand_as(q_flat)):
+                    raise ValueError("expected fixed query time")
+                self.calls.append((float(q_flat[0].item()), int(query_locations.shape[0])))
+                return q_flat + query_locations[:, 0]
+
+        class FakeModel:
+            def __init__(self):
+                self.event_model = FakeEventModel()
+
+        class FakeRunner:
+            def __init__(self):
+                self.model = FakeModel()
+                self.norm_stats = {"normalize": False}
+
+        runner = FakeRunner()
+        intensity_fn = build_exact_intensity_fn(
+            runner,
+            StateContext(payload={}),
+            torch.device("cpu"),
+        )
+        values = intensity_fn(
+            torch.tensor([2.0, 1.0, 2.0], dtype=torch.float32),
+            torch.tensor([[1.0, 0.0], [3.0, 0.0], [5.0, 0.0]], dtype=torch.float32),
+        )
+
+        self.assertTrue(torch.allclose(values, torch.tensor([3.0, 4.0, 7.0])))
+        self.assertEqual(sorted(runner.model.event_model.calls), [(1.0, 1), (2.0, 2)])
+
     def test_exact_proposal_cache_queries_one_time_slice_per_batch(self):
         seen_unique_times: list[int] = []
 

@@ -481,6 +481,7 @@ def build_exact_intensity_fn(
     transform_spec = payload.get("input_transform")
     transform = transform_from_spec(transform_spec if isinstance(transform_spec, dict) else None)
     event_model = runner.model.event_model
+    requires_fixed_time_batches = callable(getattr(event_model, "fixed_time_query_terms", None))
 
     def _transform_queries_if_needed(
         qt: torch.Tensor,
@@ -508,6 +509,38 @@ def build_exact_intensity_fn(
             return values.new_ones(())
         return values.new_tensor(max(float(scale_factor), 1e-8))
 
+    def _call_event_intensity(qt: torch.Tensor, qs: torch.Tensor) -> torch.Tensor:
+        if not requires_fixed_time_batches:
+            return event_model.intensity(
+                state=state,
+                query_times=qt,
+                query_locations=qs,
+                device=device,
+            )
+        q_flat = qt.reshape(-1)
+        if q_flat.numel() == 0:
+            return torch.zeros(0, device=device, dtype=torch.float32)
+        if torch.allclose(q_flat, q_flat[0].expand_as(q_flat), atol=1e-7, rtol=1e-6):
+            return event_model.intensity(
+                state=state,
+                query_times=qt,
+                query_locations=qs,
+                device=device,
+            )
+
+        values = torch.empty(q_flat.shape[0], device=device, dtype=torch.float32)
+        unique_times, inverse = torch.unique(q_flat.detach(), sorted=False, return_inverse=True)
+        for group_idx in range(int(unique_times.numel())):
+            idx = torch.nonzero(inverse == group_idx, as_tuple=False).reshape(-1)
+            group_values = event_model.intensity(
+                state=state,
+                query_times=qt.index_select(0, idx),
+                query_locations=qs.index_select(0, idx),
+                device=device,
+            )
+            values.index_copy_(0, idx, group_values.reshape(-1).to(dtype=torch.float32))
+        return values
+
     def intensity_fn(query_times_raw: torch.Tensor, query_locations_raw: torch.Tensor) -> torch.Tensor:
         qt = query_times_raw.unsqueeze(-1) if query_times_raw.ndim == 1 else query_times_raw
         if query_locations_raw.ndim != 2:
@@ -523,12 +556,7 @@ def build_exact_intensity_fn(
             )
         qt, qs = _transform_queries_if_needed(qt, qs)
         with torch.no_grad():
-            values = event_model.intensity(
-                state=state,
-                query_times=qt,
-                query_locations=qs,
-                device=device,
-            )
+            values = _call_event_intensity(qt, qs)
         values = values.to(dtype=torch.float32)
         values = values / _intensity_reporting_scale(values)
         return values.clamp(min=0.0)
