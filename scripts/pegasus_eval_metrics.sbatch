@@ -3,6 +3,19 @@
 #SBATCH --output=%x-%j.out
 set -euo pipefail
 
+# Slurm export behavior can vary across cluster wrappers.  Accepting these as
+# positional arguments makes synthetic GT handoff independent of environment
+# propagation from the submit shell.
+if [[ $# -ge 1 && -n "${1:-}" ]]; then
+  GROUND_TRUTH_INTENSITY="$1"
+fi
+if [[ $# -ge 2 && -n "${2:-}" ]]; then
+  GROUND_TRUTH_PARAMS="$2"
+fi
+if [[ $# -ge 3 && -n "${3:-}" ]]; then
+  DOMAIN_MASK_PATH="$3"
+fi
+
 if [[ -n "${REPO_ROOT:-}" && -f "${REPO_ROOT}/scripts/pegasus_campaign_env.sh" ]]; then
   source "${REPO_ROOT}/scripts/pegasus_campaign_env.sh"
 elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/scripts/pegasus_campaign_env.sh" ]]; then
@@ -56,6 +69,15 @@ if [[ -n "${SPLIT:-}" ]]; then
 fi
 if [[ -n "${TRAIN_DATA:-}" ]]; then
   CMD+=( --train-data "${TRAIN_DATA}" )
+fi
+if [[ -n "${GROUND_TRUTH_INTENSITY:-}" ]]; then
+  CMD+=( --ground-truth-intensity "${GROUND_TRUTH_INTENSITY}" )
+fi
+if [[ -n "${GROUND_TRUTH_PARAMS:-}" ]]; then
+  CMD+=( --ground-truth-params "${GROUND_TRUTH_PARAMS}" )
+fi
+if [[ -n "${DOMAIN_MASK_PATH:-}" ]]; then
+  CMD+=( --domain-mask "${DOMAIN_MASK_PATH}" )
 fi
 if [[ -n "${SEQ_SHARD:-}" ]]; then
   CMD+=( --seq-shard "${SEQ_SHARD}" )

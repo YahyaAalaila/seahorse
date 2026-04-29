@@ -216,10 +216,16 @@ submit_metrics_jobs_for_campaign() {
         ENV_ARGS+=( GROUND_TRUTH_PARAMS="$GT_PARAMS_PATH" )
       fi
 
+      declare -a SCRIPT_ARGS
+      SCRIPT_ARGS=(
+        "${GT_INTENSITY_PATH:-}"
+        "${GT_PARAMS_PATH:-}"
+      )
+
       sbatch_output="$(
         env \
           "${ENV_ARGS[@]}" \
-          sbatch "${SBATCH_ARGS[@]}" "$METRICS_SBATCH"
+          sbatch "${SBATCH_ARGS[@]}" "$METRICS_SBATCH" "${SCRIPT_ARGS[@]}"
       )"
       printf '%s\n' "$sbatch_output"
       job_id="$(printf '%s\n' "$sbatch_output" | awk '/Submitted batch job/ {print $4}')"
