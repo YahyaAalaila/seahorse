@@ -130,6 +130,7 @@ def eval_intensity(
     s_scale: np.ndarray,
     device=None,
     correct_for_normalization: bool = False,
+    query_chunk_size: int | None = None,
 ) -> np.ndarray:
     """Evaluate intensity at one query time over a spatial grid.
 
@@ -175,12 +176,27 @@ def eval_intensity(
             locations=history_locs_t,
             lengths=history_lengths_t,
         )
-        values = model.event_model.intensity(
-            state=state_ctx,
-            query_times=query_times_t,
-            query_locations=query_locs_t,
-            device=dev,
-        )
+        chunk_size = 0 if query_chunk_size is None else int(query_chunk_size)
+        if chunk_size > 0 and query_locs_t.shape[0] > chunk_size:
+            chunks = []
+            for start in range(0, int(query_locs_t.shape[0]), chunk_size):
+                stop = min(start + chunk_size, int(query_locs_t.shape[0]))
+                chunks.append(
+                    model.event_model.intensity(
+                        state=state_ctx,
+                        query_times=query_times_t[start:stop],
+                        query_locations=query_locs_t[start:stop],
+                        device=dev,
+                    )
+                )
+            values = torch.cat(chunks, dim=0)
+        else:
+            values = model.event_model.intensity(
+                state=state_ctx,
+                query_times=query_times_t,
+                query_locations=query_locs_t,
+                device=dev,
+            )
 
     out = values.detach().cpu().numpy().astype(np.float32).reshape(-1)
     if correct_for_normalization:
@@ -503,7 +519,6 @@ def _direct_intensity_grid(
     chunk_size: int = 512,
 ) -> np.ndarray:
     """Evaluate intensity on the grid using the first test sequence as conditioning."""
-    del chunk_size
     if not test_seqs:
         return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
 
@@ -554,6 +569,7 @@ def _direct_intensity_grid(
                 s_scale=loc_std,
                 device=device,
                 correct_for_normalization=normalize,
+                query_chunk_size=int(chunk_size),
             )
             result[ti] = intensity_vals.reshape(len(xs), len(ys))
 
