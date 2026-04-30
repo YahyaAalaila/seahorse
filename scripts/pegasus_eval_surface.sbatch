@@ -18,6 +18,7 @@ done
 
 PYTHON_BIN="${UNIFIED_STPP_PYTHON:-python}"
 mkdir -p "${OUT_DIR}"
+register_job_summary_trap "evaluate:surface:${PROFILE:-history_frame}" "${OUT_DIR}"
 
 if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "${OUT_DIR}" summary.json data.npz artifacts.json; then
   echo "[eval-surface] output already complete: ${OUT_DIR}"

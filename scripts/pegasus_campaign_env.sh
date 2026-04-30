@@ -74,3 +74,37 @@ print_context() {
   echo "[campaign] CAMPAIGN_ID=${CAMPAIGN_ID:-}"
   echo "[campaign] CONTAINER_IMAGE=${CONTAINER_IMAGE:-<none>}"
 }
+
+write_job_summary() {
+  local exit_code="$1"
+  if [[ "${UNIFIED_STPP_JOB_NOTIFY:-1}" == "0" ]]; then
+    return 0
+  fi
+  if [[ -z "${REPO_ROOT:-}" || ! -f "${REPO_ROOT}/scripts/slurm_job_summary.py" ]]; then
+    return 0
+  fi
+  local python_bin="${UNIFIED_STPP_NOTIFY_PYTHON:-python3}"
+  set +e
+  "${python_bin}" "${REPO_ROOT}/scripts/slurm_job_summary.py" --exit-code "${exit_code}"
+  set -e
+  return 0
+}
+
+register_job_summary_trap() {
+  export UNIFIED_STPP_JOB_PIPELINE="${1:-unknown}"
+  if [[ $# -ge 2 && -n "${2:-}" ]]; then
+    export UNIFIED_STPP_JOB_RESULT_ROOT="$2"
+  fi
+  __USTPP_JOB_SUMMARY_WRITTEN=0
+  _ustpp_write_job_summary_once() {
+    local exit_code="$1"
+    if [[ "${__USTPP_JOB_SUMMARY_WRITTEN:-0}" == "1" ]]; then
+      return 0
+    fi
+    __USTPP_JOB_SUMMARY_WRITTEN=1
+    write_job_summary "${exit_code}"
+  }
+  trap 'ustpp_exit_code=$?; _ustpp_write_job_summary_once "${ustpp_exit_code}"; exit "${ustpp_exit_code}"' EXIT
+  trap '_ustpp_write_job_summary_once 143; trap - TERM; exit 143' TERM
+  trap '_ustpp_write_job_summary_once 130; trap - INT; exit 130' INT
+}

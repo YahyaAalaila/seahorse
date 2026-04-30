@@ -20,6 +20,7 @@ PYTHON_BIN="${UNIFIED_STPP_PYTHON:-python}"
 BENCH_OUT="${BENCH_OUT:-$(campaign_bench_dir "${GROUP_NAME}")}"
 
 mkdir -p "${BENCH_OUT}" "$(campaign_logs_dir)"
+register_job_summary_trap "train:bench" "${BENCH_OUT}"
 
 if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "${BENCH_OUT}" bench_meta.json results.json report.html; then
   echo "[bench] output already complete: ${BENCH_OUT}"

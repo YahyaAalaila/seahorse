@@ -35,6 +35,7 @@ fi
 
 PYTHON_BIN="${UNIFIED_STPP_PYTHON:-python}"
 mkdir -p "${OUT_DIR}"
+register_job_summary_trap "evaluate:metrics:${METRIC_PROFILE:-core}" "${OUT_DIR}"
 
 if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "${OUT_DIR}" metrics.json evaluation_manifest.json artifacts.json; then
   echo "[eval-metrics] output already complete: ${OUT_DIR}"

@@ -21,6 +21,7 @@ OUT_PATH="${OUT_PATH:-$(campaign_hpo_dir)/${PRESET}_best.yaml}"
 MANIFEST_PATH="${OUT_PATH%.yaml}.hpo_manifest.json"
 
 mkdir -p "$(dirname "${OUT_PATH}")" "$(campaign_logs_dir)"
+register_job_summary_trap "tune:${PRESET}" "$(dirname "${OUT_PATH}")"
 
 if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "$(dirname "${OUT_PATH}")" "$(basename "${OUT_PATH}")" "$(basename "${MANIFEST_PATH}")"; then
   echo "[tune] output already complete: ${OUT_PATH}"

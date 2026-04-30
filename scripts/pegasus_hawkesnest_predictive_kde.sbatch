@@ -18,6 +18,7 @@ done
 
 PYTHON_BIN="${UNIFIED_STPP_PYTHON:-python}"
 mkdir -p "${OUT_DIR}"
+register_job_summary_trap "evaluate:predictive-kde" "${OUT_DIR}"
 
 if [[ "${FORCE_RUN:-0}" != "1" ]] && job_complete "${OUT_DIR}" metrics.json metrics_by_run.csv metrics_by_family_level.csv; then
   echo "[hawkesnest-predictive-kde] output already complete: ${OUT_DIR}"

@@ -20,6 +20,8 @@ shift
 PRESETS=("$@")
 
 ROOT="/home/aalaila/projects/uni-stpp"
+export REPO_ROOT="${REPO_ROOT:-$ROOT}"
+source "$ROOT/scripts/pegasus_campaign_env.sh"
 SUITE_ROOT="${SUITE_ROOT:-$ROOT/data/hawkesnest_suitesv2}"
 SUITE_PATH="${SUITE_PATH:-$SUITE_ROOT/$SUITE_NAME}"
 SUITE_DATA_TAG="${SUITE_DATA_TAG:-v2}"
@@ -40,6 +42,7 @@ OUT_ROOT="${OUT_ROOT:-runs/hawkesnest_campaigns/${SUITE_NAME}/${CAMPAIGN_TAG}}"
 
 cd "$ROOT"
 mkdir -p logs "$OUT_ROOT"
+register_job_summary_trap "train:hawkesnest-suite:${SUITE_NAME}" "$OUT_ROOT"
 
 srun -K \
   --container-image=/enroot/nvcr.io_nvidia_pytorch_24.12-py3.sqsh \
