@@ -205,6 +205,7 @@ class STPPRunner:
         _seed_fit(self.config.data.seed)
         dm = self._prepare_data_module(train_seqs, val_seqs, test_seqs, data_module)
         self._sync_model_spatial_dim_from_data(dm)
+        resume_ckpt_path = self._resume_checkpoint_path()
         run_dir = self._prepare_run_dir(self.config.model.preset)
         for callback in extra_callbacks or []:
             bind = getattr(callback, "bind_run_context", None)
@@ -223,7 +224,11 @@ class STPPRunner:
         )
         t0 = time.perf_counter()
         with _quiet_lightning():
-            trainer.fit(lm, datamodule=dm)
+            trainer.fit(
+                lm,
+                datamodule=dm,
+                ckpt_path=None if resume_ckpt_path is None else str(resume_ckpt_path),
+            )
         return self._finalize_fit(trainer, lm, dm, dataset_id, t0, run_dir, test_seqs)
 
     # ------------------------------------------------------------------
@@ -247,6 +252,15 @@ class STPPRunner:
             num_workers=self.config.data.num_workers,
             seed=self.config.data.seed,
         )
+
+    def _resume_checkpoint_path(self) -> Optional[Path]:
+        raw = self.config.training.resume_from_checkpoint
+        if not raw:
+            return None
+        path = Path(raw).expanduser().resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Resume checkpoint not found: {path}")
+        return path
 
     def _prepare_run_dir(self, preset_name: str) -> Path:
         """Create a unique run directory and save the original config (crash-safe)."""

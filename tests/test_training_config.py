@@ -77,6 +77,11 @@ class TestSchedulerSelection(unittest.TestCase):
         tc = TrainingConfig(checkpoint_select="last")
         self.assertEqual(tc.checkpoint_select, "last")
 
+    def test_resume_from_checkpoint_defaults_to_none_and_accepts_path(self):
+        self.assertIsNone(TrainingConfig().resume_from_checkpoint)
+        tc = TrainingConfig(resume_from_checkpoint="/tmp/example/last.ckpt")
+        self.assertEqual(tc.resume_from_checkpoint, "/tmp/example/last.ckpt")
+
     def test_lightning_runtime_fields_forward_to_trainer(self):
         tc = TrainingConfig(
             devices=2,

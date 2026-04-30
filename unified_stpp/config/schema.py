@@ -230,6 +230,8 @@ class TrainingConfig(BaseModel):
     """Multiplicative decay factor for StepLR."""
     checkpoint_select: Literal["best", "last"] = "best"
     """Which checkpoint to use for post-fit test and load flows."""
+    resume_from_checkpoint: Optional[str] = None
+    """Optional Lightning checkpoint path for resuming fit() with optimizer/epoch state."""
     test_nll_space: Literal["native", "raw"] = "raw"
     """Reporting space for test NLL: native/model space or raw/original data space when supported."""
     predictive_test_nll_samples: int = 128
