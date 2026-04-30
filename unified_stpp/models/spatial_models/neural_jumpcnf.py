@@ -264,15 +264,22 @@ class TimeVariableCNF(nn.Module):
 
         if HAS_TORCHDIFFEQ:
             odeint_fn = _odeint_adj if self.use_adjoint else _odeint_std
+            # Match torchdiffeq/upstream default: keep adaptive time bookkeeping in float64.
+            solver_options = {"dtype": torch.float64}
+            solver_kwargs = {
+                "rtol": tol,
+                "atol": tol,
+                "method": method,
+                "options": solver_options,
+            }
+            if self.use_adjoint:
+                solver_kwargs["adjoint_options"] = solver_options.copy()
             try:
                 solution = odeint_fn(
                     self,
                     initial_state,
                     tt,
-                    rtol=tol,
-                    atol=tol,
-                    method=method,
-                    options={"dtype": t0.dtype},
+                    **solver_kwargs,
                 )
             except AssertionError as exc:
                 if "underflow in dt" not in str(exc):

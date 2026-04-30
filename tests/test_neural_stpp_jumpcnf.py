@@ -282,6 +282,39 @@ class TestNeuralJumpCNFSpatial(unittest.TestCase):
         self.assertIn("training=True", msg)
         self.assertIn("nfe=", msg)
 
+    def test_adjoint_solver_uses_float64_time_dtype(self):
+        decoder = NeuralJumpCNFSpatial(
+            spatial_dim=2,
+            hidden_dim=8,
+            spatial_aux_dim=2,
+            hidden_dims=[],
+            solve_reverse=False,
+            use_adjoint=True,
+            n_flows=2,
+        )
+
+        original_odeint_adj = neural_jumpcnf_module._odeint_adj
+        captured = {}
+
+        def _capture_solver(func, init_state, tt, **kwargs):
+            del func, tt
+            captured.update(kwargs)
+            return tuple(torch.stack([s, s], dim=0) for s in init_state)
+
+        neural_jumpcnf_module._odeint_adj = _capture_solver
+        try:
+            decoder.cnf.integrate(
+                torch.tensor([2.8], dtype=torch.float32),
+                torch.tensor([2.3], dtype=torch.float32),
+                torch.zeros(1, 4, dtype=torch.float32),
+                torch.zeros(1, dtype=torch.float32),
+            )
+        finally:
+            neural_jumpcnf_module._odeint_adj = original_odeint_adj
+
+        self.assertEqual(captured["options"]["dtype"], torch.float64)
+        self.assertEqual(captured["adjoint_options"]["dtype"], torch.float64)
+
     def test_integrate_repairs_reverse_endpoint_before_solver(self):
         decoder = NeuralJumpCNFSpatial(
             spatial_dim=2,

@@ -165,6 +165,38 @@ class TestNeuralSTPPSharedFoundation(unittest.TestCase):
         self.assertIn("method=dopri5", msg)
         self.assertIn("nfe=", msg)
 
+    def test_temporal_adjoint_solver_uses_float64_time_dtype(self):
+        class _ZeroDrift(nn.Module):
+            def forward(self, t, state):
+                del t
+                lambda_state, hidden_state = state
+                return torch.zeros_like(lambda_state), torch.zeros_like(hidden_state)
+
+        solver = TimeVariableODE(_ZeroDrift(), use_adjoint=True)
+        original_odeint_adj = neural_point_process_module._odeint_adj
+        captured = {}
+
+        def _capture_solver(func, init_state, eval_grid, **kwargs):
+            del func, eval_grid
+            captured.update(kwargs)
+            return tuple(torch.stack([s, s], dim=0) for s in init_state)
+
+        neural_point_process_module._odeint_adj = _capture_solver
+        try:
+            solver.integrate(
+                torch.tensor([1.0], dtype=torch.float32),
+                torch.tensor([1.5], dtype=torch.float32),
+                (
+                    torch.zeros(1, dtype=torch.float32),
+                    torch.zeros(1, 4, dtype=torch.float32),
+                ),
+            )
+        finally:
+            neural_point_process_module._odeint_adj = original_odeint_adj
+
+        self.assertEqual(captured["options"]["dtype"], torch.float64)
+        self.assertEqual(captured["adjoint_options"]["dtype"], torch.float64)
+
     def test_config_data_init_overrides_and_hidden_dim_parsing(self):
         dm = SimpleNamespace(
             train_dataset=SimpleNamespace(
