@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 
 from unified_stpp.evaluation import MetricPlanError, evaluate, profile_names
-from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES, resolve_metric_plan
+from unified_stpp.evaluation.profiles import (
+    GENERATIVE_ROLLOUTS,
+    INTENSITY_GRID,
+    PREDICTIVE_SAMPLES,
+    resolve_metric_plan,
+)
 from unified_stpp.evaluation.registry import metric_by_name
 from unified_stpp.evaluation.result import Metric, MetricResult
 
@@ -25,6 +30,18 @@ class TestMetricProfiles(unittest.TestCase):
 
         self.assertIn(PREDICTIVE_SAMPLES, plan.allowed_artifact_families)
         self.assertIn("temporal_crps", plan.metric_names)
+
+    def test_surface_profile_plans_sampler_fallback_artifacts(self):
+        plan = resolve_metric_plan(
+            metric_profile_name="surface",
+            metrics=None,
+            allowed_artifact_families=None,
+            allow_heavy_artifacts=False,
+        )
+
+        self.assertIn(INTENSITY_GRID, plan.allowed_artifact_families)
+        self.assertIn(GENERATIVE_ROLLOUTS, plan.allowed_artifact_families)
+        self.assertIn("intensity_rmse", plan.metric_names)
 
     def test_nll_names_do_not_hide_sample_kde_fallback(self):
         temporal = metric_by_name("temporal_nll")

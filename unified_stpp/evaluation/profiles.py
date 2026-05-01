@@ -127,8 +127,11 @@ METRIC_PROFILES = {
     "surface": MetricProfile(
         name="surface",
         metric_names=SURFACE_METRICS,
-        allowed_artifact_families=frozenset({INTENSITY_GRID}),
-        description="Intensity-grid diagnostics; may be expensive for exact models.",
+        allowed_artifact_families=frozenset({INTENSITY_GRID, GENERATIVE_ROLLOUTS}),
+        description=(
+            "Intensity-grid diagnostics; sampler-only models may approximate "
+            "the grid from generative rollouts."
+        ),
     ),
     "full": MetricProfile(
         name="full",
