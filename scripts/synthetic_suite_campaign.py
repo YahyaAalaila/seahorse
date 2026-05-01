@@ -383,6 +383,7 @@ def _fit_campaign_run(
     curve_step: float,
     device: str | None,
     run_batch_size: int | None,
+    resume_checkpoint: Path | None = None,
 ) -> RunIndexRecord:
     cli_values: dict[str, Any] = {
         "data": {
@@ -404,6 +405,8 @@ def _fit_campaign_run(
         cli_values["training"]["device"] = device
     if run_batch_size is not None:
         cli_values["training"]["batch_size"] = int(run_batch_size)
+    if resume_checkpoint is not None:
+        cli_values["training"]["resume_from_checkpoint"] = str(resume_checkpoint)
 
     tuned_cfg = STPPConfig.from_yaml(best_yaml, sanitize=False)
     merged_cfg = tuned_cfg.model_dump(mode="json")
@@ -469,6 +472,11 @@ def _run_suite_stage(
                 existing_record = existing.get(key)
                 if resume and existing_record is not None and _record_complete(existing_record):
                     continue
+                resume_checkpoint = None
+                if resume and existing_record is not None:
+                    candidate = existing_record.run_dir / "checkpoints" / "last.ckpt"
+                    if candidate.exists():
+                        resume_checkpoint = candidate.resolve()
                 record = _fit_campaign_run(
                     suite_name=suite_name,
                     config=config,
@@ -479,6 +487,7 @@ def _run_suite_stage(
                     curve_step=curve_step,
                     device=device,
                     run_batch_size=run_batch_size,
+                    resume_checkpoint=resume_checkpoint,
                 )
                 existing[key] = record
                 _write_run_index(paths["run_index"], existing)
