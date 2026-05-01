@@ -83,6 +83,30 @@ def _load_metric_sequences(path: Path) -> list[dict[str, np.ndarray]]:
     return out
 
 
+def _limit_metric_sequences(
+    seqs: list[dict[str, np.ndarray]],
+    *,
+    max_seqs: int | None,
+    max_events: int | None,
+) -> list[dict[str, np.ndarray]]:
+    if max_seqs is not None and max_seqs < 0:
+        raise ValueError("--max-seqs must be non-negative.")
+    if max_events is not None and max_events < 0:
+        raise ValueError("--max-events must be non-negative.")
+
+    limited = seqs if max_seqs is None else seqs[: int(max_seqs)]
+    if max_events is None:
+        return limited
+    n_events = int(max_events)
+    return [
+        {
+            "times": np.asarray(seq["times"])[:n_events],
+            "locations": np.asarray(seq["locations"])[:n_events],
+        }
+        for seq in limited
+    ]
+
+
 def _load_optional_json(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
@@ -202,7 +226,11 @@ def main() -> int:
     )
     artifact_dir = out_dir / "artifacts"
     device = resolve_device(str(args.device))
-    test_seqs = _load_metric_sequences(data_path)
+    test_seqs = _limit_metric_sequences(
+        _load_metric_sequences(data_path),
+        max_seqs=args.max_seqs,
+        max_events=args.max_events,
+    )
     train_seqs = None if train_path is None else _load_metric_sequences(train_path)
 
     gt_intensity_path = (

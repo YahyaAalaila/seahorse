@@ -80,6 +80,12 @@ fi
 if [[ -n "${DOMAIN_MASK_PATH:-}" ]]; then
   CMD+=( --domain-mask "${DOMAIN_MASK_PATH}" )
 fi
+if [[ -n "${MAX_SEQS:-}" ]]; then
+  CMD+=( --max-seqs "${MAX_SEQS}" )
+fi
+if [[ -n "${MAX_EVENTS:-}" ]]; then
+  CMD+=( --max-events "${MAX_EVENTS}" )
+fi
 if [[ -n "${SEQ_SHARD:-}" ]]; then
   CMD+=( --seq-shard "${SEQ_SHARD}" )
 fi
