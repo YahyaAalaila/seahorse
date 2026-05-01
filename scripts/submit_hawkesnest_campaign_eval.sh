@@ -82,10 +82,18 @@ discover_campaign_roots() {
   local resolved
   for input in "$@"; do
     resolved="$(resolve_path "$input")"
-    if [ -f "$resolved/manifests/campaign_manifest.json" ]; then
+    if [ -f "$resolved/manifests/campaign_manifest.json" ] && [ -f "$resolved/manifests/run_index.jsonl" ]; then
       printf '%s\n' "$resolved"
     elif [ -d "$resolved" ]; then
-      find "$resolved" -path '*/manifests/campaign_manifest.json' -print | sed 's#/manifests/campaign_manifest.json##'
+      find "$resolved" -path '*/manifests/campaign_manifest.json' -print |
+        while IFS= read -r manifest; do
+          root="${manifest%/manifests/campaign_manifest.json}"
+          if [ -f "$root/manifests/run_index.jsonl" ]; then
+            printf '%s\n' "$root"
+          else
+            echo "Skipping campaign without run_index.jsonl: $root" >&2
+          fi
+        done
     else
       echo "Skipping missing path: $resolved" >&2
     fi
