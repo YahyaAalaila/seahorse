@@ -27,6 +27,7 @@ from unified_stpp.runner.runner import STPPRunner
 
 
 SUPPORTED_PRESETS = {"smash", "diffusion_stpp", "deep_stpp", "auto_stpp"}
+AUTOREGRESSIVE_ROLLOUT_DEPTH = 10
 
 
 def is_exact_preset(preset: str) -> bool:
@@ -366,30 +367,35 @@ def compute_generative_rollouts(
     k: int,
     device: torch.device,
     seed: int = 1,
+    n_context_events: int = 50,
 ) -> GenerativeRollouts:
-    """Draw K autoregressive rollouts for each test sequence."""
+    """Draw K fixed-depth autoregressive rollouts for each test sequence."""
+    n_context_events = int(n_context_events)
+    if n_context_events < 1:
+        raise ValueError("n_context_events must be >= 1")
     np.random.seed(seed)
     caps = runner.model.event_model.capabilities
     use_native = caps.has_native_sampler
     method = "native" if use_native else "thinning"
 
     xmin, xmax, ymin, ymax = _spatial_bounds_from_seqs(test_seqs)
-    median_iet = float(
-        np.median(
-            np.concatenate(
-                [
-                    np.diff(s["times"].astype(np.float32))
-                    for s in test_seqs
-                    if s["times"].shape[0] > 1
-                ]
-            )
-        )
-    )
+    iet_chunks = [
+        np.diff(np.asarray(s["times"], dtype=np.float32))
+        for s in test_seqs
+        if np.asarray(s["times"], dtype=np.float32).shape[0] > 1
+    ]
+    median_iet = 1.0
+    if iet_chunks:
+        finite_iets = np.concatenate(iet_chunks)
+        finite_iets = finite_iets[np.isfinite(finite_iets) & (finite_iets > 0.0)]
+        if finite_iets.size > 0:
+            median_iet = float(np.median(finite_iets))
 
     rollout_times: list[list[np.ndarray]] = []
     rollout_locs: list[list[np.ndarray]] = []
     true_times: list[np.ndarray] = []
     true_locs: list[np.ndarray] = []
+    context_lengths: list[int] = []
 
     runner.model.eval()
     with torch.no_grad():
@@ -400,20 +406,30 @@ def compute_generative_rollouts(
             true_times.append(times)
             true_locs.append(locs)
 
-            cond_len = max(1, n // 2)
+            cond_len = min(n_context_events, n)
+            context_lengths.append(int(cond_len))
+            if cond_len == 0:
+                rollout_times.append(
+                    [np.zeros((0,), dtype=np.float32) for _ in range(k)]
+                )
+                rollout_locs.append(
+                    [np.zeros((0, 2), dtype=np.float32) for _ in range(k)]
+                )
+                continue
+
             history = {
                 "times": times[:cond_len].copy(),
                 "locations": locs[:cond_len].copy(),
             }
-            target_len = n - cond_len
+            target_len = AUTOREGRESSIVE_ROLLOUT_DEPTH
 
             seq_rollout_t: list[np.ndarray] = []
             seq_rollout_s: list[np.ndarray] = []
 
             shared_state_ctx = None
             shared_proposal_cache = None
+            horizon = float(target_len) * median_iet * 3.0
             if not use_native and target_len > 0:
-                horizon = float(target_len) * median_iet * 3.0
                 t_start = float(history["times"][-1]) if history["times"].size > 0 else 0.0
                 shared_state_ctx = build_state_from_history(runner, history, device)
                 intensity_fn = build_exact_intensity_fn(runner, shared_state_ctx, device)
@@ -459,6 +475,7 @@ def compute_generative_rollouts(
         rollout_locs=rollout_locs,
         true_times=true_times,
         true_locs=true_locs,
+        context_lengths=context_lengths,
         method=method,
     )
 

@@ -51,6 +51,7 @@ CMD=(
   --seed "${EVAL_SEED:-0}"
   --k-pred "${K_PRED:-32}"
   --k-gen "${K_GEN:-20}"
+  --n-context-events "${N_CONTEXT_EVENTS:-50}"
   --exact-time-bins "${EXACT_TIME_BINS:-8}"
   --exact-spatial-bins "${EXACT_SPATIAL_BINS:-8}"
   --out "${OUT_DIR}"

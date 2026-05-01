@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 from typing import Any
@@ -28,7 +27,7 @@ from unified_stpp.evaluation.profiles import (
 
 @dataclass
 class GenerativeRollouts:
-    """K full-sequence rollouts from the start of each test sequence.
+    """K autoregressive continuations from a fixed prefix of each test sequence.
 
     Attributes
     ----------
@@ -36,6 +35,7 @@ class GenerativeRollouts:
     rollout_locs:   [seq_idx][k] = (n_events_k, 2) float32 — sampled locations.
     true_times:     [seq_idx] = (n_events,) float32 — ground-truth event times.
     true_locs:      [seq_idx] = (n_events, 2) float32 — ground-truth locations.
+    context_lengths:[seq_idx] = number of observed prefix events used as history.
     method:         "thinning" | "native"
     """
 
@@ -43,6 +43,7 @@ class GenerativeRollouts:
     rollout_locs: list[list[np.ndarray]]
     true_times: list[np.ndarray]
     true_locs: list[np.ndarray]
+    context_lengths: list[int]
     method: str
 
 
@@ -125,6 +126,8 @@ class EvalContext:
     train_data:    Training sequences (needed for train/test gap metrics).
     k_pred:        Number of next-event samples per test event.
     k_gen:         Number of full-sequence rollouts per test sequence.
+    n_context_events:
+                   Number of observed prefix events for autoregressive rollouts.
     grid_spec:     Dict with keys x_resolution, y_resolution, t_resolution and
                    x_range, y_range (each a [lo, hi] list).  Used for intensity grids.
     seed:          Base random seed for reproducible sampling.
@@ -143,6 +146,7 @@ class EvalContext:
         train_data: list[dict[str, np.ndarray]] | None = None,
         k_pred: int = _K_PRED_DEFAULT,
         k_gen: int = _K_GEN_DEFAULT,
+        n_context_events: int = 50,
         exact_time_bins: int = 8,
         exact_spatial_bins: int = 8,
         grid_spec: dict[str, Any] | None = None,
@@ -158,6 +162,9 @@ class EvalContext:
         self.train_data = train_data
         self.k_pred = k_pred
         self.k_gen = k_gen
+        self.n_context_events = int(n_context_events)
+        if self.n_context_events < 1:
+            raise ValueError("n_context_events must be >= 1")
         self.exact_time_bins = int(exact_time_bins)
         self.exact_spatial_bins = int(exact_spatial_bins)
         self.grid_spec = grid_spec or {}
@@ -338,7 +345,7 @@ class EvalContext:
 
     @cached_property
     def samples_generative(self) -> GenerativeRollouts:
-        """K full-sequence rollouts for every test sequence."""
+        """K fixed-prefix autoregressive rollouts for every test sequence."""
         from .predictive.rollout import compute_generative_rollouts
 
         self._require_planned_artifact(GENERATIVE_ROLLOUTS)
@@ -348,6 +355,7 @@ class EvalContext:
             k=self.k_gen,
             device=self.device,
             seed=self.seed + 1,
+            n_context_events=self.n_context_events,
         )
 
     @cached_property

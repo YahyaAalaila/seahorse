@@ -28,6 +28,7 @@ Useful overrides:
   GPU_TIME_LIMIT=24:00:00
 
   METRIC_PROFILES=predictive,surface
+  METRIC_PROFILES=autoregressive
   WITH_SURFACE_VIZ=1
   SURFACE_SEQ_IDX=0
   SURFACE_HISTORY_LENGTH=0
@@ -200,6 +201,7 @@ submit_metrics_jobs_for_campaign() {
         EVAL_SEED="${EVAL_SEED:-0}"
         K_PRED="${K_PRED:-64}"
         K_GEN="${K_GEN:-20}"
+        N_CONTEXT_EVENTS="${N_CONTEXT_EVENTS:-50}"
         EXACT_TIME_BINS="${EXACT_TIME_BINS:-8}"
         EXACT_SPATIAL_BINS="${EXACT_SPATIAL_BINS:-8}"
         BENCHMARK_ID="${TARGET_CAMPAIGN_ID}__${CONFIG_ID}__${PRESET}__s${SEED}"

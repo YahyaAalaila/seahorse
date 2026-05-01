@@ -85,6 +85,12 @@ def _add_metrics_subparser(sub) -> None:
     p.add_argument("--k-pred", type=int, default=32, help="Next-event samples per context.")
     p.add_argument("--k-gen", type=int, default=20, help="Full-rollout samples per sequence.")
     p.add_argument(
+        "--n-context-events",
+        type=int,
+        default=50,
+        help="Observed prefix length for autoregressive/generative rollout metrics.",
+    )
+    p.add_argument(
         "--exact-time-bins",
         type=int,
         default=8,
@@ -493,6 +499,7 @@ def _execute_metrics(args) -> None:
             train_data=train_seqs,
             k_pred=int(args.k_pred),
             k_gen=int(args.k_gen),
+            n_context_events=int(args.n_context_events),
             exact_time_bins=int(args.exact_time_bins),
             exact_spatial_bins=int(args.exact_spatial_bins),
             seed=int(args.seed),
@@ -678,6 +685,7 @@ def _metrics_evaluation_manifest(
             seed=int(args.seed),
             k_pred=int(args.k_pred),
             k_gen=int(args.k_gen),
+            n_context_events=int(args.n_context_events),
             metric_names=metric_names,
         ),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -722,6 +730,7 @@ def _metrics_evaluation_manifest(
             "seed": int(args.seed),
             "k_pred": int(args.k_pred),
             "k_gen": int(args.k_gen),
+            "n_context_events": int(args.n_context_events),
             "exact_time_bins": int(args.exact_time_bins),
             "exact_spatial_bins": int(args.exact_spatial_bins),
             "out_dir": str(out_dir),
@@ -752,6 +761,7 @@ def _metrics_evaluation_id(
     seed: int,
     k_pred: int,
     k_gen: int,
+    n_context_events: int,
     metric_names: list[str],
 ) -> str:
     import hashlib
@@ -764,6 +774,7 @@ def _metrics_evaluation_id(
         "seed": int(seed),
         "k_pred": int(k_pred),
         "k_gen": int(k_gen),
+        "n_context_events": int(n_context_events),
         "metric_names": list(metric_names),
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()

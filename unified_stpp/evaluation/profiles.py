@@ -89,6 +89,12 @@ GENERATIVE_METRICS = (
     "rollout_coherence",
 )
 
+AUTOREGRESSIVE_METRICS = (
+    "rollout_coherence",
+    "ar_temporal_crps_h1",
+    "ar_spatial_energy_score_h1",
+)
+
 SURFACE_METRICS = (
     "intensity_rmse",
     "intensity_relative_error",
@@ -123,6 +129,12 @@ METRIC_PROFILES = {
         metric_names=GENERATIVE_METRICS,
         allowed_artifact_families=frozenset({GENERATIVE_ROLLOUTS}),
         description="Full-rollout generative metrics.",
+    ),
+    "autoregressive": MetricProfile(
+        name="autoregressive",
+        metric_names=AUTOREGRESSIVE_METRICS,
+        allowed_artifact_families=frozenset({GENERATIVE_ROLLOUTS}),
+        description="Fixed-prefix autoregressive horizon degradation metrics.",
     ),
     "surface": MetricProfile(
         name="surface",

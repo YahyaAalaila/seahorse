@@ -22,6 +22,7 @@ dependencies = [
   "jinja2>=3.0",
   "joblib>=1.3",
   "scipy>=1.10.0",
+  "POT>=0.9.0",
   "scikit-learn>=1.3.0",
   "huggingface_hub>=0.24.0",
   "torchdiffeq>=0.2.3",

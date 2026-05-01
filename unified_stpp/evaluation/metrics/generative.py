@@ -7,9 +7,9 @@ Registers:
   spatial_count_chi2    — Spatial event count chi-squared (catalog M18)
   spatial_ripley_k      — Ripley's K spatial (catalog M19)
   temporal_ripley_k     — Temporal pair correlation (catalog M20)
-  rollout_coherence     — Sequential coherence over rollout horizon H (catalog M27)
+  rollout_coherence     — Sequential coherence over rollout horizons 1/5/10 (catalog M27)
 
-All metrics share ctx.samples_generative (K=20 rollouts per test sequence).
+All metrics share ctx.samples_generative (K=20 fixed-prefix rollouts per test sequence).
 """
 
 from __future__ import annotations
@@ -70,6 +70,81 @@ def _normalize_pts(real: np.ndarray, gen: np.ndarray) -> tuple[np.ndarray, np.nd
     std = real.std(axis=0)
     std = np.maximum(std, 1e-8)
     return real / std, gen / std
+
+
+def _point_cloud(times: np.ndarray, locs: np.ndarray) -> np.ndarray:
+    return np.column_stack([times, locs[:, 0], locs[:, 1]]).astype(np.float64, copy=False)
+
+
+def _context_length(rollouts, seq_i: int, n_events: int) -> int:
+    lengths = getattr(rollouts, "context_lengths", None)
+    if lengths is not None:
+        return int(lengths[seq_i])
+    return max(1, n_events // 2)
+
+
+def _sequence_scale(
+    true_times: np.ndarray,
+    true_locs: np.ndarray,
+    context_len: int,
+) -> np.ndarray:
+    """Stable scale for horizon point clouds, including the H=1 case."""
+    continuation_t = true_times[context_len:]
+    continuation_s = true_locs[context_len:]
+    if continuation_t.shape[0] >= 2:
+        pts = _point_cloud(continuation_t, continuation_s)
+    elif true_times.shape[0] >= 2:
+        pts = _point_cloud(true_times, true_locs)
+    else:
+        return np.ones(3, dtype=np.float64)
+    scale = pts.std(axis=0)
+    return np.maximum(scale, 1e-6)
+
+
+def _energy_distance(real_pts: np.ndarray, gen_pts: np.ndarray) -> float:
+    if real_pts.shape[0] == 0 or gen_pts.shape[0] == 0:
+        return float("nan")
+    cross = np.linalg.norm(real_pts[:, None, :] - gen_pts[None, :, :], axis=-1).mean()
+    rr = np.linalg.norm(real_pts[:, None, :] - real_pts[None, :, :], axis=-1).mean()
+    gg = np.linalg.norm(gen_pts[:, None, :] - gen_pts[None, :, :], axis=-1).mean()
+    return float(max(2.0 * cross - rr - gg, 0.0))
+
+
+def _point_cloud_distance(
+    real_pts: np.ndarray,
+    gen_pts: np.ndarray,
+    ot_module,
+) -> tuple[float, str]:
+    if real_pts.shape[0] == 0 or gen_pts.shape[0] == 0:
+        return float("nan"), "energy_fallback"
+    if ot_module is not None:
+        n_r, n_g = real_pts.shape[0], gen_pts.shape[0]
+        a = np.ones(n_r, dtype=np.float64) / n_r
+        b = np.ones(n_g, dtype=np.float64) / n_g
+        cost = np.linalg.norm(real_pts[:, None, :] - gen_pts[None, :, :], axis=-1)
+        try:
+            return float(ot_module.emd2(a, b, cost)), "w1_pot"
+        except Exception:
+            pass
+    return _energy_distance(real_pts, gen_pts), "energy_fallback"
+
+
+def _crps_1d(samples: np.ndarray, target: float) -> float:
+    if samples.size == 0:
+        return float("nan")
+    term1 = float(np.mean(np.abs(samples - target)))
+    pairwise = np.abs(samples[:, None] - samples[None, :])
+    term2 = float(np.mean(pairwise))
+    return term1 - 0.5 * term2
+
+
+def _spatial_energy_score(samples: np.ndarray, target: np.ndarray) -> float:
+    if samples.shape[0] == 0:
+        return float("nan")
+    term1 = 2.0 * float(np.linalg.norm(samples - target[None, :], axis=-1).mean())
+    pairwise = np.linalg.norm(samples[:, None, :] - samples[None, :, :], axis=-1)
+    term2 = float(pairwise.mean())
+    return term1 - term2
 
 
 # ---------------------------------------------------------------------------
@@ -504,8 +579,8 @@ def _ripley_k_1d(times: np.ndarray, rs: np.ndarray) -> np.ndarray:
 class RolloutCoherence(Metric):
     """M27: Sequential coherence — W₁ between generated and real continuations.
 
-    Evaluates at horizon H ∈ {1, 5, 20, 50} events and returns as a curve.
-    Requires POT.
+    Evaluates at fixed horizon H ∈ {1, 5, 10} events and returns as a curve.
+    The scalar value is the H=10 result.
     """
 
     name = "rollout_coherence"
@@ -514,23 +589,21 @@ class RolloutCoherence(Metric):
     artifact_families = frozenset({GENERATIVE_ROLLOUTS})
     cost_class = "sampling_heavy"
 
-    _H_VALUES = [1, 5, 20, 50]
+    _H_VALUES = (1, 5, 10)
 
     def compute(self, ctx: "EvalContext") -> MetricResult:
         try:
             import ot  # type: ignore[import]
-        except ImportError:
-            return MetricResult(
-                value=None,
-                available=False,
-                reason="POT (Python Optimal Transport) not installed",
-            )
+        except Exception:
+            ot = None
 
         rollouts = ctx.samples_generative
         curve: dict[str, float] = {}
+        used_fallback = ot is None
 
         for H in self._H_VALUES:
-            w1_vals: list[float] = []
+            distance_vals: list[float] = []
+            n_h = 0
             for seq_i, (rt_seq, rs_seq, tt, tl) in enumerate(
                 zip(
                     rollouts.rollout_times,
@@ -539,58 +612,122 @@ class RolloutCoherence(Metric):
                     rollouts.true_locs,
                 )
             ):
-                # Condition on first half → continuation is second half
                 n = tt.shape[0]
-                cond_len = max(1, n // 2)
+                cond_len = _context_length(rollouts, seq_i, n)
                 real_continuation_t = tt[cond_len:cond_len + H]
                 real_continuation_s = tl[cond_len:cond_len + H]
 
-                if real_continuation_t.shape[0] == 0:
+                if real_continuation_t.shape[0] < H:
                     continue
 
-                real_pts = np.column_stack(
-                    [real_continuation_t, real_continuation_s[:, 0], real_continuation_s[:, 1]]
-                ).astype(np.float64)
+                scale = _sequence_scale(tt, tl, cond_len)
+                real_pts = _point_cloud(real_continuation_t, real_continuation_s) / scale
 
                 # Pool generated continuations
                 gen_pts_list: list[np.ndarray] = []
                 for r_t, r_s in zip(rt_seq, rs_seq):
-                    take = min(H, r_t.shape[0])
-                    if take > 0:
-                        pts = np.column_stack([r_t[:take], r_s[:take, 0], r_s[:take, 1]])
-                        gen_pts_list.append(pts)
+                    if r_t.shape[0] >= H and r_s.shape[0] >= H:
+                        gen_pts_list.append(_point_cloud(r_t[:H], r_s[:H]) / scale)
 
                 if not gen_pts_list:
                     continue
 
-                gen_pts = np.concatenate(gen_pts_list, axis=0).astype(np.float64)
+                gen_pts = np.concatenate(gen_pts_list, axis=0).astype(np.float64, copy=False)
+                distance, method = _point_cloud_distance(real_pts, gen_pts, ot)
+                if method != "w1_pot":
+                    used_fallback = True
+                if not math.isfinite(distance):
+                    continue
+                distance_vals.append(distance)
+                n_h += 1
 
-                # Normalize by real
-                std = real_pts.std(axis=0)
-                std = np.maximum(std, 1e-8)
-                real_pts_n = real_pts / std
-                gen_pts_n = gen_pts / std
+            if distance_vals:
+                curve[str(H)] = float(np.median(distance_vals))
+                curve[f"n_h_{H}"] = float(n_h)
 
-                n_r, n_g = real_pts_n.shape[0], gen_pts_n.shape[0]
-                a = np.ones(n_r) / n_r
-                b = np.ones(n_g) / n_g
-                M = np.linalg.norm(real_pts_n[:, None] - gen_pts_n[None, :], axis=-1)
+        value = curve.get("10")
+        if value is None:
+            return MetricResult(
+                value=None,
+                curve=curve or None,
+                method="energy_fallback" if used_fallback else "w1_pot",
+                available=False,
+                reason="no valid h=10 sequences",
+            )
 
-                try:
-                    w1 = float(ot.emd2(a, b, M))
-                except Exception:
-                    try:
-                        w1 = float(ot.sinkhorn2(a, b, M, reg=0.05)[0])
-                    except Exception:
-                        continue
-                w1_vals.append(w1)
+        return MetricResult(
+            value=float(value),
+            curve=curve,
+            method="energy_fallback" if used_fallback else "w1_pot",
+        )
 
-            if w1_vals:
-                curve[str(H)] = float(np.median(w1_vals))
 
-        if not curve:
-            return MetricResult(value=None, available=False, reason="no valid sequences")
+@register_metric
+class ARTemporalCRPSH1(Metric):
+    """Single-step temporal CRPS from fixed-prefix autoregressive rollouts."""
 
-        # Primary scalar: W₁ at H=20 (or first available)
-        value = curve.get("20", next(iter(curve.values())))
-        return MetricResult(value=value, curve=curve, method=rollouts.method)
+    name = "ar_temporal_crps_h1"
+    catalog_id = None
+    requires = frozenset({"samples_generative"})
+    artifact_families = frozenset({GENERATIVE_ROLLOUTS})
+    cost_class = "sampling_heavy"
+
+    def compute(self, ctx: "EvalContext") -> MetricResult:
+        rollouts = ctx.samples_generative
+        values: list[float] = []
+        for seq_i, (rt_seq, tt) in enumerate(zip(rollouts.rollout_times, rollouts.true_times)):
+            n = tt.shape[0]
+            cond_len = _context_length(rollouts, seq_i, n)
+            if cond_len < 1 or cond_len >= n:
+                continue
+            hist_end = float(tt[cond_len - 1])
+            target = float(tt[cond_len] - hist_end)
+            pred = [
+                max(float(r_t[0]) - hist_end, 0.0)
+                for r_t in rt_seq
+                if r_t.shape[0] >= 1 and math.isfinite(float(r_t[0]))
+            ]
+            if not pred:
+                continue
+            score = _crps_1d(np.asarray(pred, dtype=np.float64), target)
+            if math.isfinite(score):
+                values.append(score)
+        if not values:
+            return MetricResult(value=None, available=False, reason="no valid h=1 rollouts")
+        return MetricResult(value=float(np.mean(values)), method=rollouts.method)
+
+
+@register_metric
+class ARSpatialEnergyScoreH1(Metric):
+    """Single-step spatial energy score from fixed-prefix autoregressive rollouts."""
+
+    name = "ar_spatial_energy_score_h1"
+    catalog_id = None
+    requires = frozenset({"samples_generative"})
+    artifact_families = frozenset({GENERATIVE_ROLLOUTS})
+    cost_class = "sampling_heavy"
+
+    def compute(self, ctx: "EvalContext") -> MetricResult:
+        rollouts = ctx.samples_generative
+        values: list[float] = []
+        for seq_i, (rs_seq, tt, tl) in enumerate(
+            zip(rollouts.rollout_locs, rollouts.true_times, rollouts.true_locs)
+        ):
+            n = tt.shape[0]
+            cond_len = _context_length(rollouts, seq_i, n)
+            if cond_len < 1 or cond_len >= n:
+                continue
+            target = np.asarray(tl[cond_len], dtype=np.float64)
+            pred = [
+                np.asarray(r_s[0], dtype=np.float64)
+                for r_s in rs_seq
+                if r_s.shape[0] >= 1 and np.isfinite(r_s[0]).all()
+            ]
+            if not pred:
+                continue
+            score = _spatial_energy_score(np.vstack(pred), target)
+            if math.isfinite(score):
+                values.append(score)
+        if not values:
+            return MetricResult(value=None, available=False, reason="no valid h=1 rollouts")
+        return MetricResult(value=float(np.mean(values)), method=rollouts.method)

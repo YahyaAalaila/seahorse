@@ -16,7 +16,7 @@ Useful environment overrides:
   MEM=32G
   TIME_LIMIT=12:00:00
   SPLIT=test
-  METRIC_PROFILE=core|nll|predictive|generative|surface|full
+  METRIC_PROFILE=core|nll|predictive|generative|autoregressive|surface|full
   ARTIFACT_MODE=load_or_compute|load_only
   DEVICE=cpu|cuda|auto
   EVAL_SEED=0
@@ -122,6 +122,7 @@ while IFS=$'\x1f' read -r BENCH_ID DATASET_ID PRESET SEED RUN_DIR DATA_PATH TRAI
     EVAL_SEED="${EVAL_SEED:-0}"
     K_PRED="${K_PRED:-32}"
     K_GEN="${K_GEN:-20}"
+    N_CONTEXT_EVENTS="${N_CONTEXT_EVENTS:-50}"
     EXACT_TIME_BINS="${EXACT_TIME_BINS:-8}"
     EXACT_SPATIAL_BINS="${EXACT_SPATIAL_BINS:-8}"
     BENCHMARK_ID="$BENCH_ID"

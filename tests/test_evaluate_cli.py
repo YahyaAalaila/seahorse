@@ -65,6 +65,57 @@ class TestEvaluateCLI(unittest.TestCase):
             self.assertTrue((out_dir / "evaluation_manifest.json").exists())
             self.assertTrue((out_dir / "artifacts.json").exists())
 
+    def test_metrics_cli_autoregressive_smoke(self):
+        sequence = {
+            "times": [float(i) for i in range(15)],
+            "locations": [[float(i) / 20.0, 1.0 + float(i) / 20.0] for i in range(15)],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_path = write_history_jsonl(root / "test.jsonl", [sequence])
+            run_dir = make_saved_run(root, preset="diffusion_stpp", label="diffusion")
+            out_dir = root / "metrics_autoregressive"
+
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "unified_stpp",
+                    "evaluate",
+                    "metrics",
+                    "--run",
+                    str(run_dir),
+                    "--data",
+                    str(data_path),
+                    "--metric-profile",
+                    "autoregressive",
+                    "--k-gen",
+                    "2",
+                    "--n-context-events",
+                    "3",
+                    "--max-seqs",
+                    "1",
+                    "--device",
+                    "cpu",
+                    "--out",
+                    str(out_dir),
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            with open(out_dir / "metrics.json") as f:
+                metrics = json.load(f)
+            coherence = metrics["rollout_coherence"]
+            curve = coherence["curve"]
+            self.assertTrue(coherence["available"])
+            self.assertEqual(set(curve), {"1", "5", "10", "n_h_1", "n_h_5", "n_h_10"})
+            self.assertEqual(coherence["value"], curve["10"])
+            self.assertIn("ar_temporal_crps_h1", metrics)
+            self.assertIn("ar_spatial_energy_score_h1", metrics)
+
     def test_metrics_cli_explicit_heavy_metric_requires_matching_profile(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

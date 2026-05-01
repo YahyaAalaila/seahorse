@@ -194,6 +194,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--k-pred", type=int, default=32)
     parser.add_argument("--k-gen", type=int, default=20)
+    parser.add_argument("--n-context-events", type=int, default=50)
     parser.add_argument("--exact-time-bins", type=int, default=8)
     parser.add_argument("--exact-spatial-bins", type=int, default=8)
     parser.add_argument("--benchmark-id", default=None)
@@ -267,6 +268,7 @@ def main() -> int:
             train_data=train_seqs,
             k_pred=int(args.k_pred),
             k_gen=int(args.k_gen),
+            n_context_events=int(args.n_context_events),
             exact_time_bins=int(args.exact_time_bins),
             exact_spatial_bins=int(args.exact_spatial_bins),
             grid_spec=grid_spec,

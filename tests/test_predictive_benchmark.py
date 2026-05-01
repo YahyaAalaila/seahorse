@@ -17,6 +17,7 @@ from unified_stpp.evaluation.predictive.rollout import (
     ExactProposalConfig,
     _build_exact_proposal_cache,
     build_exact_intensity_fn,
+    compute_generative_rollouts,
 )
 from unified_stpp.evaluation.predictive.sampling import compute_predictive_samples
 from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
@@ -134,6 +135,73 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
             samples.is_last_context,
             np.asarray([False, False, True], dtype=np.bool_),
         )
+
+    def test_generative_rollouts_use_fixed_prefix_and_depth(self):
+        class FakeStateModel:
+            spatial_dim = 2
+            token_loc_min = torch.zeros(2, dtype=torch.float32)
+            token_loc_range = torch.ones(2, dtype=torch.float32)
+            token_delta_t_min = torch.tensor(0.0, dtype=torch.float32)
+            token_delta_t_range = torch.tensor(1.0, dtype=torch.float32)
+
+            def __init__(self):
+                self.calls: list[int] = []
+
+            def encode_sampling_history(self, *, times, locations, lengths, **kwargs):
+                del times, locations, kwargs
+                self.calls.append(int(lengths.detach().cpu().item()))
+                return StateContext(payload={"diff_cond_last": lengths.float().view(1, 1, 1)})
+
+        class FakeEventModel:
+            capabilities = SimpleNamespace(has_native_sampler=True)
+
+            def sample_native(self, *, state, batch_size=None, device=None, **kwargs):
+                del state, kwargs
+                samples = torch.zeros((int(batch_size), 1, 3), dtype=torch.float32, device=device)
+                samples[:, 0, 0] = 0.5
+                samples[:, 0, 1] = 0.25
+                samples[:, 0, 2] = 0.75
+                return {"samples": samples}
+
+        class FakeModel:
+            def __init__(self):
+                self.state_model = FakeStateModel()
+                self.event_model = FakeEventModel()
+
+            def eval(self):
+                return self
+
+        runner = SimpleNamespace(
+            model=FakeModel(),
+            norm_stats={"normalize": False},
+            config=SimpleNamespace(model=SimpleNamespace(preset="diffusion_stpp")),
+        )
+        seq = {
+            "times": np.arange(15, dtype=np.float32),
+            "locations": np.column_stack(
+                [
+                    np.linspace(0.0, 1.0, 15, dtype=np.float32),
+                    np.linspace(1.0, 2.0, 15, dtype=np.float32),
+                ]
+            ),
+        }
+
+        rollouts = compute_generative_rollouts(
+            runner,
+            [seq],
+            k=2,
+            device=torch.device("cpu"),
+            seed=0,
+            n_context_events=3,
+        )
+
+        self.assertEqual(rollouts.context_lengths, [3])
+        self.assertEqual(len(rollouts.rollout_times[0]), 2)
+        self.assertEqual(rollouts.rollout_times[0][0].shape[0], 10)
+        self.assertEqual(rollouts.rollout_times[0][1].shape[0], 10)
+        self.assertEqual(len(runner.model.state_model.calls), 20)
+        self.assertEqual(runner.model.state_model.calls[0], 3)
+        self.assertEqual(runner.model.state_model.calls[10], 3)
 
     def test_summary_bundle_writes_context_and_last_context_outputs(self):
         samples = PredictiveSamples(

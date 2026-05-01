@@ -83,6 +83,7 @@ def evaluate(
     train_data: list[dict[str, np.ndarray]] | None = None,
     k_pred: int = 32,
     k_gen: int = 20,
+    n_context_events: int = 50,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
     grid_spec: dict[str, Any] | None = None,
@@ -116,6 +117,8 @@ def evaluate(
         Number of next-event samples per test event for predictive metrics.
     k_gen:
         Number of full-sequence rollouts per test sequence for generative metrics.
+    n_context_events:
+        Number of observed prefix events used for autoregressive rollouts.
     grid_spec:
         Dict with keys ``x_resolution``, ``y_resolution``, ``t_resolution``,
         ``x_range``, ``y_range``.  Controls the intensity grid for grid metrics.
@@ -198,6 +201,7 @@ def evaluate(
         train_data=train_data,
         k_pred=k_pred,
         k_gen=k_gen,
+        n_context_events=n_context_events,
         exact_time_bins=exact_time_bins,
         exact_spatial_bins=exact_spatial_bins,
         grid_spec=grid_spec,
