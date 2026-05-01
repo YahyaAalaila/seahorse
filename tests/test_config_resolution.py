@@ -197,6 +197,14 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(tuning.n_gpus_per_trial, 1)
             self.assertEqual(tuning.max_concurrent_trials, 1)
 
+    def test_neural_jumpcnf_hpo_keeps_adjoint_disabled(self):
+        raw = STPPConfig.raw_source_dict(config="unified_stpp/configs/neural_jumpcnf_hpo.yaml")
+        cfg_dict, _raw_tuning = STPPConfig.split_tuning_dict(raw)
+
+        spatial_cfg = cfg_dict["model"]["decoder"]["spatial"]
+        self.assertTrue(spatial_cfg["solve_reverse"])
+        self.assertFalse(spatial_cfg["use_adjoint"])
+
     def test_auto_stpp_configs_use_paper_sliding_window_training_view(self):
         config_dir = Path("unified_stpp/configs")
         for name in (
