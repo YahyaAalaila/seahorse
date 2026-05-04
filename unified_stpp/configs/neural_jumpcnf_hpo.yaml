@@ -1,7 +1,7 @@
 # Minimal HPO config for the shared-hidden Neural STPP JumpCNF preset.
 #
 # Keep the paper-style architecture and regularization fixed. Tune only the
-# optimizer scale for this expensive provisional model.
+# optimizer scale for this expensive benchmark-supported model.
 
 model:
   preset: neural_jumpcnf

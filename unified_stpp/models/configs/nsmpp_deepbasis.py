@@ -27,7 +27,7 @@ def _as_float_tuple(
     return tuple(float(x) for x in arr.tolist())
 
 
-@ConfigRegistry.register("nsmpp", status="provisional")
+@ConfigRegistry.register("nsmpp", status="canonical")
 @dataclasses.dataclass
 class NSMPPDeepBasisConfig(BaseModelConfig):
     _STATE_MODEL: ClassVar[str] = "nsmpp_deepbasis"

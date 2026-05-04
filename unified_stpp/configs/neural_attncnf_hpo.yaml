@@ -1,7 +1,7 @@
 # Minimal HPO config for the shared-hidden Neural STPP attentive CNF preset.
 #
 # Keep the paper-style architecture fixed. Tune only optimizer scale for this
-# expensive provisional model.
+# expensive benchmark-supported model.
 
 model:
   preset: neural_attncnf
