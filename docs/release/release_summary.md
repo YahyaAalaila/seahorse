@@ -6,14 +6,14 @@ The repo is not currently releasable as a clean public v1. It has the expected s
 
 ## Top 10 Blockers
 
-1. Dirty working tree with modified files and many untracked generated/research artifacts.
+1. Dirty working tree with modified files and untracked research artifacts that need intentional disposition.
 2. Missing public metadata: citation, authors/contributors, contributing guide, changelog, and release notes template.
 3. Package version/name/description/project URL polish remains.
 4. Naming inconsistency across Seahorse, `unified_stpp`, `unified-stpp`, and `uni-stpp`.
 5. Data access docs are incomplete for real HF datasets, suite 3/4 HF uploads, and HawkesNest generation.
 6. Dataset schema docs need to be promoted from README sketch to release-grade documentation.
-7. Hardcoded local and cluster-specific paths remain in docs/scripts.
-8. Tracked generated artifacts and stray tracked file `=2.0.0` need intentional disposition.
+7. Hardcoded local and cluster-specific paths remain in internal docs and local-only scripts.
+8. Full tracked `data/` still needs replacement with Hugging Face access docs plus tiny public examples.
 9. Paper figure/table reproduction is not documented as a public command map with inputs, outputs, and HF data dependencies.
 10. Clean install, smoke fit/evaluate, focused tests, and full tests still need to be run on the release candidate.
 
@@ -66,3 +66,9 @@ Excluded:
 - Curated `examples/` directory beyond minimal v1 quickstart.
 - Stable normal-user Python wrapper.
 - More polished benchmark automation beyond the paper reproduction commands needed for v1.
+
+## Public-Surface Cleanup Status
+
+The release branch now removes the first wave of public-inappropriate generated outputs, `archive/`, old root entrypoints, and site-specific cluster wrappers from Git tracking while keeping local files on disk.
+
+Remaining public-surface blockers are the dataset publication/docs handoff, final paper artifact command map, missing metadata files, naming polish, and review of untracked paper-analysis scripts/tests.

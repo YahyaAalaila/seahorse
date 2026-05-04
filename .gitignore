@@ -55,10 +55,20 @@ htmlcov/
 *.ckpt
 
 # Local junk
+archive/
 unnified_stpp/
+train.py
 temp_*.py
 original_models_manifesto.md
 scripts/debug_neural_stpp_surface.py
+
+# Local/internal cluster launch wrappers
+scripts/*.sbatch
+scripts/pegasus_campaign_env.sh
+scripts/submit_*.sh
+scripts/print_hawkesnest_easy_hard_submit_commands.sh
+scripts/tiny_train.sh
+scripts/slurm_job_summary.py
 
 # Generated local data/reference artifacts
 data/sthp0/dataset_meta.json
