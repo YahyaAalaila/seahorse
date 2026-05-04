@@ -50,7 +50,7 @@ class ConfigRegistry:
     _status: ClassVar[dict[str, str]] = {}
     _is_alias: ClassVar[dict[str, bool]] = {}
     _VALID_STATUSES: ClassVar[frozenset[str]] = frozenset(
-        {"canonical", "provisional", "deprecated", "legacy"}
+        {"canonical", "deprecated", "legacy"}
     )
 
     @classmethod

@@ -1,4 +1,4 @@
-# Unified Neural STPP Framework
+"""Public package exports for Seahorse / ``unified-stpp``."""
 
 from .config import STPPConfig, DataConfig, ModelConfig, TrainingConfig, LoggingConfig
 from .runner import STPPRunner, RunResult

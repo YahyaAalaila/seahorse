@@ -226,7 +226,7 @@ class ConfigResolutionTest(unittest.TestCase):
                 self.assertEqual(tuning.n_trials, 30)
                 self.assertEqual(
                     cfg_dict["model"]["decoder"]["n_prodnet"],
-                    [2, 4, 6, 10],
+                    [2, 6, 10],
                 )
 
     def test_temporal_gmm_yaml_fields_are_forwarded_directly(self):

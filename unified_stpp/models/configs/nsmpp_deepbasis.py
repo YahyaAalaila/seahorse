@@ -211,6 +211,7 @@ class NSMPPDeepBasisConfig(BaseModelConfig):
         return IdentityTransformArtifact()
 
 
+# Historical preset identifier accepted for old configs and run manifests.
 ConfigRegistry.register_alias(
     "nsmpp_deepbasis_provisional",
     "nsmpp",

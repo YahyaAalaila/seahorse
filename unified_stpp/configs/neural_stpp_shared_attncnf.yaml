@@ -1,16 +1,7 @@
-# Faithful shared-hidden Neural STPP attentive CNF preset.
-#
-# Shared family contract:
-#   - raw time is reconstructed locally inside the Neural STPP state model
-#   - standardized space is preserved from the benchmark data path
-#   - the spatial decoder receives the full shared temporal hidden state
-#   - attentive CNF base-distribution conditioning uses the aux-state tail
-#
-# This faithful preset follows the upstream README-style attentive variant by
-# enabling ``l2_attn`` while keeping the shared-hidden neural temporal backbone.
+# Compatibility config path for the canonical Neural STPP attentive CNF preset.
 
 model:
-  preset: neural_stpp_shared_attncnf
+  preset: neural_attncnf
   hidden_dim: 32
   spatial_dim: 2
   event_cov_dim: 0
