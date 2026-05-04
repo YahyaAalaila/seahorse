@@ -22,6 +22,7 @@ dist/
 .ruff_cache/
 
 # Project outputs
+docs/
 runs/
 runs2/
 runs3/
