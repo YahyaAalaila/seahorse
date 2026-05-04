@@ -23,6 +23,8 @@ dist/
 
 # Project outputs
 runs/
+runs2/
+runs3/
 artifacts/
 bench_*/
 checkpoints/
@@ -32,6 +34,11 @@ ray_results/
 *.log
 *.gif
 *.png
+
+# Test/coverage outputs
+.coverage
+coverage.xml
+htmlcov/
 
 # Model/data artifacts
 *.pkl
