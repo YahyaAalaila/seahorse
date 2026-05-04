@@ -40,13 +40,11 @@ sbatch templates, see [PEGASUS_CAMPAIGN.md](PEGASUS_CAMPAIGN.md).
 - Temp `temp_*` evaluation scripts still exist as parity references and can be
   retired once they are no longer needed.
 
-### Provisional
-- Neural STPP presets remain provisional:
-  `neural_cond_gmm`, `neural_jumpcnf`, `neural_attncnf`.
-- The packaged `surface --profile future_exact` lane for neural exact families
-  remains provisional until packaged parity is proven on real runs.
-- Exclude them from headline experiments until they pass finite and stable
-  benchmark-style smoke and surface checks.
+### Neural Exact Families
+- Neural exact-family presets are benchmark-supported:
+  `njsde`, `neural_jumpcnf`, `neural_attncnf`.
+- The packaged `surface --profile future_exact` lane remains a diagnostic path
+  and should be validated on real runs before relying on surface artifacts.
 
 ### Legacy
 - Benchmark artifacts from March 30, 2026 are legacy.
@@ -83,7 +81,7 @@ sbatch templates, see [PEGASUS_CAMPAIGN.md](PEGASUS_CAMPAIGN.md).
 - Add HF/public dataset access.
 - Add secondary metrics.
 - Broaden the synthetic benchmark suite.
-- Reconsider provisional presets only after stabilization.
+- Revisit diagnostic surface coverage after stabilization.
 
 ## Notes
 

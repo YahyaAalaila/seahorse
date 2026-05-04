@@ -246,7 +246,7 @@ class NeuralSTPPAttnSCConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_cond_gmm", status="provisional")
+@ConfigRegistry.register("njsde", status="canonical")
 @dataclasses.dataclass
 class NeuralSTPPSharedCondGMMConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -262,7 +262,7 @@ class NeuralSTPPSharedCondGMMConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_jumpcnf", status="provisional")
+@ConfigRegistry.register("neural_jumpcnf", status="canonical")
 @dataclasses.dataclass
 class NeuralSTPPSharedJumpCNFConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -284,7 +284,7 @@ class NeuralSTPPSharedJumpCNFConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-@ConfigRegistry.register("neural_attncnf", status="provisional")
+@ConfigRegistry.register("neural_attncnf", status="canonical")
 @dataclasses.dataclass
 class NeuralSTPPSharedAttnCNFConfig(NeuralSTPPConfig):
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
@@ -307,6 +307,7 @@ class NeuralSTPPSharedAttnCNFConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
-ConfigRegistry.register_alias("neural_stpp_shared_cond_gmm", "neural_cond_gmm", status="deprecated")
+ConfigRegistry.register_alias("neural_cond_gmm", "njsde", status="deprecated")
+ConfigRegistry.register_alias("neural_stpp_shared_cond_gmm", "njsde", status="deprecated")
 ConfigRegistry.register_alias("neural_stpp_shared_jumpcnf", "neural_jumpcnf", status="deprecated")
 ConfigRegistry.register_alias("neural_stpp_shared_attncnf", "neural_attncnf", status="deprecated")

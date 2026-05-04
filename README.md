@@ -1,293 +1,481 @@
-# unified_stpp
+# Seahorse / unified-stpp
 
-A research framework for neural spatio-temporal point processes (STPPs).
-Multiple model families — exact-likelihood, score-based, and diffusion-based — share
-a common training pipeline, artifact layout, and CLI.
+Seahorse (`unified-stpp`, imported as `unified_stpp`) is a research framework
+for spatio-temporal point process benchmarks. It keeps different model families
+behind one training, benchmark, data, and post-fit evaluation interface while
+preserving each model's own internal objective and preprocessing choices.
 
----
+The current public workflow is:
 
-## Framework Design
-
-Every STPP model is decomposed into two framework-facing pieces.
-
-**`StateModel`** encodes the observed event history into a `StateContext`:
-
-```python
-ctx = state_model.encode_history(
-    times=times,          # (B, N)
-    locations=locations,  # (B, N, d)
-    lengths=lengths,      # (B,)
-)
+```text
+data -> tune -> bench -> evaluate
 ```
 
-**`EventModel`** consumes that state to compute the training objective:
-
-```python
-out = event_model.training_loss(
-    times=times, locations=locations, lengths=lengths,
-    state=ctx,
-)  # must return {"loss": Tensor}; may also include "nll", sub-term matrices, etc.
-```
-
-**`UnifiedSTPP`** is the thin wrapper that routes a forward pass through both:
-
-```python
-out = model(times=times, locations=locations, lengths=lengths)
-# {"nll": Tensor, ...}
-```
-
-The framework standardizes this outer interface. Internal components — sequence encoders,
-Hawkes kernels, normalizing flows, diffusion networks — are unconstrained.
-
-## What the Framework Standardizes
-
-| Concern | How it is standardized |
-|---------|------------------------|
-| Training entry point | `python -m unified_stpp fit --preset <name> ...` |
-| Optimizer, scheduler, gradient clipping | `TrainingConfig` → Lightning `Trainer` |
-| Validation metric and early stopping | Lightning `EarlyStopping` on `val/nll` |
-| Artifact layout | `artifacts/<preset>_<run-id>/` — same structure for every model |
-| State wrapper contract | `StateModel.encode_history(...) → StateContext` |
-| Event wrapper contract | `EventModel.training_loss(state, ...) → {"loss": Tensor}` |
-
-A Hawkes-process temporal model and a self-attentive CNF spatial model train through
-the same loop because they satisfy the same outer contracts.
-
----
-
-## Available Presets
-
-| Preset | Family | Spatial model | Objective |
-|--------|--------|---------------|-----------|
-| `poisson_gmm` | Factorized — Homogeneous Poisson | Gaussian mixture | Exact NLL |
-| `hawkes_gmm` | Factorized — Hawkes | Gaussian mixture | Exact NLL |
-| `selfcorrecting_gmm` | Factorized — Self-correcting | Gaussian mixture | Exact NLL |
-| `poisson_cnf` | Factorized — Homogeneous Poisson | CNF, time-invariant | Exact NLL |
-| `hawkes_cnf` | Factorized — Hawkes | CNF, time-invariant | Exact NLL |
-| `selfcorrecting_cnf` | Factorized — Self-correcting | CNF, time-invariant | Exact NLL |
-| `poisson_tvcnf` | Factorized — Homogeneous Poisson | CNF, time-varying | Exact NLL |
-| `hawkes_tvcnf` | Factorized — Hawkes | CNF, time-varying | Exact NLL |
-| `selfcorrecting_tvcnf` | Factorized — Self-correcting | CNF, time-varying | Exact NLL |
-| `deep_stpp` | DeepSTPP | VAE latent + Gaussian | ELBO |
-| `auto_stpp` | AutoSTPP | AutoInt integrator | Exact NLL |
-| `neural_stpp_attn_sc` | Neural STPP | Self-attentive CNF | Exact NLL |
-| `neural_stpp_jump_sc` | Neural STPP | Jump CNF | Exact NLL |
-| `smash` | SMASH | Score-based | Score matching |
-| `diffusion_stpp` | Diffusion STPP | Diffusion decoder | Diffusion ELBO |
-
-Factorized models treat the temporal and spatial marginals as independent.
-All other families learn joint spatio-temporal structure.
-
----
+The benchmark path is raw-first: datasets enter in original coordinates, models
+may transform internally, and benchmark-facing NLL is reported in the selected
+canonical space whenever the model can support it.
 
 ## Installation
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[all,dev]"
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 ```
 
-Optional: install pre-commit hooks for linting and formatting:
+Development and release checks:
 
 ```bash
-pre-commit install
+python -m pip install -e ".[dev]"
 ```
 
----
+All optional extras, including HPO:
 
-## Data Format
+```bash
+python -m pip install -e ".[all]"
+```
 
-Input files are newline-delimited JSON (JSONL), one sequence per line:
+HPO only:
+
+```bash
+python -m pip install -e ".[hpo]"
+```
+
+## Public CLI
+
+```bash
+python -m unified_stpp fit      ...
+python -m unified_stpp tune     ...
+python -m unified_stpp bench    ...
+python -m unified_stpp evaluate ...
+```
+
+Use `--help` on any command for the full argument list.
+
+## Data Contract
+
+The canonical dataset format is JSONL, one sequence per line:
 
 ```json
-{"times": [0.1, 0.4, 1.2, 2.7], "locations": [[0.3, 0.7], [0.1, 0.5], [0.8, 0.2], [0.4, 0.9]]}
-{"times": [0.3, 1.1], "locations": [[0.6, 0.3], [0.2, 0.8]]}
+{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
+{"times": [0.2, 0.9], "locations": [[0.5, 0.5], [0.4, 0.6]], "marks": [0, 1]}
 ```
 
-- `times`: list of floats (absolute or relative; variable sequence length is supported)
-- `locations`: list of `[x, y]` coordinate pairs (or higher-dimensional)
-- `marks` (optional): list of integer class labels
+Required fields:
 
-Normalization (zero-mean, unit-variance per axis) is computed on the training split
-and applied consistently to val and test. No pre-processing is required.
+- `times`: event times, length `T`
+- `locations`: event locations, shape `T x d`
 
----
+Optional fields:
 
-## Quickstart
+- `marks`: integer event marks
+- `event_covariates`: event-level covariates
+- `field_covariates`: covariates pre-evaluated at events
+
+Benchmark-ready datasets should expose:
+
+```text
+dataset_root/
+  train.jsonl
+  val.jsonl
+  test.jsonl
+  dataset_meta.json      # optional but recommended
+  splits.json            # optional, for extra split provenance
+```
+
+## Dataset Loading
+
+The data API supports both Hugging Face-backed datasets and direct local paths:
+
+```python
+from unified_stpp.data import download_dataset, load_dataset
+
+root = download_dataset("yahya021/covid-stpp")
+splits = load_dataset("yahya021/covid-stpp")
+train = load_dataset("yahya021/covid-stpp", split="train")
+
+local_splits = load_dataset("/path/to/local/dataset")
+```
+
+`revision` means a Hugging Face dataset repo revision: tag, branch, commit, or
+SHA. For paper releases, use explicit tags such as `v1` after creating the tag
+on the HF dataset repo:
+
+```python
+root = download_dataset("yahya021/covid-stpp", revision="v1")
+```
+
+For the v1/paper release, real datasets are hosted on Hugging Face. Processed
+HawkesNest suite 3 and suite 4 synthetic datasets will also be uploaded to
+Hugging Face with documented repo paths and revisions. Synthetic HawkesNest
+generation is documented through a release notebook; the repository data
+contract remains the JSONL split layout shown above.
+
+The CLI accepts the same source style:
 
 ```bash
 python -m unified_stpp fit \
-    --preset hawkes_cnf \
-    --train  data/train.jsonl \
-    --val    data/val.jsonl
+  --preset deep_stpp \
+  --dataset yahya021/covid-stpp \
+  --out runs/smoke_deep
+
+python -m unified_stpp fit \
+  --preset deep_stpp \
+  --train /path/train.jsonl \
+  --val /path/val.jsonl \
+  --test /path/test.jsonl \
+  --out runs/smoke_deep_local
 ```
 
-Add `--test data/test.jsonl` to evaluate on a held-out set.
-Training logs per-epoch validation NLL and prints the final result on exit.
+## Presets
 
-### Artifacts
+Current public preset names:
 
-Every run writes to `artifacts/<preset>_<run-id>/`:
+| Preset | Family | Status | NLL lane |
+|---|---|---:|---|
+| `poisson_gmm` | factorized Poisson + GMM spatial | canonical | exact |
+| `hawkes_gmm` | factorized Hawkes + GMM spatial | canonical | exact |
+| `selfcorrecting_gmm` | factorized self-correcting + GMM spatial | canonical | exact |
+| `poisson_cnf` | factorized Poisson + CNF spatial | canonical | exact |
+| `hawkes_cnf` | factorized Hawkes + CNF spatial | canonical | exact |
+| `selfcorrecting_cnf` | factorized self-correcting + CNF spatial | canonical | exact |
+| `poisson_tvcnf` | factorized Poisson + time-varying CNF spatial | canonical | exact |
+| `hawkes_tvcnf` | factorized Hawkes + time-varying CNF spatial | canonical | exact |
+| `selfcorrecting_tvcnf` | factorized self-correcting + time-varying CNF spatial | canonical | exact |
+| `rmtpp_gmm` | RMTPP temporal + GMM spatial | canonical | exact |
+| `thp_gmm` | THP temporal + GMM spatial | canonical | exact |
+| `deep_stpp` | DeepSTPP-style neural Hawkes/GMM model | canonical | exact/reportable |
+| `auto_stpp` | AutoSTPP faithful AutoInt model | canonical | exact/reportable |
+| `smash` | SMASH score-based model | canonical | approximate |
+| `diffusion_stpp` | diffusion STPP model | canonical | approximate/surrogate |
+| `nsmpp` | NSMPP DeepBasis implementation | benchmark-supported | exact/reportable |
+| `njsde` | NJSDE + GMM | benchmark-supported | exact/reportable |
+| `neural_jumpcnf` | Neural STPP JumpCNF | benchmark-supported | exact/reportable |
+| `neural_attncnf` | Neural STPP attentive CNF | benchmark-supported | exact/reportable |
+| `auto_stpp_legacy` | older AutoSTPP implementation | legacy | compatibility |
 
+Deprecated legacy aliases remain accepted in the registry for old runs, but new
+configs, docs, and benchmark tables should use the canonical names above.
+
+## Training One Model
+
+```bash
+python -m unified_stpp fit \
+  --preset auto_stpp \
+  --dataset yahya021/covid-stpp \
+  --out runs/fit_covid_auto
 ```
-artifacts/hawkes_cnf_<id>/
-├── config.yaml          # full resolved config (preset defaults + any overrides)
-├── run_result.json      # val_nll, test_nll, n_params, norm_stats, runtime, ...
-├── metrics.csv          # per-epoch train/val metrics (Lightning CSV logger)
-└── checkpoints/
-    ├── best.ckpt        # checkpoint at best validation NLL
-    └── last.ckpt        # checkpoint after the final epoch
+
+Or with explicit splits:
+
+```bash
+python -m unified_stpp fit \
+  --preset hawkes_gmm \
+  --train data/sthp0/train.jsonl \
+  --val data/sthp0/val.jsonl \
+  --test data/sthp0/test.jsonl \
+  --out runs/fit_hawkes_gmm
 ```
 
-`run_result.json` includes `norm_stats` (training-split time and location statistics),
-so results can be de-normalized without re-running.
+Use dotted overrides for quick smoke runs:
 
-### Reloading a run
+```bash
+python -m unified_stpp fit \
+  --preset deep_stpp \
+  --dataset yahya021/covid-stpp \
+  --out /tmp/deep_stpp_smoke \
+  --override \
+    training.n_epochs=1 \
+    training.batch_size=16 \
+    training.device=cpu \
+    data.num_workers=0
+```
+
+Run directories use:
+
+```text
+<out>/fit/<preset>/<run_id>/
+  config.yaml
+  resolved_config.yaml
+  run_result.json
+  artifacts.json
+  metrics.csv
+  checkpoints/
+```
+
+`run_result.json` records the model objective, validation objective, benchmark
+test NLL metadata, raw/native reporting space, preset status, selected
+checkpoint, data fingerprint/provenance, and run directory.
+
+## Benchmark NLL Semantics
+
+The benchmark-facing `test_nll` is not the old mixed full-sequence/windowed
+quantity. It is now a held-out next-event predictive score:
+
+For each test sequence `(e_1, ..., e_T)`, the scored contexts are:
+
+```text
+H_i = (e_1, ..., e_{i-1}) -> target e_i, for i = 2, ..., T
+```
+
+The reported value is the mean per scored next-event context.
+
+Important distinctions:
+
+- `val_objective`: model-native validation objective used for checkpointing.
+- `test_nll`: benchmark-facing held-out next-event NLL.
+- `nll_kind`: `exact`, `approx`, or `none`.
+- `nll_report_space`: `raw` or `native`.
+
+Exact families should report comparable raw-space NLL when their transform
+artifact supports the required Jacobian correction. Approximate families such
+as `smash` and `diffusion_stpp` keep explicit approximate/surrogate metadata.
+
+## Hyperparameter Tuning
+
+HPO uses Ray Tune and reads search spaces from YAML. Scalars are fixed values;
+lists are choices; `{min, max}` defines numeric search ranges.
+
+```bash
+python -m unified_stpp tune \
+  --config unified_stpp/configs/auto_stpp_hpo.yaml \
+  --dataset yahya021/covid-stpp \
+  --seed 42 \
+  --n_trials 30 \
+  --max-concurrent-trials 1 \
+  --out runs/exp1/covid-stpp/tune/auto_stpp/auto_stpp_best.yaml
+```
+
+The tuning command writes:
+
+```text
+*_best.yaml
+*.data_manifest.json
+*.trials.json
+*.trials.csv
+*.hpo_manifest.json
+```
+
+For production benchmark runs, tune first, freeze the best YAMLs, then run
+`bench` with `--hpo_configs_dir`. Avoid mixing fresh HPO and pre-tuned configs
+inside one benchmark table unless you explicitly allow that policy.
+
+## Benchmark Runs
+
+Single HF-backed dataset:
+
+```bash
+python -m unified_stpp bench \
+  --presets auto_stpp deep_stpp smash diffusion_stpp \
+  --dataset yahya021/covid-stpp \
+  --seeds 42 \
+  --out runs/bench_covid \
+  --hpo_configs_dir runs/exp1/covid-stpp/tune \
+  --n_workers 1 \
+  --no-normalize
+```
+
+Local split collection:
+
+```bash
+python -m unified_stpp bench \
+  --presets poisson_gmm hawkes_gmm selfcorrecting_gmm \
+  --splits_dir data/bench_splits \
+  --seeds 42 43 44 \
+  --out runs/bench_factorized \
+  --no-normalize
+```
+
+Benchmark outputs include:
+
+```text
+bench_meta.json
+data_manifest.json
+cell_index.json
+results.json
+report.html
+table_*_all.csv
+table_*_exact.csv
+fit/<preset>/<run_id>/...
+```
+
+## Post-Fit Evaluation
+
+### Metric Profiles
+
+The main packaged evaluation path is:
+
+```bash
+python -m unified_stpp evaluate metrics \
+  --run runs/bench_covid/fit/deep_stpp/<run_id> \
+  --data /path/to/test.jsonl \
+  --split test \
+  --metric-profile predictive \
+  --k-pred 128 \
+  --seed 42 \
+  --out runs/eval/deep_stpp_predictive
+```
+
+Profiles:
+
+- `core`: lightweight scalar metrics
+- `nll`: NLL-focused metrics
+- `predictive`: benchmark-aligned held-out next-event predictive artifacts
+- `generative`: rollout-based metrics
+- `surface`: intensity-grid artifacts
+- `full`: broader packaged metric set
+
+The predictive profile writes context-level artifacts such as:
+
+```text
+next_event_context_index.npz
+next_event_benchmark_summary.json
+scores/<metric>_per_context.npy
+scores/<metric>_per_sequence_mean.npy
+scores/<metric>_last_context_per_sequence.npy
+```
+
+This preserves within-run context variation, within-run sequence variation, and
+per-sequence last-context scores for later seed-level aggregation.
+
+### Predictive Compare
+
+`predictive-compare` is qualitative future-window visualization, not the
+primary benchmark metric path:
+
+```bash
+python -m unified_stpp evaluate predictive-compare \
+  --run runs/bench_covid/fit/deep_stpp/<run_id> \
+  --history /path/to/test.jsonl \
+  --seq-idx 0 \
+  --start-event-idx 20 \
+  --rollout-mode teacher_forced \
+  --horizon 1.0 \
+  --n-rollouts 32 \
+  --plot-style both \
+  --out runs/eval/predictive_compare
+```
+
+### Surface Diagnostics
+
+`surface` is a secondary diagnostic path for intensity surfaces:
+
+```bash
+python -m unified_stpp evaluate surface \
+  --run runs/bench_covid/fit/hawkes_gmm/<run_id> \
+  --history /path/to/test.jsonl \
+  --seq-idx 0 \
+  --profile history_frame \
+  --out runs/eval/hawkes_surface
+```
+
+## Cluster Templates
+
+The repo includes Pegasus-oriented sbatch templates.
+
+General campaign templates:
+
+- `scripts/pegasus_tune_preset.sbatch`
+- `scripts/pegasus_bench_group.sbatch`
+- `scripts/pegasus_eval_metrics.sbatch`
+- `scripts/pegasus_eval_predictive_compare.sbatch`
+- `scripts/pegasus_eval_surface.sbatch`
+
+Family-specific tuning templates:
+
+- `scripts/tune_gpu_preset.sbatch`
+- `scripts/tune_factorized_gmm_cpu.sbatch`
+- `scripts/tune_factorized_cnf_gpu.sbatch`
+- `scripts/tune_temporal_gmm_gpu.sbatch`
+
+Examples:
+
+```bash
+sbatch scripts/tune_factorized_gmm_cpu.sbatch \
+  poisson_gmm hawkes_gmm selfcorrecting_gmm
+
+sbatch scripts/tune_factorized_cnf_gpu.sbatch \
+  poisson_cnf hawkes_cnf selfcorrecting_cnf \
+  poisson_tvcnf hawkes_tvcnf selfcorrecting_tvcnf
+
+sbatch scripts/tune_temporal_gmm_gpu.sbatch rmtpp_gmm thp_gmm
+
+sbatch scripts/tune_gpu_preset.sbatch deep_stpp smash diffusion_stpp njsde
+```
+
+See `docs/PEGASUS_CAMPAIGN.md` for the production cluster workflow.
+
+## Framework Internals
+
+Every model family is represented by:
+
+- a `StateModel`, which encodes observed history into a `StateContext`
+- an `EventModel`, which computes loss/NLL/intensity-facing outputs from that state
+- a config class registered by preset name
+
+The outer model wrapper is `UnifiedSTPP`.
 
 ```python
-from unified_stpp import STPPRunner
+ctx = state_model.encode_history(
+    times=times,
+    locations=locations,
+    lengths=lengths,
+)
 
-runner = STPPRunner.load("artifacts/hawkes_cnf_<id>/")
+out = event_model.training_loss(
+    times=times,
+    locations=locations,
+    lengths=lengths,
+    state=ctx,
+)
 ```
 
-`load` looks for `checkpoints/best.ckpt` first, then falls back to `model.ckpt`.
-
----
-
-## Configuration
-
-**Preset only** — no YAML needed; runs with preset defaults:
-
-```bash
-python -m unified_stpp fit --preset hawkes_cnf --train data/train.jsonl --val data/val.jsonl
-```
-
-**YAML config** — override specific fields; everything else inherits preset defaults:
-
-```yaml
-# my_run.yaml
-model:
-  preset: hawkes_cnf
-  hidden_dim: 256
-
-training:
-  n_epochs: 100
-  lr: 5.0e-4
-  batch_size: 32
-  patience: 20
-```
-
-```bash
-python -m unified_stpp fit --config my_run.yaml --train data/train.jsonl --val data/val.jsonl
-```
-
-See [`unified_stpp/config/schema.py`](unified_stpp/config/schema.py) for the full schema
-(`DataConfig`, `ModelConfig`, `TrainingConfig`, `LoggingConfig`).
-
----
+Different families can keep different internals: Hawkes kernels, GRUs, CNFs,
+AutoInt monotone integrators, score networks, and diffusion decoders. The
+framework standardizes only the benchmark-facing contracts.
 
 ## Repository Layout
 
-```
+```text
 unified_stpp/
-├── models/
-│   ├── abstractions.py          # StateModel, EventModel, StateContext (ABCs)
-│   ├── unified_model.py         # UnifiedSTPP — wires state + event models
-│   ├── configs/                 # BaseModelConfig, ConfigRegistry, per-family configs
-│   ├── state_models/            # StateModel implementations
-│   ├── event_models/            # EventModel implementations
-│   ├── temporal_models/         # Internal: parametric temporal processes
-│   ├── spatial_models/          # Internal: spatial density / flow models
-│   └── ...                      # Other internal components
-├── training/
-│   ├── lightning_module.py      # STPPLightningModule
-│   └── data_module.py           # STPPDataModule (loads, normalizes, batches)
-├── config/
-│   └── schema.py                # Pydantic STPPConfig
-├── runner/
-│   └── runner.py                # STPPRunner — fit / save / load
-├── data/
-│   └── dataset.py               # STPPDataset (normalization, padding, collation)
-└── __main__.py                  # CLI entry point
+  cli/                 # fit, tune, bench, evaluate commands
+  config/              # Pydantic config schema and tuning config
+  data/                # JSONL datasets, HF/local loading, transforms, collate
+  benchmark/           # benchmark grid, HPO, report aggregation
+  runner/              # STPPRunner, saved run artifacts, RunResult
+  training/            # Lightning module and data module
+  models/
+    configs/           # preset registry and family configs
+    state_models/      # framework-facing history encoders
+    event_models/      # framework-facing objectives/intensities
+    temporal_models/   # internal temporal processes
+    spatial_models/    # internal spatial densities/flows
+  evaluation/
+    metrics/           # metric implementations
+    predictive/        # predictive rollout/summary workflows
+    surface/           # surface query/diagnostic workflows
 ```
 
----
+## Development Checks
 
-## How to Add a New Model Family
-
-Five steps to integrate a new STPP family into the framework.
-
-**1. Implement internal components** (optional)
-
-Add temporal models, spatial density models, encoders, or decoders anywhere under
-`models/temporal_models/`, `models/spatial_models/`, or a new subdirectory. No
-constraints — only the outer `StateModel` and `EventModel` wrappers need to satisfy
-the framework interface.
-
-**2. Implement a `StateModel` subclass**
-
-```python
-# models/state_models/my_state.py
-from unified_stpp.models.abstractions import StateModel, StateContext
-
-class MyStateModel(StateModel):
-    def encode_history(self, *, times, locations, lengths, **kwargs) -> StateContext:
-        # build state from observed history
-        return StateContext(payload={"h": h})
+```bash
+pytest
 ```
 
-**3. Implement an `EventModel` subclass**
+Useful focused checks:
 
-```python
-# models/event_models/my_event.py
-from unified_stpp.models.abstractions import EventModel
-
-class MyEventModel(EventModel):
-    def training_loss(self, *, times, locations, lengths, state, **kwargs):
-        h = state.payload["h"]
-        # compute loss
-        return {"loss": loss, "nll": nll}
+```bash
+pytest tests/test_config_resolution.py
+pytest tests/test_benchmark_config.py
+pytest tests/test_evaluate_cli.py
+pytest tests/test_evaluation_import_audit.py
 ```
 
-**4. Write a config class and register it**
+## Documentation Pointers
 
-```python
-# models/configs/my_model.py
-import dataclasses
-from .base import BaseModelConfig, ConfigRegistry
-
-@ConfigRegistry.register("my_preset")
-@dataclasses.dataclass
-class MyModelConfig(BaseModelConfig):
-    my_param: float = 1.0
-
-    @classmethod
-    def from_dict(cls, d, *, hidden_dim=128, spatial_dim=2, **kwargs):
-        return cls(
-            hidden_dim=hidden_dim,
-            spatial_dim=spatial_dim,
-            my_param=d.get("my_param", 1.0),
-        )
-
-    def build_model(self):
-        from unified_stpp.models.unified_model import UnifiedSTPP
-        return UnifiedSTPP(
-            state_model=MyStateModel(...),
-            event_model=MyEventModel(...),
-            hidden_dim=self.hidden_dim,
-        )
-```
-
-**5. Import in `models/configs/__init__.py`**
-
-```python
-from .my_model import MyModelConfig
-```
-
-Done. `python -m unified_stpp fit --preset my_preset ...` now trains the new model
-through the same pipeline as every other preset.
-
----
-
-Benchmark comparison (`bench`) and hyperparameter search (`tune`) are available as
-separate CLI subcommands; native sampling and intensity-evaluation metrics are planned.
+- `docs/BENCHMARK.md`: benchmark contract and reporting semantics
+- `docs/PEGASUS_CAMPAIGN.md`: cluster campaign workflow
+- `docs/EXPERIMENT_READINESS.md`: experiment freeze checklist
+- `docs/metrics_catalog.md`: metric definitions
+- `docs/release/`: v1 release audit, validation commands, and paper artifact reproducibility notes
+- `docs/internal/`: paper-facing summaries and locked model-parameter notes

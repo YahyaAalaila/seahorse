@@ -46,7 +46,7 @@ Current public status groups are:
 - `canonical` approximate-reporting families:
   `smash`, `diffusion_stpp`
 - `provisional` exact families:
-  `nsmpp`, `neural_cond_gmm`, `neural_jumpcnf`, `neural_attncnf`
+  `nsmpp`, `njsde`, `neural_jumpcnf`, `neural_attncnf`
 - `legacy` public preset:
   `auto_stpp_legacy`
 

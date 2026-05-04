@@ -1,4 +1,4 @@
-# Compatibility config path for the canonical NJSDE + GMM preset.
+# Canonical NJSDE + GMM preset.
 
 model:
   preset: njsde

@@ -77,7 +77,7 @@ class SurfaceDiagnosticEvaluator:
         runner = STPPRunner.load(run_dir)
         preset = runner.config.model.preset
         prefer_cpu = spec.profile == "future_exact" and preset in {
-            "neural_cond_gmm",
+            "njsde",
             "neural_jumpcnf",
             "neural_attncnf",
         }
@@ -111,9 +111,9 @@ class SurfaceDiagnosticEvaluator:
                 device=device,
             )
         else:
-            if preset not in {"neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"}:
+            if preset not in {"njsde", "neural_jumpcnf", "neural_attncnf"}:
                 raise SystemExit(
-                    "surface --profile future_exact currently supports only provisional neural exact families."
+                    "surface --profile future_exact currently supports only neural exact families."
                 )
             payload = evaluate_neural_future_exact(
                 runner=runner,
@@ -233,11 +233,11 @@ def resolve_neural_exact_profile(
         and int(y_nstep) == DEFAULT_Y_NSTEP
         and int(t_nstep) == DEFAULT_T_NSTEP
     )
-    if preset == "neural_cond_gmm":
+    if preset == "njsde":
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 4096
         profile["warnings"].append(
-            "Neural exact-family packaged support is provisional until parity is proven."
+            "Neural exact-family packaged surface support is intended for diagnostics."
         )
         return profile
     if preset == "neural_jumpcnf":

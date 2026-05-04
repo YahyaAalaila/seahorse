@@ -70,6 +70,12 @@ MINI_OVERRIDES = {
         "model.decoder.timesteps=2",
         "model.decoder.sampling_timesteps=1",
     ],
+    "njsde": [
+        "model.hidden_dim=8",
+        "model.backbone.tpp_hidden_dims=8-8",
+        "model.decoder.spatial.hidden_dims=8-8",
+        "model.decoder.spatial.n_mixtures=2",
+    ],
     "neural_cond_gmm": [
         "model.hidden_dim=8",
         "model.backbone.tpp_hidden_dims=8-8",

@@ -13,7 +13,7 @@ from temp_intensity_viz import (
 class TestNeuralSTPPVizProfiles(unittest.TestCase):
     def test_cond_gmm_keeps_dense_defaults(self):
         profile = _resolve_neural_stpp_viz_profile(
-            preset="neural_cond_gmm",
+            preset="njsde",
             x_nstep=DEFAULT_X_NSTEP,
             y_nstep=DEFAULT_Y_NSTEP,
             t_nstep=DEFAULT_T_NSTEP,

@@ -1,4 +1,4 @@
-# Compatibility HPO config path for the canonical NJSDE + GMM preset.
+# Minimal HPO config for the canonical NJSDE + GMM preset.
 #
 # Keep the shared-hidden backbone fixed. Tune only mixture count and optimizer
 # scale for this cheaper benchmark-supported neural baseline.

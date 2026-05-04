@@ -104,11 +104,11 @@ class TestEvalIntensity(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(vals)), f"Non-finite values: {vals}")
 
 
-class TestProvisionalPresetStatus(unittest.TestCase):
-    def test_neural_presets_are_marked_provisional(self):
-        for preset in ("neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"):
+class TestPaperPresetStatus(unittest.TestCase):
+    def test_neural_presets_are_benchmark_supported(self):
+        for preset in ("njsde", "neural_jumpcnf", "neural_attncnf"):
             with self.subTest(preset=preset):
-                self.assertEqual(ConfigRegistry.canonical_status(preset), "provisional")
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "canonical")
 
 
 class TestScaleCorrection(unittest.TestCase):

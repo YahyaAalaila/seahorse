@@ -13,6 +13,8 @@ class TestRegistryCompat(unittest.TestCase):
         from unified_stpp.models.configs import ConfigRegistry
 
         self.assertEqual(set(PRESETS), set(ConfigRegistry.canonical_preset_names()))
+        self.assertIn("njsde", PRESETS)
+        self.assertNotIn("neural_cond_gmm", PRESETS)
         self.assertTrue(all(payload == {} for payload in PRESETS.values()))
 
     def test_registry_exposes_canonical_and_status_metadata(self):
@@ -28,12 +30,24 @@ class TestRegistryCompat(unittest.TestCase):
         self.assertEqual(legacy.status, "legacy")
         self.assertFalse(legacy.is_alias)
 
-        provisional = ConfigRegistry.describe("neural_cond_gmm")
-        self.assertEqual(provisional.status, "provisional")
+        neural = ConfigRegistry.describe("njsde")
+        self.assertEqual(neural.canonical_name, "njsde")
+        self.assertEqual(neural.status, "canonical")
+        self.assertFalse(neural.is_alias)
+
+        legacy_neural = ConfigRegistry.describe("neural_cond_gmm")
+        self.assertEqual(legacy_neural.canonical_name, "njsde")
+        self.assertEqual(legacy_neural.status, "deprecated")
+        self.assertEqual(legacy_neural.canonical_status, "canonical")
+        self.assertTrue(legacy_neural.is_alias)
 
     def test_config_loading_supports_nsmpp_without_direct_module_import(self):
         cfg = STPPConfig.from_source(preset="nsmpp", config=None)
         self.assertEqual(cfg.model.preset, "nsmpp")
+
+    def test_legacy_neural_cond_gmm_alias_loads_njsde(self):
+        cfg = STPPConfig.from_source(preset="neural_cond_gmm", config=None)
+        self.assertEqual(cfg.model.preset, "njsde")
 
     def test_build_model_supports_known_preset(self):
         from unified_stpp.models.unified_model import UnifiedSTPP

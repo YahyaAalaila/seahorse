@@ -103,7 +103,7 @@ class ConfigResolutionTest(unittest.TestCase):
 
     def test_runner_uses_dataset_spatial_dim_for_model_construction(self):
         cfg = STPPConfig.from_source(
-            preset="neural_cond_gmm",
+            preset="njsde",
             override_list=["model.spatial_dim=2"],
         )
         runner = STPPRunner(cfg)
@@ -148,7 +148,7 @@ class ConfigResolutionTest(unittest.TestCase):
         config_dir = Path("unified_stpp/configs")
         for name in (
             "auto_stpp_hpo.yaml",
-            "neural_cond_gmm_hpo.yaml",
+            "njsde_hpo.yaml",
             "neural_attncnf_hpo.yaml",
             "neural_jumpcnf_hpo.yaml",
             "nsmpp_hpo.yaml",
@@ -185,7 +185,7 @@ class ConfigResolutionTest(unittest.TestCase):
     def test_slow_neural_hpo_configs_are_gpu_bounded(self):
         config_dir = Path("unified_stpp/configs")
         for name in (
-            "neural_cond_gmm_hpo.yaml",
+            "njsde_hpo.yaml",
             "neural_attncnf_hpo.yaml",
             "neural_jumpcnf_hpo.yaml",
         ):

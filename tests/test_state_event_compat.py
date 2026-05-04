@@ -10,17 +10,17 @@ from unified_stpp.models.configs import ConfigRegistry
 from unified_stpp.registry import build_model
 
 
-_NON_PROVISIONAL_PRESETS = (
+_FORWARD_SMOKE_PRESETS = (
     "deep_stpp",
     "auto_stpp",
     "auto_stpp_legacy",
     "smash",
 )
 
-_PROVISIONAL_PRESETS = (
+_PAPER_NEURAL_PRESETS = (
     "neural_attncnf",
     "neural_jumpcnf",
-    "neural_cond_gmm",
+    "njsde",
 )
 
 _REMOVED_PRESETS = (
@@ -49,7 +49,7 @@ def _tiny_batch() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
 class TestStateEventCompat(unittest.TestCase):
     def test_registered_presets_build_across_statuses(self):
-        for preset in _NON_PROVISIONAL_PRESETS + _PROVISIONAL_PRESETS:
+        for preset in _FORWARD_SMOKE_PRESETS + _PAPER_NEURAL_PRESETS:
             with self.subTest(preset=preset):
                 model = build_model(
                     config={},
@@ -60,11 +60,11 @@ class TestStateEventCompat(unittest.TestCase):
                 self.assertIsNotNone(model.state_model)
                 self.assertIsNotNone(model.event_model)
 
-    def test_non_provisional_presets_forward_finite(self):
+    def test_forward_smoke_presets_forward_finite(self):
         times, locations, lengths = _tiny_batch()
-        for preset in _NON_PROVISIONAL_PRESETS:
+        for preset in _FORWARD_SMOKE_PRESETS:
             with self.subTest(preset=preset):
-                self.assertNotEqual(ConfigRegistry.canonical_status(preset), "provisional")
+                self.assertIn(ConfigRegistry.canonical_status(preset), {"canonical", "legacy"})
                 torch.manual_seed(7)
                 model = build_model(
                     config={},
@@ -80,10 +80,10 @@ class TestStateEventCompat(unittest.TestCase):
                 self.assertIn("total_events", out)
                 self.assertTrue(torch.isfinite(out["nll"]))
 
-    def test_provisional_presets_are_classified_explicitly(self):
-        for preset in _PROVISIONAL_PRESETS:
+    def test_paper_neural_presets_are_benchmark_supported(self):
+        for preset in _PAPER_NEURAL_PRESETS:
             with self.subTest(preset=preset):
-                self.assertEqual(ConfigRegistry.canonical_status(preset), "provisional")
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "canonical")
 
     def test_removed_presets_rejected(self):
         for preset in _REMOVED_PRESETS:

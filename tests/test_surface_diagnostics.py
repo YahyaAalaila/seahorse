@@ -66,12 +66,12 @@ class TestSurfaceDiagnostics(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             history_path = write_history_jsonl(root / "history.jsonl")
-            run_dir = make_saved_run(root, preset="neural_cond_gmm", label="neural")
+            run_dir = make_saved_run(root, preset="njsde", label="neural")
 
             fake_payload = {
                 "profile": "future_exact",
                 "split": "test",
-                "preset": "neural_cond_gmm",
+                "preset": "njsde",
                 "device": "cpu",
                 "history_times": np.asarray([0.32, 0.58, 0.91, 1.23], dtype=np.float32),
                 "history_locs": np.asarray(

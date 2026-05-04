@@ -9,7 +9,7 @@ static plots and optional interactive HTML output.
 Current support:
 - deep_stpp
 - auto_stpp
-- neural_cond_gmm
+- njsde
 - neural_jumpcnf
 - neural_attncnf
 
@@ -139,11 +139,11 @@ def _resolve_neural_stpp_viz_profile(
         and int(t_nstep) == DEFAULT_T_NSTEP
     )
 
-    if preset == "neural_cond_gmm":
+    if preset in {"njsde", "neural_cond_gmm"}:
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 4096
         profile["warnings"].append(
-            "Neural-STPP CondGMM uses closed-form conditional-mixture queries and is the cheapest "
+            "NJSDE + GMM uses closed-form conditional-mixture queries and is the cheapest "
             "family member for dense temporary surface visualization."
         )
         return profile
@@ -191,7 +191,7 @@ def _resolve_device(spec: str, *, preset: str | None = None) -> torch.device:
     if (
         spec == "auto"
         and preset is not None
-        and preset in {"neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"}
+        and preset in {"njsde", "neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"}
     ):
         try:
             import torch as _torch
@@ -897,6 +897,7 @@ def main() -> None:
     if preset not in {
         "deep_stpp",
         "auto_stpp",
+        "njsde",
         "neural_cond_gmm",
         "neural_jumpcnf",
         "neural_attncnf",
@@ -904,7 +905,7 @@ def main() -> None:
         raise SystemExit(
             f"Unsupported preset for this temporary script: {preset}. "
             "Supported: deep_stpp, auto_stpp, "
-            "neural_cond_gmm, neural_jumpcnf, neural_attncnf."
+            "njsde, neural_jumpcnf, neural_attncnf."
         )
 
     device = _resolve_device(args.device, preset=preset)
@@ -913,6 +914,7 @@ def main() -> None:
 
     seq = _load_sequence(history_path, args.seq_idx, args.history_length)
     if preset in {
+        "njsde",
         "neural_cond_gmm",
         "neural_jumpcnf",
         "neural_attncnf",

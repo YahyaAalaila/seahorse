@@ -108,8 +108,8 @@ class TestConditionalGMMSpatial(unittest.TestCase):
 
 class TestConditionalGMMPreset(unittest.TestCase):
     def test_preset_loads_from_yaml_and_builds_model(self):
-        cfg = STPPConfig.from_source(preset="neural_cond_gmm")
-        self.assertEqual(cfg.model.preset, "neural_cond_gmm")
+        cfg = STPPConfig.from_source(preset="njsde")
+        self.assertEqual(cfg.model.preset, "njsde")
         self.assertEqual(cfg.data.adapter_kwargs.get("max_events"), 4000)
         model = cfg.model.build_model()
 
@@ -137,7 +137,7 @@ class TestConditionalGMMPreset(unittest.TestCase):
         self.assertTrue(torch.isfinite(out["nll"]))
 
     def test_fixed_time_query_terms_match_joint_intensity_factorization(self):
-        cfg = STPPConfig.from_source(preset="neural_cond_gmm")
+        cfg = STPPConfig.from_source(preset="njsde")
         model = cfg.model.build_model()
         model.eval()
 

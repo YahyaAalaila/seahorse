@@ -660,10 +660,10 @@ class TestQuerySurfaceContract(unittest.TestCase):
                     f"{preset}: expected surface_query_type='proxy_kde'",
                 )
 
-    def test_provisional_neural_presets_are_not_in_benchmark_surface_gate(self):
-        for preset in ("neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"):
+    def test_paper_neural_presets_are_benchmark_supported(self):
+        for preset in ("njsde", "neural_jumpcnf", "neural_attncnf"):
             with self.subTest(preset=preset):
-                self.assertEqual(ConfigRegistry.canonical_status(preset), "provisional")
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "canonical")
 
     def test_base_event_model_raises(self):
         """Base EventModel.query_surface() must raise NotImplementedError."""
