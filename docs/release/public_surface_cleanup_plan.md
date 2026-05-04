@@ -18,7 +18,7 @@ Scope: prepare the private Seahorse / `unified-stpp` tree for a clean public v1 
 | `README.md` | tracked | KEEP public v1 | Primary public landing doc. | Low | Keep public CLI/data wording current |
 | `pyproject.toml` | tracked | KEEP public v1 | Package metadata and dependencies. | Low | None in this pass |
 | `pytest.ini` | tracked | KEEP public v1 | Test configuration. | Low | None |
-| `requirements.txt` | tracked | KEEP but document | Useful compatibility file, but `pyproject.toml` should remain authoritative. | Low | Document in release metadata plan |
+| `requirements.txt` | tracked, redundant with `pyproject.toml`, missing `POT` dependency | REMOVE from Git tracking / ignore | `pyproject.toml` is the dependency source of truth and no tracked public workflow uses `pip install -r requirements.txt`. | Low | `git rm --cached requirements.txt`; keep local file if needed |
 | `unified_stpp/` | tracked | KEEP public v1 | Live package tree and stable CLI. | High | None in cleanup pass |
 | `tests/` | tracked plus untracked candidate tests | KEEP public v1 | Release validation depends on tests. | Medium | Do not delete; review untracked tests separately |
 | `docs/` | tracked plus untracked internal candidates | KEEP public v1 with internal split | Public docs stay under `docs/`; private paper notes move under `docs/internal/`. | Medium | Move stale root docs into `docs/internal/`; add cleanup plan/examples |
@@ -98,7 +98,37 @@ This follow-up pass keeps scripts only when they support benchmark/paper reprodu
 - Synthetic suites 3 and 4 will be uploaded to Hugging Face.
 - HawkesNest generation will be documented separately, preferably as a curated notebook plus command map.
 - The repository may keep a tiny toy JSONL dataset under `examples/tiny_jsonl/` for CLI smoke examples.
+- `examples/tiny_jsonl/` is retained only as a tiny synthetic smoke-test dataset for the documented quickstart commands. It is not benchmark data.
 - Existing tracked `data/` is classified but not removed in this safe cleanup pass because tests/examples may still reference some paths and the HF repo IDs are not finalized.
+
+## Docs Classification
+
+Public docs to keep for v1:
+
+- `docs/BENCHMARK.md`
+- `docs/DEVELOPMENT.md`
+- `docs/evaluation_layout.md`
+- `docs/examples/cli_examples.md`
+- `docs/metrics_catalog.md`
+- `docs/metrics_paper_ready.md`
+
+Internal or release-management docs to remove from the final public-facing tree before tagging v1:
+
+- `docs/EXPERIMENT_READINESS.md`
+- `docs/internal/`
+- `docs/release/branch_consolidation_plan.md`
+- `docs/release/docs_metadata_plan.md`
+- `docs/release/public_surface_cleanup_plan.md`
+- `docs/release/release_audit.md`
+- `docs/release/release_summary.md`
+- `docs/release/v1_release_checklist.md`
+- `docs/release/v1_scope.md`
+- `docs/release/validation_commands.md`
+
+Potentially public paper/reproduction docs that need a final naming/content pass:
+
+- `docs/release/paper_artifact_reproducibility.md`: keep only if promoted to a public reproduction guide outside `docs/release/`.
+- untracked `docs/appendix_evaluation.md`: review before adding; likely paper appendix material rather than package user docs.
 
 ## Legacy, Provisional, And Local-Path Wording
 
@@ -120,6 +150,7 @@ This follow-up pass keeps scripts only when they support benchmark/paper reprodu
    - `logs/`
    - `runs/paper_readiness_latest/`
    - `best_config.yaml`
+   - `requirements.txt`
    - `archive/`
    - `train.py`
    - `temp_intensity_viz.py`

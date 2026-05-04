@@ -9,7 +9,7 @@ python -m unified_stpp bench
 python -m unified_stpp evaluate
 ```
 
-The commands below use the tiny JSONL toy data in `examples/tiny_jsonl/`. They are intended to show the public command shape, not to produce meaningful scientific results.
+The commands below use the tiny synthetic smoke-test JSONL data in `examples/tiny_jsonl/`. They are intended to show the public command shape and provide quick CLI checks. They are not benchmark data and should not be used for scientific comparison.
 
 Normal public usage should call the module CLI directly. Old root-level wrappers such as `train.py` and temporary visualization scripts are not part of the v1 public surface.
 

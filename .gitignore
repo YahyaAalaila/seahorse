@@ -60,6 +60,7 @@ unnified_stpp/
 train.py
 temp_*.py
 original_models_manifesto.md
+requirements.txt
 scripts/debug_neural_stpp_surface.py
 
 # Local/internal cluster launch wrappers

@@ -372,8 +372,9 @@ python -m unified_stpp evaluate surface \
 ## Examples
 
 Minimal public CLI examples are in `docs/examples/cli_examples.md`. They use
-the tiny JSONL files under `examples/tiny_jsonl/` and cover `fit`, `tune`,
-`bench`, and `evaluate`.
+the tiny synthetic smoke-test JSONL files under `examples/tiny_jsonl/` and
+cover `fit`, `tune`, `bench`, and `evaluate`. These files are only for
+quickstart and CLI smoke checks; they are not benchmark data.
 
 Cluster launch templates are internal operational material and are not required
 for the public v1 workflow.

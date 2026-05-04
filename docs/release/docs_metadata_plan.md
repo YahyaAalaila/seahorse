@@ -6,7 +6,6 @@ Present:
 
 - `README.md`
 - `LICENSE`
-- `requirements.txt`
 - Markdown docs under `docs/`
 - Internal/paper-facing Seahorse notes under `docs/internal/`
 - CI config under `.github/workflows/ci.yml`
@@ -47,7 +46,7 @@ Required before v1:
 - Document base, dev, hpo, and all-extra install modes.
 - Document supported Python versions. `pyproject.toml` declares `>=3.10`; CI covers 3.10 and 3.11.
 - Decide whether Python 3.12/3.13 are supported or simply untested.
-- Align `requirements.txt` with `pyproject.toml` or document that `pyproject.toml` is authoritative.
+- Keep `pyproject.toml` as the package dependency source of truth; do not publish a redundant `requirements.txt` unless a maintained container workflow requires it.
 
 ## Dataset And HF Access Plan
 
