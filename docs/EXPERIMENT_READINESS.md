@@ -4,8 +4,8 @@ This file defines the repo's experiment-freeze target and benchmark contract.
 It is execution-facing: it records what is already in place, what is still not
 frozen, and what must be true before launching new benchmark experiments.
 
-For the concrete Pegasus launch workflow, grouped job policy, and rerunnable
-sbatch templates, see [PEGASUS_CAMPAIGN.md](PEGASUS_CAMPAIGN.md).
+Cluster launch workflows are internal operational material and are not required
+for the public v1 surface.
 
 ## Current state
 
@@ -63,7 +63,8 @@ sbatch templates, see [PEGASUS_CAMPAIGN.md](PEGASUS_CAMPAIGN.md).
 
 - One live package tree.
 - Canonical preset IDs only in new configs and results.
-- Explicit preset statuses: `canonical`, `provisional`, `deprecated`, `legacy`.
+- Registry status metadata is explicit for canonical presets and compatibility
+  aliases.
 - Raw-first artifact metadata persisted in results.
 - Exact-model comparable NLL reporting path is active for benchmark-eligible
   presets.

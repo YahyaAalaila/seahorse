@@ -2,20 +2,21 @@
 
 This doc defines the public benchmark contract for `unified_stpp`.
 
-For the cluster-side execution flow that uses this contract in production, see
-[PEGASUS_CAMPAIGN.md](PEGASUS_CAMPAIGN.md).
+Cluster-specific launch workflows are internal operational material and are not
+part of the public benchmark contract.
 
 ## Scope
 
 Benchmark tables include **all models**. The table itself is inclusive; result
 interpretation comes from the metadata stored with each run and benchmark
-report, not from hiding approximate or provisional families.
+report, not from hiding approximate families.
 
 The key metadata fields are:
 
 - `nll_kind`: `exact`, `approx`, or `none`
 - `nll_report_space`: `raw` or `native`
-- `preset_status`: `canonical`, `provisional`, `deprecated`, or `legacy`
+- `preset_status`: registry status metadata for canonical presets and
+  compatibility aliases.
 
 Those fields are preserved in `run_result.json`, carried into benchmark
 aggregation, and should stay available for downstream reporting and LaTeX
@@ -45,13 +46,15 @@ Current public status groups are:
   `selfcorrecting_tvcnf`, `deep_stpp`, `auto_stpp`
 - `canonical` approximate-reporting families:
   `smash`, `diffusion_stpp`
-- `provisional` exact families:
+- benchmark-supported neural/exact families:
   `nsmpp`, `njsde`, `neural_jumpcnf`, `neural_attncnf`
 - `legacy` public preset:
   `auto_stpp_legacy`
 
 Deprecated aliases remain accepted for compatibility, but new configs and run
-artifacts canonicalize them to the public preset IDs.
+artifacts canonicalize them to the public preset IDs. Current paper presets are
+benchmark-supported; runtime caveats belong in paper/reproduction notes rather
+than release-support downgrades.
 
 ## Outputs
 

@@ -26,6 +26,7 @@ runs/
 runs2/
 runs3/
 artifacts/
+bench_out/
 bench_*/
 checkpoints/
 logs/
@@ -34,6 +35,13 @@ ray_results/
 *.log
 *.gif
 *.png
+report*.html
+*_results.html
+*_results.json
+fig_*.svg
+best_config.yaml
+best_*_config.yaml
+docs/release.zip
 
 # Test/coverage outputs
 .coverage
