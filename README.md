@@ -53,8 +53,11 @@ python -m unified_stpp evaluate --help
 
 ## Data Policy
 
-The package reads local JSONL splits and Hugging Face dataset repositories. The
-canonical local layout is:
+Benchmark datasets are resolved from Hugging Face dataset repositories. Users
+with custom or private data should pass their own local JSONL split paths or a
+local split directory. The repository does not bundle public datasets.
+
+The canonical local layout is:
 
 ```text
 dataset_root/
@@ -72,51 +75,3 @@ Each JSONL line is one event sequence:
 Real paper datasets are hosted on Hugging Face. Processed HawkesNest suite 3
 and suite 4 synthetic datasets will also be uploaded to Hugging Face. Synthetic
 generation will be documented separately.
-
-## Tiny Smoke Example
-
-`examples/tiny_jsonl/` is a tiny synthetic smoke-test dataset for checking the
-public CLI shape. It is not benchmark data and should not be used for
-scientific comparison.
-
-```bash
-python -m unified_stpp fit \
-  --preset poisson_gmm \
-  --train examples/tiny_jsonl/train.jsonl \
-  --val examples/tiny_jsonl/val.jsonl \
-  --test examples/tiny_jsonl/test.jsonl \
-  --out runs/examples/tiny_fit \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
-
-```bash
-python -m unified_stpp tune \
-  --preset poisson_gmm \
-  --train examples/tiny_jsonl/train.jsonl \
-  --val examples/tiny_jsonl/val.jsonl \
-  --n_trials 1 \
-  --out runs/examples/tiny_tune/poisson_gmm_best.yaml
-```
-
-```bash
-python -m unified_stpp bench \
-  --presets poisson_gmm \
-  --dataset examples/tiny_jsonl \
-  --seeds 1 \
-  --out runs/examples/tiny_bench \
-  --n_workers 1 \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
-
-Use a run directory produced by `fit` or `bench` for evaluation:
-
-```bash
-python -m unified_stpp evaluate metrics \
-  --run runs/examples/tiny_fit/fit/poisson_gmm/<run_id> \
-  --data examples/tiny_jsonl/test.jsonl \
-  --split test \
-  --metric-profile core \
-  --out runs/examples/tiny_eval
-```
-
-Replace `<run_id>` with the timestamped run directory created by `fit`.

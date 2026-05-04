@@ -23,6 +23,10 @@ dist/
 
 # Project outputs
 docs/
+data/
+local_data/
+datasets/
+examples/tiny_jsonl/
 runs/
 runs2/
 runs3/
@@ -57,6 +61,7 @@ htmlcov/
 
 # Local junk
 archive/
+configs
 unnified_stpp/
 train.py
 temp_*.py
@@ -73,7 +78,4 @@ scripts/tiny_train.sh
 scripts/slurm_job_summary.py
 
 # Generated local data/reference artifacts
-data/sthp0/dataset_meta.json
-data/sthp0/intensity_surface.html
-data/sthp1/
-data/hawkesnest_suitesv2_faulted/
+data_cache/
