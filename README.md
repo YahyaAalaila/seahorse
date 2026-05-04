@@ -369,41 +369,14 @@ python -m unified_stpp evaluate surface \
   --out runs/eval/hawkes_surface
 ```
 
-## Cluster Templates
+## Examples
 
-The repo includes Pegasus-oriented sbatch templates.
+Minimal public CLI examples are in `docs/examples/cli_examples.md`. They use
+the tiny JSONL files under `examples/tiny_jsonl/` and cover `fit`, `tune`,
+`bench`, and `evaluate`.
 
-General campaign templates:
-
-- `scripts/pegasus_tune_preset.sbatch`
-- `scripts/pegasus_bench_group.sbatch`
-- `scripts/pegasus_eval_metrics.sbatch`
-- `scripts/pegasus_eval_predictive_compare.sbatch`
-- `scripts/pegasus_eval_surface.sbatch`
-
-Family-specific tuning templates:
-
-- `scripts/tune_gpu_preset.sbatch`
-- `scripts/tune_factorized_gmm_cpu.sbatch`
-- `scripts/tune_factorized_cnf_gpu.sbatch`
-- `scripts/tune_temporal_gmm_gpu.sbatch`
-
-Examples:
-
-```bash
-sbatch scripts/tune_factorized_gmm_cpu.sbatch \
-  poisson_gmm hawkes_gmm selfcorrecting_gmm
-
-sbatch scripts/tune_factorized_cnf_gpu.sbatch \
-  poisson_cnf hawkes_cnf selfcorrecting_cnf \
-  poisson_tvcnf hawkes_tvcnf selfcorrecting_tvcnf
-
-sbatch scripts/tune_temporal_gmm_gpu.sbatch rmtpp_gmm thp_gmm
-
-sbatch scripts/tune_gpu_preset.sbatch deep_stpp smash diffusion_stpp njsde
-```
-
-See `docs/PEGASUS_CAMPAIGN.md` for the production cluster workflow.
+Cluster launch templates are internal operational material and are not required
+for the public v1 workflow.
 
 ## Framework Internals
 
@@ -474,8 +447,8 @@ pytest tests/test_evaluation_import_audit.py
 ## Documentation Pointers
 
 - `docs/BENCHMARK.md`: benchmark contract and reporting semantics
-- `docs/PEGASUS_CAMPAIGN.md`: cluster campaign workflow
 - `docs/EXPERIMENT_READINESS.md`: experiment freeze checklist
 - `docs/metrics_catalog.md`: metric definitions
 - `docs/release/`: v1 release audit, validation commands, and paper artifact reproducibility notes
+- `docs/examples/cli_examples.md`: minimal public CLI examples
 - `docs/internal/`: paper-facing summaries and locked model-parameter notes
