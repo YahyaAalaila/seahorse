@@ -1,4 +1,4 @@
-"""Direct joint-intensity event model for the provisional NSMPP DeepBasis preset."""
+"""Direct joint-intensity event model for the NSMPP DeepBasis preset."""
 
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ class NSMPPDeepBasisEventModel(EventModel):
     def _numerical_compensator(self, event_vectors: Tensor, valid_mask: Tensor) -> Tensor:
         batch_size, _, _ = event_vectors.shape
         if not self.numerical_int:
-            raise NotImplementedError("NSMPP provisional port only supports numerical_int=True.")
+            raise NotImplementedError("NSMPP DeepBasis currently supports numerical_int=True.")
 
         total = event_vectors.new_zeros(batch_size)
         history_times = event_vectors[..., 0]

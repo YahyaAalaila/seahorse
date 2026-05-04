@@ -1,4 +1,4 @@
-"""Thin passthrough state model for the provisional NSMPP DeepBasis preset."""
+"""Thin passthrough state model for the NSMPP DeepBasis preset."""
 
 from __future__ import annotations
 

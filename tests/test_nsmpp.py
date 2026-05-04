@@ -104,7 +104,7 @@ class TestNSMPPDeepBasisConfig(unittest.TestCase):
         self.assertAlmostEqual(dec["init_gain"], 5e-1, places=8)
         self.assertAlmostEqual(dec["init_std"], 1e-1, places=8)
         self.assertAlmostEqual(dec["init_weight_mean"], -5.0, places=8)
-        self.assertEqual(dec["int_res"], 20)
+        self.assertEqual(dec["int_res"], 40)
         self.assertAlmostEqual(cfg.training.lr, 1.0, places=8)
         self.assertAlmostEqual(cfg.training.grad_clip, 5.0, places=8)
 
@@ -112,10 +112,10 @@ class TestNSMPPDeepBasisConfig(unittest.TestCase):
         cfg = STPPConfig.from_source(preset="nsmpp_deepbasis_provisional", config=None)
         self.assertEqual(cfg.model.preset, "nsmpp")
 
-    def test_preset_is_provisional_and_builds(self):
+    def test_preset_is_benchmark_supported_and_builds(self):
         self.assertEqual(
             ConfigRegistry.canonical_status("nsmpp"),
-            "provisional",
+            "canonical",
         )
         model = _build_model()
         self.assertIsInstance(model.event_model, NSMPPDeepBasisEventModel)

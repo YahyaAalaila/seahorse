@@ -1,4 +1,4 @@
-"""Upstream-style low-rank DeepBasis kernel for the provisional NSMPP port."""
+"""Upstream-style low-rank DeepBasis kernel for the NSMPP DeepBasis port."""
 
 from __future__ import annotations
 

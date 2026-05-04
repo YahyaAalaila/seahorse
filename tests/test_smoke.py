@@ -7,7 +7,7 @@ from unified_stpp.registry import build_model
 
 
 class SmokeTest(unittest.TestCase):
-    def test_non_provisional_forward_nll_is_finite(self):
+    def test_forward_smoke_preset_nll_is_finite(self):
         times = torch.tensor([[0.0, 0.2, 0.5, 0.9]], dtype=torch.float32)
         locations = torch.tensor(
             [[[0.0, 0.0], [0.3, -0.1], [0.1, 0.2], [-0.2, 0.1]]], dtype=torch.float32
