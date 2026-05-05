@@ -69,6 +69,12 @@ original_models_manifesto.md
 requirements.txt
 scripts/debug_neural_stpp_surface.py
 
+# Retired local AutoSTPP compatibility path
+unified_stpp/models/configs/auto_stpp_compat.py
+unified_stpp/models/event_models/auto_stpp_compat.py
+unified_stpp/models/state_models/auto_stpp_compat.py
+tests/test_auto_stpp_state_event_parity.py
+
 # Local/internal cluster launch wrappers
 scripts/*.sbatch
 scripts/pegasus_campaign_env.sh

@@ -300,22 +300,6 @@ class TestAutoSTPPKernel(unittest.TestCase):
 
 
 class TestAutoSTPPSmoke(unittest.TestCase):
-    def test_canonical_auto_stpp_replaces_old_coarse_variant(self):
-        torch.manual_seed(1)
-        old_model = build_model(
-            config={},
-            preset="auto_stpp_legacy",
-            spatial_dim=2,
-            hidden_dim=8,
-        )
-        new_model = build_model(
-            config={},
-            preset="auto_stpp",
-            spatial_dim=2,
-            hidden_dim=8,
-        )
-        self.assertNotEqual(type(old_model.event_model), type(new_model.event_model))
-
     def test_bundled_yaml_loads_from_canonical_name(self):
         cfg = STPPConfig.from_preset("auto_stpp")
         self.assertEqual(cfg.model.preset, "auto_stpp")

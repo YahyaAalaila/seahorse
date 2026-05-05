@@ -17,7 +17,6 @@ class SmokeTest(unittest.TestCase):
         for preset in (
             "deep_stpp",
             "auto_stpp",
-            "auto_stpp_legacy",
             "smash",
         ):
             with self.subTest(preset=preset):

@@ -13,7 +13,6 @@ from unified_stpp.registry import build_model
 _FORWARD_SMOKE_PRESETS = (
     "deep_stpp",
     "auto_stpp",
-    "auto_stpp_legacy",
     "smash",
 )
 

@@ -1,10 +1,6 @@
 # Canonical AutoSTPP preset.
 #
-# This is the canonical AutoSTPP configuration. The older coarse implementation
-# remains available only as the legacy preset `auto_stpp_legacy`.
-#
-# Real-data no-HPO runs should use the upstream paper/code defaults here rather
-# than an old dataset-specific tuned result.
+# This is the AutoSTPP configuration used by current benchmark runs.
 
 model:
   preset: auto_stpp

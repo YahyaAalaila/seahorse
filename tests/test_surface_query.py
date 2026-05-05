@@ -617,9 +617,6 @@ class TestQuerySurfaceContract(unittest.TestCase):
     def test_auto_stpp(self):
         self._check("auto_stpp")
 
-    def test_auto_stpp_legacy(self):
-        self._check("auto_stpp_legacy")
-
     def test_factorized_gmm(self):
         self._check("hawkes_gmm")
 
@@ -637,7 +634,7 @@ class TestQuerySurfaceContract(unittest.TestCase):
     # ---- surface_query_type declaration ------------------------------------
 
     def test_surface_query_type_intensity_families(self):
-        for preset in ("deep_stpp", "auto_stpp", "auto_stpp_legacy", "hawkes_gmm"):
+        for preset in ("deep_stpp", "auto_stpp", "hawkes_gmm"):
             with self.subTest(preset=preset):
                 model = build_model(
                     config={}, preset=preset, spatial_dim=2, hidden_dim=16,

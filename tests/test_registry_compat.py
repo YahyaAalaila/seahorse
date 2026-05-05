@@ -25,11 +25,6 @@ class TestRegistryCompat(unittest.TestCase):
         self.assertEqual(auto.status, "canonical")
         self.assertFalse(auto.is_alias)
 
-        legacy = ConfigRegistry.describe("auto_stpp_legacy")
-        self.assertEqual(legacy.canonical_name, "auto_stpp_legacy")
-        self.assertEqual(legacy.status, "legacy")
-        self.assertFalse(legacy.is_alias)
-
         neural = ConfigRegistry.describe("njsde")
         self.assertEqual(neural.canonical_name, "njsde")
         self.assertEqual(neural.status, "canonical")
