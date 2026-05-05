@@ -1,48 +1,12 @@
 # Seahorse / unified-stpp
 
-Seahorse (`unified-stpp`, imported as `unified_stpp`) is a research framework
-for training, tuning, benchmarking, and evaluating spatio-temporal point process
-models through one package interface.
+Seahorse, packaged as `unified-stpp` and imported as `unified_stpp`, is a
+research framework for spatio-temporal point process models. It provides one
+package interface for training, tuning, benchmarking, and post-fit evaluation.
 
-The public v1 surface is the Python package and module CLI:
-
-```bash
-python -m unified_stpp fit
-python -m unified_stpp tune
-python -m unified_stpp bench
-python -m unified_stpp evaluate
-```
-
-## Install
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-```
-
-Development checks:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-All optional extras, including HPO support:
-
-```bash
-python -m pip install -e ".[all]"
-```
-
-`pyproject.toml` is the dependency source of truth.
-
-## CLI Modes
-
-- `fit`: train one preset or YAML config on local JSONL splits or a Hugging Face dataset.
-- `tune`: run HPO and write a best-config YAML.
-- `bench`: run one or more presets across datasets and seeds.
-- `evaluate`: compute post-fit metrics, predictive comparisons, surfaces, or merge evaluation artifacts.
-
-Use `--help` for the exact arguments:
+Seahorse exists to make STPP experiments easier to compare. The public surface
+centers on a stable module CLI, explicit data inputs, saved run artifacts, and
+benchmark reports that preserve the metadata needed to interpret results.
 
 ```bash
 python -m unified_stpp fit --help
@@ -51,11 +15,86 @@ python -m unified_stpp bench --help
 python -m unified_stpp evaluate --help
 ```
 
-## Data Policy
+## Installation
 
-Benchmark datasets are resolved from Hugging Face dataset repositories. Users
-with custom or private data should pass their own local JSONL split paths or a
-local split directory. The repository does not bundle public datasets.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+For development checks:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+For HPO workflows that use Ray Tune:
+
+```bash
+python -m pip install -e ".[hpo]"
+```
+
+## Quickstart
+
+Train one model on local JSONL splits:
+
+```bash
+python -m unified_stpp fit \
+  --preset poisson_gmm \
+  --train examples/tiny_jsonl/train.jsonl \
+  --val examples/tiny_jsonl/val.jsonl \
+  --test examples/tiny_jsonl/test.jsonl \
+  --out runs/quickstart \
+  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
+```
+
+Tune one preset and write the best YAML config:
+
+```bash
+python -m unified_stpp tune \
+  --preset poisson_gmm \
+  --train examples/tiny_jsonl/train.jsonl \
+  --val examples/tiny_jsonl/val.jsonl \
+  --n_trials 1 \
+  --out runs/quickstart/poisson_gmm_best.yaml
+```
+
+Run a benchmark grid over presets, datasets, and seeds:
+
+```bash
+python -m unified_stpp bench \
+  --preset poisson_gmm \
+  --dataset examples/tiny_jsonl \
+  --seeds 1 \
+  --out runs/quickstart_bench \
+  --n_workers 1 \
+  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
+```
+
+Evaluate a saved run:
+
+```bash
+python -m unified_stpp evaluate metrics \
+  --run runs/quickstart/fit/poisson_gmm/<run_id> \
+  --data examples/tiny_jsonl/test.jsonl \
+  --split test \
+  --metric-profile core
+```
+
+Replace `<run_id>` with the timestamped run directory created by `fit`.
+
+## Supported Use Cases
+
+- Users training or evaluating a single STPP preset with explicit data paths.
+- Advanced benchmark users running preset-by-dataset-by-seed benchmark grids.
+- Researchers adding model families through the registry and preset config path.
+
+## Data
+
+Seahorse resolves data from either Hugging Face dataset repositories or explicit
+local JSONL paths. Use `--dataset owner/repo[/subdir]` for Hugging Face-backed
+data, or pass `--train`, `--val`, and optionally `--test` for local files.
 
 The canonical local layout is:
 
@@ -72,6 +111,15 @@ Each JSONL line is one event sequence:
 {"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
 ```
 
-Real paper datasets are hosted on Hugging Face. Processed HawkesNest suite 3
-and suite 4 synthetic datasets will also be uploaded to Hugging Face. Synthetic
-generation will be documented separately.
+## Documentation
+
+The documentation source starts at [docs/index.md](docs/index.md). This
+repository also includes `mkdocs.yml` for a dark MkDocs Material site.
+
+## Citation
+
+Citation details will be added before publication.
+
+## License
+
+Seahorse is distributed under the MIT License. See [LICENSE](LICENSE).
