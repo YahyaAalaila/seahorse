@@ -39,6 +39,7 @@ exclude_docs: |
   evaluation_layout.md
   metrics_catalog.md
   metrics_paper_ready.md
+  original_models_manifesto.md
   appendix_evaluation.md
   examples/**
   internal/**

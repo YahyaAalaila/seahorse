@@ -38,8 +38,11 @@ runner = []
 hpo = [
   "ray[tune]>=2.0",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+]
 all = [
-  "unified-stpp[runner,hpo]",
+  "unified-stpp[runner,hpo,docs]",
 ]
 
 [tool.setuptools.packages.find]

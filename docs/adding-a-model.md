@@ -62,9 +62,9 @@ The CLI can then load it with:
 ```bash
 python -m unified_stpp fit \
   --preset my_preset \
-  --train examples/tiny_jsonl/train.jsonl \
-  --val examples/tiny_jsonl/val.jsonl \
-  --test examples/tiny_jsonl/test.jsonl \
+  --train path/to/train.jsonl \
+  --val path/to/val.jsonl \
+  --test path/to/test.jsonl \
   --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
 ```
 
@@ -78,7 +78,7 @@ Keep the first tests narrow:
 - The preset name is registered and resolves through `ConfigRegistry`.
 - `STPPConfig.from_preset("my_preset")` or `STPPConfig.from_yaml(...)` loads.
 - The model builds for a tiny config.
-- A one-epoch fit on `examples/tiny_jsonl/` completes or fails with a clear,
+- A one-epoch fit on a small local JSONL split completes or fails with a clear,
   intentional unsupported-capability error.
 
 Do not add a preset to benchmark examples until the fit, save/load, and

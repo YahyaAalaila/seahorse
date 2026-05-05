@@ -9,9 +9,9 @@ Start with a local smoke run:
 ```bash
 python -m unified_stpp fit \
   --preset poisson_gmm \
-  --train examples/tiny_jsonl/train.jsonl \
-  --val examples/tiny_jsonl/val.jsonl \
-  --test examples/tiny_jsonl/test.jsonl \
+  --train path/to/train.jsonl \
+  --val path/to/val.jsonl \
+  --test path/to/test.jsonl \
   --out runs/quickstart \
   --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
 ```
@@ -21,7 +21,7 @@ Then evaluate the saved run:
 ```bash
 python -m unified_stpp evaluate metrics \
   --run runs/quickstart/fit/poisson_gmm/<run_id> \
-  --data examples/tiny_jsonl/test.jsonl \
+  --data path/to/test.jsonl \
   --split test \
   --metric-profile core
 ```
