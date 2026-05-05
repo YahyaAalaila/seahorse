@@ -77,9 +77,9 @@ class STPPDataset(Dataset):
         """
         Args:
             sequences: list of sequence dicts (times, locations, field_covariates, …)
-            normalize_time: z-score normalise event times. Legacy path only.
-            normalize_space: z-score normalise event locations. Legacy path only.
-            normalize_covariates: z-score normalise field_covariates. Legacy path only.
+            normalize_time: z-score normalise event times.
+            normalize_space: z-score normalise event locations.
+            normalize_covariates: z-score normalise field_covariates.
             min_length: drop sequences shorter than this
             cov_mean: if provided, use this mean to normalise field_covariates
                       instead of computing it from this split's data.

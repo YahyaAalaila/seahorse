@@ -53,7 +53,7 @@ _DIRECT_EXPORTS = {
 }
 
 
-__all__ = list(_DIRECT_EXPORTS) 
+__all__ = list(_DIRECT_EXPORTS)
 
 def __getattr__(name: str):
     if name in _DIRECT_EXPORTS:

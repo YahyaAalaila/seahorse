@@ -42,7 +42,6 @@ def _leaf_specs(
     specs = [
         CuratedDatasetSpec(
             name=collection_name,
-            local_paths=(f"data/exports/{repo_dir}",),
             repo_path=repo_dir,
             aliases=(repo_dir,),
         )
@@ -54,7 +53,6 @@ def _leaf_specs(
         specs.append(
             CuratedDatasetSpec(
                 name=f"{collection_name}/{leaf}",
-                local_paths=(f"data/exports/{repo_dir}/{leaf}",),
                 repo_path=f"{repo_dir}/{leaf}",
                 aliases=tuple(aliases),
             )
@@ -66,7 +64,6 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
     specs = [
         CuratedDatasetSpec(
             name="sthp0",
-            local_paths=("data/sthp0",),
             repo_path="sthp0",
         ),
     ]

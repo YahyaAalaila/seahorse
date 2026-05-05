@@ -214,6 +214,12 @@ class TestDatasetHub(unittest.TestCase):
         self.assertEqual(kwargs["repo_id"], "owner/repo")
         self.assertEqual(kwargs["allow_patterns"], ["datasets/toy_remote/**"])
 
+    def test_built_in_curated_specs_do_not_use_repo_relative_local_fallbacks(self):
+        from unified_stpp.data.hub import _CURATED_DATASETS
+
+        for key, spec in _CURATED_DATASETS.items():
+            self.assertEqual(spec.local_paths, (), key)
+
     def test_load_dataset_can_select_one_split_from_curated_spec(self):
         with tempfile.TemporaryDirectory() as td:
             local_root = Path(td) / "toy_dataset"
