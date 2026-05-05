@@ -17,6 +17,7 @@ Optional (present in dict but may be None)
   marks             (B, N)      int64   — discrete mark indices
   event_covariates  (B, N, p)   float32 — per-event covariate features
   field_covariates  (B, N, r)   float32 — field covariates pre-evaluated at events
+  coordinate_space  scalar str  — semantic coordinate space of times/locations
 
 Invariants checked by `validate_batch`
 ---------------------------------------
@@ -49,6 +50,65 @@ _REQUIRED_DTYPES: Dict[str, torch.dtype] = {
     "pad_mask":  torch.bool,
     "txys":      torch.float32,
 }
+
+
+# ---------------------------------------------------------------------------
+# JSONL sequence-record validation
+# ---------------------------------------------------------------------------
+
+def validate_sequence_record(record: Dict[str, Any], *, source: str = "record") -> None:
+    """Validate one raw JSONL sequence record used by the dataset hub.
+
+    The minimal public contract is intentionally small:
+
+    - each record is a dict
+    - ``times`` and ``locations`` are present
+    - ``len(times) == len(locations)``
+    - optional per-event arrays (for example ``marks``) match that length when
+      they are sequence-like
+    """
+    if not isinstance(record, dict):
+        raise TypeError(f"{source}: expected dict, got {type(record).__name__}.")
+
+    if "times" not in record or "locations" not in record:
+        raise ValueError(
+            f"{source}: record must contain both 'times' and 'locations'."
+        )
+
+    times = record["times"]
+    locations = record["locations"]
+    if not hasattr(times, "__len__") or not hasattr(locations, "__len__"):
+        raise TypeError(
+            f"{source}: 'times' and 'locations' must be sequence-like values."
+        )
+
+    n_times = len(times)
+    n_locations = len(locations)
+    if n_times != n_locations:
+        raise ValueError(
+            f"{source}: 'times' and 'locations' must have matching lengths "
+            f"(got {n_times} and {n_locations})."
+        )
+
+    for key in ("marks", "event_covariates", "field_covariates"):
+        value = record.get(key)
+        if value is None or isinstance(value, (str, bytes)):
+            continue
+        if hasattr(value, "__len__") and len(value) != n_times:
+            raise ValueError(
+                f"{source}: optional field '{key}' must have length {n_times}, "
+                f"got {len(value)}."
+            )
+
+
+def validate_sequence_records(records: list[Dict[str, Any]], *, source: str) -> None:
+    """Validate a list of raw JSONL sequence records with indexed error context."""
+    if not isinstance(records, list):
+        raise TypeError(
+            f"{source}: expected a list of sequence records, got {type(records).__name__}."
+        )
+    for idx, record in enumerate(records):
+        validate_sequence_record(record, source=f"{source}[{idx}]")
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +217,12 @@ def validate_batch(batch: Dict[str, Any]) -> None:
         raise ValueError("validate_batch: 'locations' contains NaN or Inf.")
 
     # --- optional-field dtype checks (only when not None) ---
+    coordinate_space = batch.get("coordinate_space")
+    if coordinate_space is not None and not isinstance(coordinate_space, str):
+        raise TypeError(
+            f"validate_batch: 'coordinate_space' must be a str or None, got {type(coordinate_space).__name__}."
+        )
+
     if batch.get("marks") is not None:
         m = batch["marks"]
         if not isinstance(m, Tensor) or m.dtype != torch.int64:
@@ -226,6 +292,7 @@ def fingerprint_batch(batch: Dict[str, Any]) -> Dict[str, Any]:
     fp["n_events_max"] = int(shapes["times"][1]) if "times" in shapes else None
     fp["spatial_dim"] = int(shapes["locations"][2]) if "locations" in shapes else None
     fp["total_events"] = int(lengths.sum().item()) if lengths is not None else None
+    fp["coordinate_space"] = batch.get("coordinate_space")
 
     fp["shapes"] = shapes
     fp["dtypes"] = dtypes

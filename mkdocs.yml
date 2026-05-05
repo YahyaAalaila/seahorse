@@ -1,0 +1,45 @@
+site_name: Seahorse
+site_description: Unified spatio-temporal point process modeling documentation
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: black
+    accent: cyan
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Data Format: data-format.md
+  - CLI Reference: cli.md
+  - Benchmarks: benchmarks.md
+  - Evaluation: evaluation.md
+  - Adding a Model: adding-a-model.md
+  - Paper Reproduction: paper-reproduction.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+
+exclude_docs: |
+  DEVELOPMENT.md
+  EXPERIMENT_READINESS.md
+  BENCHMARK.md
+  evaluation_layout.md
+  metrics_catalog.md
+  metrics_paper_ready.md
+  appendix_evaluation.md
+  examples/**
+  internal/**
+  release/**

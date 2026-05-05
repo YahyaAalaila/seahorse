@@ -1,0 +1,48 @@
+# Canonical shared-hidden Neural STPP attentive CNF preset.
+
+model:
+  preset: neural_attncnf
+  hidden_dim: 32
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  backbone:
+    tpp_hidden_dims: "32-32"
+    tpp_cond: true
+    tpp_style: gru
+    share_hidden: true
+    tpp_actfn: softplus
+    solver: dopri5
+    atol: 1.0e-4
+    rtol: 1.0e-4
+    energy_regularization: 0 #1.0e-4
+  decoder:
+    spatial:
+      hidden_dims: "64-64-64"
+      layer_type: concat
+      actfn: swish
+      zero_init: true
+      l2_attn: true
+      naive_hutch: false
+      tol: 1.0e-4
+      otreg_strength: 0 #1.0e-4
+      nblocks: 2
+      num_heads: 4
+
+training:
+  optimizer: adamw
+  lr: 1.0e-3
+  lr_schedule: cosine
+  weight_decay: 1.0e-6
+  adam_beta2: 0.98
+  grad_clip: 0.0
+  n_epochs: 200
+  batch_size: 32
+  patience: 30
+
+data:
+  protocol: raw
+  normalize: false
+  num_workers: 0
+  adapter_kwargs:
+    max_events: 4000

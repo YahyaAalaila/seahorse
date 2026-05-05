@@ -22,13 +22,36 @@ dist/
 .ruff_cache/
 
 # Project outputs
-runs/
-artifacts/
+/docs/
+/data/
+/local_data/
+/datasets/
+/examples/tiny_jsonl/
+/runs/
+/runs2/
+/runs3/
+/artifacts/
+/bench_out/
+bench_*/
+checkpoints/
+logs/
 wandb/
 ray_results/
 *.log
 *.gif
 *.png
+report*.html
+*_results.html
+*_results.json
+fig_*.svg
+best_config.yaml
+best_*_config.yaml
+docs/release.zip
+
+# Test/coverage outputs
+.coverage
+coverage.xml
+htmlcov/
 
 # Model/data artifacts
 *.pkl
@@ -37,4 +60,28 @@ ray_results/
 *.ckpt
 
 # Local junk
+/archive/
+/configs
 unnified_stpp/
+train.py
+temp_*.py
+original_models_manifesto.md
+requirements.txt
+scripts/debug_neural_stpp_surface.py
+
+# Retired local AutoSTPP compatibility path
+unified_stpp/models/configs/auto_stpp_compat.py
+unified_stpp/models/event_models/auto_stpp_compat.py
+unified_stpp/models/state_models/auto_stpp_compat.py
+tests/test_auto_stpp_state_event_parity.py
+
+# Local/internal cluster launch wrappers
+scripts/*.sbatch
+scripts/pegasus_campaign_env.sh
+scripts/submit_*.sh
+scripts/print_hawkesnest_easy_hard_submit_commands.sh
+scripts/tiny_train.sh
+scripts/slurm_job_summary.py
+
+# Generated local data/reference artifacts
+data_cache/

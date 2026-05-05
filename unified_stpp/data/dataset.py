@@ -10,6 +10,49 @@ from typing import List, Dict, Optional
 import numpy as np
 
 
+def _strict_float32_times(times, *, context: str) -> np.ndarray:
+    """Return float32 event times that remain strictly increasing.
+
+    The source sequence is first checked in float64. If it is already
+    non-increasing there, we raise and preserve that data bug. If strictness is
+    lost only because of the float32 cast, we repair it with a forward
+    ``nextafter`` pass.
+    """
+    times64 = np.asarray(times, dtype=np.float64).reshape(-1)
+    if times64.size <= 1:
+        return times64.astype(np.float32, copy=True)
+
+    raw_dt64 = np.diff(times64)
+    if (raw_dt64 <= 0).any():
+        bad = raw_dt64 <= 0
+        first_bad = int(np.flatnonzero(bad)[0] + 1)
+        raise ValueError(
+            f"Non-increasing source event times in {context}; "
+            f"event_index={first_bad}, bad_count={int(bad.sum())}, "
+            f"min_raw_dt={float(raw_dt64.min()):.6e}"
+        )
+
+    times32 = times64.astype(np.float32, copy=True)
+    if (np.diff(times32) > 0).all():
+        return times32
+
+    for i in range(1, times32.size):
+        if not (times32[i] > times32[i - 1]):
+            times32[i] = np.nextafter(times32[i - 1], np.float32(np.inf))
+
+    raw_dt32 = np.diff(times32)
+    if (raw_dt32 <= 0).any():
+        bad = raw_dt32 <= 0
+        first_bad = int(np.flatnonzero(bad)[0] + 1)
+        raise ValueError(
+            f"float32 time repair failed in {context}; "
+            f"event_index={first_bad}, bad_count={int(bad.sum())}, "
+            f"min_raw_dt={float(raw_dt32.min()):.6e}"
+        )
+
+    return times32
+
+
 class STPPDataset(Dataset):
     """
     Dataset for STPP sequences.
@@ -24,8 +67,9 @@ class STPPDataset(Dataset):
     def __init__(
         self,
         sequences: List[Dict],
-        normalize_time: bool = True,
-        normalize_space: bool = True,
+        normalize_time: bool = False,
+        normalize_space: bool = False,
+        normalize_covariates: Optional[bool] = None,
         min_length: int = 3,
         cov_mean: Optional[np.ndarray] = None,
         cov_std: Optional[np.ndarray] = None,
@@ -33,8 +77,9 @@ class STPPDataset(Dataset):
         """
         Args:
             sequences: list of sequence dicts (times, locations, field_covariates, …)
-            normalize_time: z-score normalise event times
-            normalize_space: z-score normalise event locations
+            normalize_time: z-score normalise event times.
+            normalize_space: z-score normalise event locations.
+            normalize_covariates: z-score normalise field_covariates.
             min_length: drop sequences shorter than this
             cov_mean: if provided, use this mean to normalise field_covariates
                       instead of computing it from this split's data.
@@ -45,26 +90,54 @@ class STPPDataset(Dataset):
         # Filter short sequences
         self.sequences = [s for s in sequences if len(s["times"]) >= min_length]
 
-        # Compute normalization stats for times and locations
-        all_times = np.concatenate([s["times"] for s in self.sequences])
-        all_locs = np.concatenate([s["locations"] for s in self.sequences])
-
-        self.time_mean = all_times.mean() if normalize_time else 0.0
-        self.time_std = all_times.std() + 1e-8 if normalize_time else 1.0
-        self.loc_mean = all_locs.mean(axis=0) if normalize_space else np.zeros(all_locs.shape[1])
-        self.loc_std = all_locs.std(axis=0) + 1e-8 if normalize_space else np.ones(all_locs.shape[1])
-
         self.normalize_time = normalize_time
         self.normalize_space = normalize_space
+        self.normalize_covariates = (
+            bool(normalize_time or normalize_space)
+            if normalize_covariates is None
+            else bool(normalize_covariates)
+        )
+        self.coordinate_space = (
+            "zscore"
+            if (self.normalize_time or self.normalize_space or self.normalize_covariates)
+            else "raw"
+        )
+
+        first_seq = self.sequences[0] if self.sequences else None
+        if first_seq is not None:
+            spatial_dim = int(np.asarray(first_seq["locations"]).shape[-1])
+        else:
+            spatial_dim = 2
+
+        if self.normalize_time or self.normalize_space:
+            all_times = np.concatenate([s["times"] for s in self.sequences])
+            all_locs = np.concatenate([s["locations"] for s in self.sequences])
+            self.time_mean = all_times.mean() if normalize_time else 0.0
+            self.time_std = all_times.std() + 1e-8 if normalize_time else 1.0
+            self.loc_mean = (
+                all_locs.mean(axis=0)
+                if normalize_space
+                else np.zeros(spatial_dim, dtype=np.float32)
+            )
+            self.loc_std = (
+                all_locs.std(axis=0) + 1e-8
+                if normalize_space
+                else np.ones(spatial_dim, dtype=np.float32)
+            )
+        else:
+            self.time_mean = 0.0
+            self.time_std = 1.0
+            self.loc_mean = np.zeros(spatial_dim, dtype=np.float32)
+            self.loc_std = np.ones(spatial_dim, dtype=np.float32)
 
         # Field covariate normalization stats.
         # If caller supplies external stats (e.g. from the training split) use
         # those; otherwise compute from this split's data so that the dataset
         # is self-contained when used standalone.
-        if cov_mean is not None and cov_std is not None:
+        if self.normalize_covariates and cov_mean is not None and cov_std is not None:
             self.cov_mean = np.asarray(cov_mean, dtype=np.float32)
             self.cov_std  = np.asarray(cov_std,  dtype=np.float32)
-        else:
+        elif self.normalize_covariates:
             cov_arrays = [
                 s["field_covariates"] for s in self.sequences
                 if "field_covariates" in s
@@ -78,24 +151,64 @@ class STPPDataset(Dataset):
             else:
                 self.cov_mean = None
                 self.cov_std  = None
+        else:
+            self.cov_mean = None
+            self.cov_std = None
 
     def __len__(self):
         return len(self.sequences)
 
+    def batch_by_size(self, max_events: int) -> list:
+        """Group sequence indices into batches where total events ≤ max_events.
+
+        Sequences sorted by length descending to minimise padding waste.
+        Returns list[list[int]] compatible with DataLoader(batch_sampler=...).
+        """
+        indices = sorted(
+            range(len(self.sequences)),
+            key=lambda i: len(self.sequences[i]["times"]),
+            reverse=True,
+        )
+        batches: list = []
+        current: list = []
+        current_total = 0
+        for i in indices:
+            n = len(self.sequences[i]["times"])
+            if n > max_events:
+                # Sequence longer than the entire budget: isolate it
+                if current:
+                    batches.append(current)
+                    current = []
+                    current_total = 0
+                batches.append([i])
+            elif current_total + n > max_events and current:
+                batches.append(current)
+                current = [i]
+                current_total = n
+            else:
+                current.append(i)
+                current_total += n
+        if current:
+            batches.append(current)
+        return batches
+
     def __getitem__(self, idx):
         seq = self.sequences[idx]
-        times = seq["times"].copy()
-        locs = seq["locations"].copy()
+        times = np.asarray(seq["times"], dtype=np.float64).copy()
+        locs = np.asarray(seq["locations"], dtype=np.float32).copy()
 
         if self.normalize_time:
             times = (times - self.time_mean) / self.time_std
         if self.normalize_space:
             locs = (locs - self.loc_mean) / self.loc_std
 
+        times = _strict_float32_times(times, context=f"STPPDataset[idx={idx}]")
+
         item = {
             "times": torch.tensor(times, dtype=torch.float32),
             "locations": torch.tensor(locs, dtype=torch.float32),
             "length": len(times),
+            "coordinate_space": self.coordinate_space,
         }
 
         if "event_covariates" in seq and seq["event_covariates"] is not None:
@@ -105,13 +218,124 @@ class STPPDataset(Dataset):
 
         if "field_covariates" in seq and seq["field_covariates"] is not None:
             cov = seq["field_covariates"].copy()
-            if self.cov_mean is not None and len(cov) > 0:
+            if self.normalize_covariates and self.cov_mean is not None and len(cov) > 0:
                 cov = (cov - self.cov_mean) / self.cov_std
             item["field_covariates"] = torch.tensor(cov, dtype=torch.float32)
 
         if "marks" in seq and seq["marks"] is not None:
             item["marks"] = torch.tensor(seq["marks"], dtype=torch.long)
 
+        return item
+
+
+class SlidingWindowSTPPDataset(Dataset):
+    """Raw-coordinate fixed-window view over STPP sequences.
+
+    This is a training/validation adapter for models such as AutoSTPP whose
+    paper recipe treats each fixed lookback/lookahead window as one example.
+    It preserves raw locations and encodes times so that per-event deltas inside
+    each window match the original sequence deltas.
+    """
+
+    def __init__(
+        self,
+        sequences: List[Dict],
+        *,
+        lookback: int,
+        lookahead: int = 1,
+    ):
+        self.lookback = int(lookback)
+        self.lookahead = int(lookahead)
+        if self.lookback < 1:
+            raise ValueError(f"lookback must be >= 1, got {lookback!r}.")
+        if self.lookahead < 1:
+            raise ValueError(f"lookahead must be >= 1, got {lookahead!r}.")
+
+        self.window_length = self.lookback + self.lookahead
+        self.coordinate_space = "raw"
+        self.normalize_time = False
+        self.normalize_space = False
+        self.normalize_covariates = False
+        self.time_mean = 0.0
+        self.time_std = 1.0
+        self.cov_mean = None
+        self.cov_std = None
+
+        self.stat_sequences = [
+            {
+                "times": np.asarray(seq["times"], dtype=np.float32).copy(),
+                "locations": np.asarray(seq["locations"], dtype=np.float32).copy(),
+            }
+            for seq in sequences
+            if len(seq["times"]) > 0
+        ]
+        spatial_dim = (
+            int(np.asarray(self.stat_sequences[0]["locations"]).shape[-1])
+            if self.stat_sequences
+            else 2
+        )
+        self.loc_mean = np.zeros(spatial_dim, dtype=np.float32)
+        self.loc_std = np.ones(spatial_dim, dtype=np.float32)
+
+        self.sequences: list[Dict] = []
+        for seq_idx, seq in enumerate(sequences):
+            times = _strict_float32_times(
+                seq["times"],
+                context=f"SlidingWindowSTPPDataset[source_sequence_index={seq_idx}]",
+            )
+            locs = np.asarray(seq["locations"], dtype=np.float32)
+            n_events = int(times.shape[0])
+            if n_events < self.window_length:
+                continue
+
+            delta_t = np.zeros(n_events, dtype=np.float32)
+            delta_t[0] = times[0]
+            if n_events > 1:
+                delta_t[1:] = np.diff(times).astype(np.float32, copy=False)
+
+            for start in range(0, n_events - self.window_length + 1):
+                end = start + self.window_length
+                window = {
+                    "times": np.cumsum(delta_t[start:end]).astype(np.float32, copy=False),
+                    "locations": locs[start:end].astype(np.float32, copy=True),
+                    "source_sequence_index": seq_idx,
+                    "target_event_index": start + self.lookback,
+                    "history_length": self.lookback,
+                }
+                for key in ("event_covariates", "field_covariates", "marks"):
+                    value = seq.get(key)
+                    if value is not None:
+                        window[key] = np.asarray(value)[start:end].copy()
+                self.sequences.append(window)
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def batch_by_size(self, max_events: int) -> list:
+        indices = list(range(len(self.sequences)))
+        if max_events <= 0:
+            return [[i] for i in indices]
+        per_batch = max(1, int(max_events) // max(1, self.window_length))
+        return [indices[i : i + per_batch] for i in range(0, len(indices), per_batch)]
+
+    def __getitem__(self, idx):
+        seq = self.sequences[idx]
+        item = {
+            "times": torch.tensor(seq["times"], dtype=torch.float32),
+            "locations": torch.tensor(seq["locations"], dtype=torch.float32),
+            "length": len(seq["times"]),
+            "coordinate_space": self.coordinate_space,
+        }
+        if "event_covariates" in seq and seq["event_covariates"] is not None:
+            item["event_covariates"] = torch.tensor(
+                seq["event_covariates"], dtype=torch.float32
+            )
+        if "field_covariates" in seq and seq["field_covariates"] is not None:
+            item["field_covariates"] = torch.tensor(
+                seq["field_covariates"], dtype=torch.float32
+            )
+        if "marks" in seq and seq["marks"] is not None:
+            item["marks"] = torch.tensor(seq["marks"], dtype=torch.long)
         return item
 
 
@@ -143,6 +367,7 @@ class PaperSlidingWindowDataset(Dataset):
         """
         self._windows  = np.asarray(windows, dtype=np.float32)
         self._n_events = int(self._windows.shape[1])  # T = lookback + lookahead
+        self.coordinate_space = "paper_minmax"
 
         # Expose same attrs as STPPDataset.
         # Convention: (x - loc_mean) / loc_std = x_mm,
@@ -172,6 +397,7 @@ class PaperSlidingWindowDataset(Dataset):
             "times":     torch.tensor(t,  dtype=torch.float32),
             "locations": torch.tensor(xy, dtype=torch.float32),
             "length":    self._n_events,
+            "coordinate_space": self.coordinate_space,
         }
 
 
@@ -193,6 +419,12 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
     N_max = lengths.max().item()
     B = len(batch)
     d = batch[0]["locations"].shape[-1]
+    coordinate_space = batch[0].get("coordinate_space", "raw")
+    for item in batch[1:]:
+        if item.get("coordinate_space", coordinate_space) != coordinate_space:
+            raise ValueError(
+                "collate_fn requires a consistent coordinate_space within one batch."
+            )
 
     times = torch.zeros(B, N_max)
     locations = torch.zeros(B, N_max, d)
@@ -235,6 +467,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
         "lengths": lengths,
         "pad_mask": pad_mask,
         "txys": txys,
+        "coordinate_space": coordinate_space,
         "event_covariates": event_covariates,
         "field_covariates": field_covariates,
         "marks": marks_out,

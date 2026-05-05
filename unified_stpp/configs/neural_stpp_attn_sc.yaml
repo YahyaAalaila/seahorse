@@ -1,0 +1,61 @@
+# NeuralSTPP — SelfAttentiveCNFSpatial (sequence-coupled variant).
+#
+# Hyperparameters matched to original NeuralSTPP repo (Chen et al. 2021):
+#   --hdims "64-64-64"        → hidden_dim: 64, n_hidden_layers: 3
+#   --layer_type concat       → layer_type: concat  (ConcatSquash)
+#   --tpp_style gru           → backbone.update_type: gru
+#   --tpp_hdims "32-32"       → backbone.tpp_hidden_dims: [32, 32]
+#   --tpp_actfn softplus      → backbone.tpp_actfn: softplus
+#   --tpp_otreg_strength 1e-4 → backbone.energy_regularization (set in preset)
+#   --otreg_strength 1e-4     → decoder.spatial.otreg_strength (set in preset)
+#   --tol 1e-4                → atol/rtol: 1e-4
+#   --lr 1e-3                 → training.lr
+#   --weight_decay 1e-6       → training.weight_decay
+#   --gradclip 0              → training.grad_clip: 0.0  (no clipping)
+#   --test_bsz 32             → training.batch_size: 32
+#
+# NOT yet implemented (future work):
+#   --actfn swish             → spatial velocity field activation (currently Softplus)
+#   --l2_attn                 → L2 regularisation on attention weights
+#   --naive_hutch             → Hutchinson trace estimator variant
+#
+# Note: --num_iterations 10000 is iteration-based (original); we use epoch-based
+# training with early stopping instead.
+#
+# Run standalone:
+#   python train.py --config unified_stpp/configs/neural_stpp_attn_sc.yaml
+#
+# Include in benchmark:
+#   bench = Benchmark(["neural_stpp_attn_sc", "auto_stpp"], splits=...)
+
+model:
+  preset: neural_stpp_attn_sc
+  hidden_dim: 32           # --hdims "64-64-64" → 3 layers of width 64
+  spatial_dim: 2
+  event_cov_dim: 0
+  field_cov_dim: 0
+  backbone:
+    tpp_hidden_dims: "32-32"   # --tpp_hdims "32-32"
+    tpp_actfn: softplus        # --tpp_actfn softplus
+  decoder:
+    spatial:
+      num_heads: 4
+      n_hidden_layers: 3   # --hdims "64-64-64" → 3-layer velocity field
+      layer_type: concat   # --layer_type concat (ConcatSquash)
+      solver: dopri5
+      atol: 1.0e-5         # --tol 1e-4
+      rtol: 1.0e-5         # --tol 1e-4
+
+training:
+  lr: 5.0e-4               # --lr 1e-3
+  weight_decay: 1.0e-5     # --weight_decay 1e-6
+  grad_clip: 1.0           # --gradclip 0 (no gradient clipping)
+  n_epochs: 200
+  batch_size: 64           # --test_bsz 32
+  patience: 30
+
+data:
+  type: hawkes
+  n_train: 200
+  n_val: 50
+  T: 10.0
