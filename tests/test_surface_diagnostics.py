@@ -62,7 +62,7 @@ class TestSurfaceDiagnostics(unittest.TestCase):
             self.assertIn("intensity_heatmap", artifacts)
             self.assertTrue(artifacts["intensity_heatmap"].exists())
 
-    def test_future_exact_surface_is_marked_provisional(self):
+    def test_future_exact_surface_bundle_and_render(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             history_path = write_history_jsonl(root / "history.jsonl")
@@ -89,9 +89,9 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                 "future_horizon": 0.5,
                 "spatial_chunk_size": 8,
                 "auto_coarsened_grid": False,
-                "notes": ["Neural exact-family packaged support is provisional until parity is proven."],
+                "notes": ["NJSDE exact-family surface support is intended for diagnostics."],
                 "query_complexity": {"total_chunk_calls": 15},
-                "provisional": True,
+                "provisional": False,
             }
             with mock.patch(
                 "unified_stpp.evaluation.surface.diagnostics.evaluate_neural_future_exact",
@@ -116,8 +116,8 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                     ),
                 )
 
-            self.assertTrue(result.provisional)
-            self.assertTrue(any("provisional" in note.lower() for note in result.notes))
+            self.assertFalse(result.provisional)
+            self.assertTrue(any("NJSDE" in note for note in result.notes))
             self.assertIn("lambda_t", result.extra_arrays)
             self.assertIn("spatial_density", result.extra_arrays)
             assert_finite_array(self, result.primary_cube)

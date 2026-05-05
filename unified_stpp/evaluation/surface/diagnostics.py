@@ -237,7 +237,7 @@ def resolve_neural_exact_profile(
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 4096
         profile["warnings"].append(
-            "Neural exact-family packaged surface support is intended for diagnostics."
+            "NJSDE exact-family surface support is intended for diagnostics."
         )
         return profile
     if preset == "neural_jumpcnf":
@@ -246,7 +246,7 @@ def resolve_neural_exact_profile(
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 1024
         profile["warnings"].append(
-            "Neural exact-family packaged support is provisional until parity is proven."
+            "Neural JumpCNF exact-family surface support uses a coarsened diagnostic grid."
         )
         return profile
     if preset == "neural_attncnf":
@@ -255,7 +255,7 @@ def resolve_neural_exact_profile(
         if profile["spatial_chunk_size"] is None:
             profile["spatial_chunk_size"] = 512
         profile["warnings"].append(
-            "Neural exact-family packaged support is provisional until parity is proven."
+            "Neural AttnCNF exact-family surface support uses a coarsened diagnostic grid."
         )
         return profile
     raise ValueError(f"Unsupported neural exact profile for preset {preset!r}.")
@@ -465,7 +465,7 @@ def evaluate_neural_future_exact(
             "chunk_calls_per_frame": chunk_calls_per_frame,
             "total_chunk_calls": chunk_calls_per_frame * len(t_grid),
         },
-        "provisional": True,
+        "provisional": False,
     }
 
 

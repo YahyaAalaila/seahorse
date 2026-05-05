@@ -7,15 +7,15 @@ Two layers live here:
      spatial grid from a provided history.
    - ``calc_lamb``: build a full intensity cube from explicit x/y/t ranges.
 
-2. Notebook-faithful helpers for DeepSTPP / AutoSTPP
-   - ``calc_lamb_sequence``: mimic the upstream Visualizer-style ``calc_lamb``
-     semantics on one full sequence.
+2. Reference plotting helpers for DeepSTPP / AutoSTPP
+   - ``calc_lamb_sequence``: build a ``calc_lamb``-style surface cube on one
+     full sequence.
    - ``calc_lamb_from_runner``: thin wrapper that pulls normalization stats and
      paper-space bounds from a loaded ``STPPRunner``.
 
-The notebook-faithful path deliberately preserves the active upstream history
-selection convention (including the ``<=`` prefix rule) while avoiding upstream
-notebook-state coupling and brittle DataLoader dependencies.
+The reference plotting path preserves the historical history-selection
+convention (including the ``<=`` prefix rule) while avoiding notebook-state
+coupling and brittle DataLoader dependencies.
 """
 
 from __future__ import annotations
@@ -81,12 +81,12 @@ def _paper_stats_from_model(model) -> tuple[np.ndarray, np.ndarray, float] | Non
 
 
 def paper_output_scale_factor(model) -> float | None:
-    """Return the paper-space output scaling used by notebook-faithful intensity plots.
+    """Return the paper-space output scaling used by reference intensity plots.
 
     DeepSTPP / AutoSTPP internally parameterize intensity in their paper-space
-    coordinates. Upstream-style visualization divides the queried values by the
-    paper location/time scaling factor before treating them as comparable
-    original-space intensities.
+    coordinates. Reference visualization divides the queried values by the
+    paper location/time scaling factor before comparing original-space
+    intensities.
     """
     paper_stats = _paper_stats_from_model(model)
     if paper_stats is None:
@@ -110,7 +110,7 @@ def _infer_notebook_lookback(model) -> int:
     )
 
 
-def _build_linspace_via_upstream_arange(lo: float, hi: float, n_step: int) -> np.ndarray:
+def _build_linspace_via_reference_arange(lo: float, hi: float, n_step: int) -> np.ndarray:
     if n_step < 2:
         raise ValueError(f"n_step must be >= 2, got {n_step}.")
     step = (float(hi) - float(lo)) / float(n_step - 1)
@@ -273,7 +273,7 @@ def calc_lamb_sequence(
     device=None,
     output_scale_factor: float = 1.0,
 ) -> IntensityCubeResult:
-    """Notebook-faithful intensity cube for one chosen sequence."""
+    """Reference intensity cube for one chosen sequence."""
     times = _as_float_array(sequence_times, ndim=1)
     locs = _as_float_array(sequence_locs)
     if locs.ndim != 2 or locs.shape[-1] < 2:
@@ -305,8 +305,8 @@ def calc_lamb_sequence(
         ymin = float(ymin)
         ymax = float(ymax)
 
-    x_range = _build_linspace_via_upstream_arange(xmin, xmax, x_nstep)
-    y_range = _build_linspace_via_upstream_arange(ymin, ymax, y_nstep)
+    x_range = _build_linspace_via_reference_arange(xmin, xmax, x_nstep)
+    y_range = _build_linspace_via_reference_arange(ymin, ymax, y_nstep)
 
     t_start = float(times[int(lookback)])
     t_end = float(times[-1])
@@ -324,7 +324,7 @@ def calc_lamb_sequence(
     frames: list[np.ndarray] = []
     max_history = int(max_history)
     for t_query in t_range:
-        # Upstream notebook semantics: use <= on all but the final event.
+        # Historical plotting convention: use <= on all but the final event.
         i = int(np.sum(times[:-1] <= float(t_query)) - 1)
         i = max(i, 0)
         hist_t = times[: i + 1]
@@ -377,11 +377,11 @@ def calc_lamb_from_runner(
     max_history: Optional[int] = None,
     device=None,
 ) -> IntensityCubeResult:
-    """Notebook-faithful ``calc_lamb`` wrapper for a loaded runner."""
+    """Reference ``calc_lamb`` wrapper for a loaded runner."""
     preset = runner.config.model.preset
     if preset not in {"deep_stpp", "auto_stpp"}:
         raise ValueError(
-            "Notebook-faithful calc_lamb currently supports only "
+            "Reference calc_lamb currently supports only "
             f"'deep_stpp' and 'auto_stpp', got {preset!r}."
         )
     if seq_idx < 0 or seq_idx >= len(sequences):
@@ -407,13 +407,13 @@ def calc_lamb_from_runner(
     if paper_stats is None:
         raise ValueError(
             f"Preset {preset!r} does not expose paper-space stats required for "
-            "notebook-faithful intensity plotting."
+            "reference intensity plotting."
         )
     output_scale_factor = paper_output_scale_factor(model)
     if output_scale_factor is None:
         raise ValueError(
             f"Preset {preset!r} does not expose paper-space stats required for "
-            "notebook-faithful intensity plotting."
+            "reference intensity plotting."
         )
 
     return calc_lamb_sequence(

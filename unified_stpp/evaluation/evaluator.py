@@ -184,7 +184,7 @@ def evaluate(
     if only_requires is not None:
         planned_metrics = [m for m in planned_metrics if m.requires <= only_requires]
 
-    # Re-validate after legacy filtering in case explicit metrics were passed.
+    # Re-validate after filters in case explicit metrics were passed.
     plan = resolve_metric_plan(
         metric_profile_name=None,
         metrics=planned_metrics,
