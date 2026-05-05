@@ -10,8 +10,8 @@ import torch
 
 from unified_stpp.registry import build_model
 from unified_stpp.models.configs.smash import SMASHConfig
-from unified_stpp.models.history_encoders.smash_upstream_transformer import (
-    SMASHUpstreamTransformerST,
+from unified_stpp.models.history_encoders.smash_transformer import (
+    SMASHTransformerST,
 )
 
 
@@ -53,7 +53,7 @@ def _tiny_marked_batch():
 
 
 class TestSMASHStateEvent(unittest.TestCase):
-    def test_smash_uses_upstream_transformer(self):
+    def test_smash_uses_transformer(self):
         model = build_model(
             config={},
             preset="smash",
@@ -61,7 +61,7 @@ class TestSMASHStateEvent(unittest.TestCase):
             hidden_dim=64,
             n_marks=0,
         )
-        self.assertIsInstance(model.state_model.transformer, SMASHUpstreamTransformerST)
+        self.assertIsInstance(model.state_model.transformer, SMASHTransformerST)
 
     def test_smash_data_init_overrides_compute_global_stats(self):
         class _Dataset:

@@ -9,7 +9,7 @@ from torch import Tensor
 
 from ..abstractions import StateCapabilities, StateContext, StateModel
 from ..model_registry import register_state
-from ..history_encoders.smash_upstream_transformer import SMASHUpstreamTransformerST
+from ..history_encoders.smash_transformer import SMASHTransformerST
 
 
 @register_state("smash")
@@ -19,7 +19,7 @@ class SMASHStateModel(StateModel):
     def __init__(
         self,
         *,
-        transformer: SMASHUpstreamTransformerST,
+        transformer: SMASHTransformerST,
         loc_dim: int,
         num_types: int,
         log_normalization: bool = False,

@@ -8,7 +8,7 @@ import unittest
 import torch
 
 from unified_stpp.config.schema import STPPConfig
-from unified_stpp.models.spatial_models.neural_cond_gmm import ConditionalGMMSpatial
+from unified_stpp.models.spatial_models.njsde import ConditionalGMMSpatial
 
 
 class TestConditionalGMMSpatial(unittest.TestCase):

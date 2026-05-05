@@ -155,8 +155,7 @@ class SMASHConfig(BaseModelConfig):
         enc_type = enc_cfg.pop("type", "smash_transformer")
         if enc_type not in {"smash_transformer", "smash_upstream_transformer"}:
             raise ValueError(
-                "SMASH build expects encoder.type='smash_transformer' "
-                f"(or 'smash_upstream_transformer'), got '{enc_type}'."
+                f"SMASH build expects encoder.type='smash_transformer', got '{enc_type}'."
             )
 
         dec_cfg = copy.deepcopy(d.get("decoder", {}))
@@ -225,9 +224,9 @@ class SMASHConfig(BaseModelConfig):
         )
 
     def _state_kwargs(self) -> dict:
-        from unified_stpp.models.history_encoders import SMASHUpstreamTransformerST
+        from unified_stpp.models.history_encoders import SMASHTransformerST
         loc_dim = 3 if self.num_types > 1 else 2
-        transformer = SMASHUpstreamTransformerST(
+        transformer = SMASHTransformerST(
             d_model=self.d_model,
             d_rnn=self.d_rnn,
             d_inner=self.d_inner,
@@ -264,7 +263,7 @@ class SMASHConfig(BaseModelConfig):
         )
 
     def _event_kwargs(self) -> dict:
-        from unified_stpp.models.event_models.smash_event import ScoreNet
+        from unified_stpp.models.event_models.smash import ScoreNet
         loc_dim = 3 if self.num_types > 1 else 2
         score_net = ScoreNet(
             dim=1 + loc_dim,

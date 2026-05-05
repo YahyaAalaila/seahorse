@@ -215,7 +215,7 @@ class DiffusionSTPPConfig(BaseModelConfig):
         )
 
     def _event_kwargs(self) -> dict:
-        from unified_stpp.models.event_models.diffusion_event import STDiffusionNet
+        from unified_stpp.models.event_models.diffusion import STDiffusionNet
         cond_dim = self.d_model
         seq_length = 1 + self.spatial_dim  # delta_time + spatial coords
         denoising_model = STDiffusionNet(

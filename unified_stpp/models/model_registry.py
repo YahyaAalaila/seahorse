@@ -14,7 +14,7 @@ All three model registries follow the same lazy-dict + decorator pattern:
 
 This file replaces the duplicate ``_get_spatial_registry()`` functions that
 previously appeared in both ``models/configs/neural_stpp.py`` and
-``models/event_models/neural_stpp_event.py``.
+``models/event_models/neural.py``.
 """
 
 from __future__ import annotations

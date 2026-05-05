@@ -1,4 +1,4 @@
-"""Faithful conditional-GMM spatial decoder for the Neural STPP family."""
+"""Conditional-GMM spatial decoder for the canonical NJSDE preset."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ def _gmm_sample(params: Tensor, n_mixtures: int) -> Tensor:
 
 @register_spatial("conditional_gmm")
 class ConditionalGMMSpatial(Decoder):
-    """Shared-hidden Neural STPP conditional Gaussian mixture decoder.
+    """NJSDE conditional Gaussian mixture spatial decoder.
 
     This mirrors the upstream facebookresearch/neural_stpp ``ConditionalGMM``
     head, adapted to the unified shared-family contract where the decoder

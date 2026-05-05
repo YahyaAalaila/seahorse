@@ -43,10 +43,9 @@ ALL_BUDGET_PRESETS = CORE_PRESETS + EXTRA_PRESETS
 PRESET_LABELS: dict[str, str] = {
     "auto_stpp":       "AutoSTPP",
     "deep_stpp":       "DeepSTPP",
-    "njsde":           "NJSDE + GMM",
-    "neural_cond_gmm": "NJSDE + GMM",
-    "neural_jumpcnf":  "JumpCNF",
-    "neural_attncnf":  "AttnCNF",
+    "njsde":           "NJSDE",
+    "neural_jumpcnf":  "Neural JumpCNF",
+    "neural_attncnf":  "Neural AttnCNF",
     "diffusion_stpp":  "DSTPP",
     "smash":           "SMASH",
     "nsmpp":           "NSMPP",
@@ -403,8 +402,8 @@ Output directory: `runs/local_eval_analysis/suite3_paper_artifacts/`
 
 ## suite3_budget_recovery_core
 
-**Layout:** 2 × 3 panels (ABCDEF). Panels: AutoSTPP, DeepSTPP, NJSDE + GMM,
-Neural-AttnCNF (solid lines); NSMPP, SMASH (dashed lines).
+**Layout:** 2 × 3 panels (ABCDEF). Panels: AutoSTPP, DeepSTPP, NJSDE,
+Neural AttnCNF (solid lines); NSMPP, SMASH (dashed lines).
 Within each panel, one line per entanglement level L0–L3.
 Lines = mean over up to 3 seeds; shaded band = ±1 std.
 **x-axis:** training budget (%). **y-axis:** test NLL.

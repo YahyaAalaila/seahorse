@@ -413,8 +413,8 @@ class RNNLayers(nn.Module):
         return self.projection(out)
 
 
-class SMASHUpstreamTransformerST(nn.Module):
-    """Exact upstream SMASH Transformer_ST with optional length-based masking."""
+class SMASHTransformerST(nn.Module):
+    """SMASH Transformer_ST with optional length-based masking."""
 
     def __init__(
         self,
@@ -491,3 +491,7 @@ class SMASHUpstreamTransformerST(nn.Module):
             )
 
         return enc_output_all, non_pad_mask
+
+
+# Backward-compatible class alias for older imports.
+SMASHUpstreamTransformerST = SMASHTransformerST

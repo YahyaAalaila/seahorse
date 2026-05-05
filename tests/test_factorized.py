@@ -115,7 +115,7 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
         )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
         from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
-        from unified_stpp.models.event_models.factorized_event import FactorizedEventModel
+        from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.abstractions import StateContext
 
         event_model = FactorizedEventModel(
@@ -140,7 +140,7 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
         """Test that explicit t1 runs without error and gives finite nll."""
         from unified_stpp.models.temporal_models.parametric_processes import HawkesProcess
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.event_models.factorized_event import FactorizedEventModel
+        from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.abstractions import StateContext
 
         event_model = FactorizedEventModel(

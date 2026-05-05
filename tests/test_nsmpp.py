@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from unified_stpp.config.schema import STPPConfig
 from unified_stpp.models.configs import ConfigRegistry
 from unified_stpp.models.configs.nsmpp_deepbasis import NSMPPDeepBasisConfig
-from unified_stpp.models.event_models.nsmpp_deepbasis_event import NSMPPDeepBasisEventModel
+from unified_stpp.models.event_models.nsmpp_deepbasis import NSMPPDeepBasisEventModel
 from unified_stpp.models.event_models.nsmpp_deepbasis_kernel import DeepBasisKernel
 from unified_stpp.runner import STPPRunner
 

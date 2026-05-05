@@ -19,7 +19,7 @@ PREDICTIVE_PRESETS = frozenset(
         "thp_gmm",
         "smash",
         "diffusion_stpp",
-        "neural_cond_gmm",
+        "njsde",
         "neural_jumpcnf",
         "neural_attncnf",
         "poisson_gmm",
@@ -36,7 +36,7 @@ PREDICTIVE_PRESETS = frozenset(
 
 SURFACE_HISTORY_PRESETS = frozenset({"auto_stpp", "deep_stpp"})
 SURFACE_FUTURE_EXACT_PRESETS = frozenset(
-    {"neural_cond_gmm", "neural_jumpcnf", "neural_attncnf"}
+    {"njsde", "neural_jumpcnf", "neural_attncnf"}
 )
 
 GROUP_PRESETS = {

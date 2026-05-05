@@ -91,7 +91,7 @@ class FactorizedConfig(BaseModelConfig):
         )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
         from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
-        from unified_stpp.models.event_models.factorized_event import FactorizedEventModel
+        from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.unified_model import UnifiedSTPP
 
         _temporal_cls = {
@@ -254,7 +254,7 @@ class FactorizedCNFConfig(BaseModelConfig):
         )
         from unified_stpp.models.spatial_models.independent_cnf import IndependentCNF
         from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
-        from unified_stpp.models.event_models.factorized_event import FactorizedEventModel
+        from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.unified_model import UnifiedSTPP
 
         _temporal_cls = {

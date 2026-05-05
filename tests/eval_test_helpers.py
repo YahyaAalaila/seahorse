@@ -76,12 +76,6 @@ MINI_OVERRIDES = {
         "model.decoder.spatial.hidden_dims=8-8",
         "model.decoder.spatial.n_mixtures=2",
     ],
-    "neural_cond_gmm": [
-        "model.hidden_dim=8",
-        "model.backbone.tpp_hidden_dims=8-8",
-        "model.decoder.spatial.hidden_dims=8-8",
-        "model.decoder.spatial.n_mixtures=2",
-    ],
     "nsmpp": [
         "model.decoder.n_basis=2",
         "model.decoder.basis_dim=4",
@@ -128,7 +122,7 @@ def make_saved_run(
 
     status = preset_status
     if status is None:
-        status = "provisional" if preset.startswith("neural_") else "canonical"
+        status = "canonical"
     kind = nll_kind
     if kind is None:
         kind = "approx" if preset in {"smash", "diffusion_stpp"} else "exact"
