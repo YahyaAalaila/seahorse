@@ -320,9 +320,9 @@ def _write_report(
         f"<td>{html.escape(str(row['suite']))}</td>"
         f"<td>{html.escape(str(row['config_id']))}</td>"
         f"<td>{html.escape(str(row['preset']))}</td>"
-        f"<td>{'' if row.get('rmse_mean') is None else f'{float(row['rmse_mean']):.4f}'}</td>"
-        f"<td>{'' if row.get('mae_mean') is None else f'{float(row['mae_mean']):.4f}'}</td>"
-        f"<td>{'' if row.get('count_mae_mean') is None else f'{float(row['count_mae_mean']):.4f}'}</td>"
+        f"<td>{'' if row.get('rmse_mean') is None else '{:.4f}'.format(float(row['rmse_mean']))}</td>"
+        f"<td>{'' if row.get('mae_mean') is None else '{:.4f}'.format(float(row['mae_mean']))}</td>"
+        f"<td>{'' if row.get('count_mae_mean') is None else '{:.4f}'.format(float(row['count_mae_mean']))}</td>"
         "</tr>"
         for row in sorted(
             summary_rows,

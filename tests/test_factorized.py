@@ -114,7 +114,6 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
             HomogeneousPoissonProcess,
         )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.state_models.factorized import FactorizedStateModel
         from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.abstractions import StateContext
 

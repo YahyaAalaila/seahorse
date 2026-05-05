@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-import importlib
 import json
-import math
 import subprocess
 import sys
 from dataclasses import dataclass

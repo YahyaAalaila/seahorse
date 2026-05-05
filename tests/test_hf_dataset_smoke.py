@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from unified_stpp.cli import bench, fit, tune
-from unified_stpp.config.schema import DataConfig, STPPConfig
+from unified_stpp.config.schema import STPPConfig
 
 
 HF_SMOKE_ENABLED = os.environ.get("UNIFIED_STPP_RUN_HF_SMOKE") == "1"

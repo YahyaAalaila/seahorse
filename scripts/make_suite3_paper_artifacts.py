@@ -163,7 +163,6 @@ def make_budget_recovery(curves: pd.DataFrame) -> None:
     plotted: list[dict] = []
 
     for preset in ALL_BUDGET_PRESETS:
-        label = PRESET_LABELS.get(preset, preset)
         stem = f"suite3_budget_{preset}"
 
         fig, ax = plt.subplots(figsize=(PANEL_W * 1.1, PANEL_H), constrained_layout=True)
