@@ -144,72 +144,93 @@ class ConfigResolutionTest(unittest.TestCase):
         self.assertEqual(tuning.search_alg, "random")
         self.assertEqual(tuning.scheduler, "none")
 
-    def test_bundled_hpo_configs_use_raw_data_and_non_deprecated_metric(self):
+    def test_bundled_yaml_files_match_runtime_preset_defaults(self):
         config_dir = Path("unified_stpp/configs")
-        for name in (
-            "auto_stpp_hpo.yaml",
-            "njsde_hpo.yaml",
-            "neural_attncnf_hpo.yaml",
-            "neural_jumpcnf_hpo.yaml",
-            "nsmpp_hpo.yaml",
-        ):
-            raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
-            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
-            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
+        self.assertEqual(
+            {path.name for path in config_dir.glob("*.yaml")},
+            {
+                "auto_stpp.yaml",
+                "deep_stpp.yaml",
+                "diffusion_stpp.yaml",
+                "neural_attncnf.yaml",
+                "neural_jumpcnf.yaml",
+                "neural_stpp_attn_sc.yaml",
+                "njsde.yaml",
+                "nsmpp.yaml",
+                "rmtpp_gmm.yaml",
+                "smash.yaml",
+                "thp_gmm.yaml",
+            },
+        )
 
-            self.assertFalse(
-                cfg_dict["data"]["normalize"],
-                f"{name} should keep HPO on raw data to match the benchmark path",
-            )
-            self.assertEqual(
-                tuning.metric,
-                "val_objective",
-                f"{name} should not rely on the deprecated val_nll label",
-            )
+    def test_preset_resolution_uses_canonical_yaml_or_schema_defaults(self):
+        from unified_stpp.models.configs import ConfigRegistry
 
-    def test_all_bundled_hpo_configs_use_current_objective_label(self):
         config_dir = Path("unified_stpp/configs")
-        for path in sorted(config_dir.glob("*_hpo.yaml")):
-            raw = STPPConfig.raw_source_dict(config=str(path))
+        yaml_defaults = {
+            "auto_stpp": "auto_stpp.yaml",
+            "deep_stpp": "deep_stpp.yaml",
+            "diffusion_stpp": "diffusion_stpp.yaml",
+            "neural_attncnf": "neural_attncnf.yaml",
+            "neural_jumpcnf": "neural_jumpcnf.yaml",
+            "neural_stpp_attn_sc": "neural_stpp_attn_sc.yaml",
+            "njsde": "njsde.yaml",
+            "nsmpp": "nsmpp.yaml",
+            "rmtpp_gmm": "rmtpp_gmm.yaml",
+            "smash": "smash.yaml",
+            "thp_gmm": "thp_gmm.yaml",
+        }
+
+        for preset in ConfigRegistry.canonical_preset_names():
+            raw = STPPConfig.raw_source_dict(preset=preset)
+            yaml_name = yaml_defaults.get(preset)
+            if yaml_name is None:
+                self.assertEqual(
+                    raw,
+                    {"data": {}, "model": {"preset": preset}, "training": {}},
+                    preset,
+                )
+            else:
+                self.assertEqual(
+                    raw,
+                    STPPConfig.raw_source_dict(config=str(config_dir / yaml_name)),
+                    preset,
+                )
+
+    def test_tune_preset_uses_same_runtime_source_as_fit(self):
+        for preset in ("auto_stpp", "njsde", "neural_jumpcnf", "neural_attncnf", "nsmpp"):
+            raw = STPPConfig.raw_source_dict(preset=preset)
             cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
-            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
 
-            self.assertIn("model", cfg_dict, path.name)
-            self.assertIn("preset", cfg_dict["model"], path.name)
-            self.assertEqual(
-                tuning.metric,
-                "val_objective",
-                f"{path.name} should not rely on the deprecated val_nll label",
-            )
+            self.assertIn("model", cfg_dict)
+            self.assertEqual(raw_tuning, {}, preset)
 
-    def test_slow_neural_hpo_configs_are_gpu_bounded(self):
-        config_dir = Path("unified_stpp/configs")
-        for name in (
-            "njsde_hpo.yaml",
-            "neural_attncnf_hpo.yaml",
-            "neural_jumpcnf_hpo.yaml",
-        ):
-            raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
-            cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
-            tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
-
-            self.assertEqual(cfg_dict["training"]["device"], "cuda")
-            self.assertEqual(tuning.n_gpus_per_trial, 1)
-            self.assertEqual(tuning.max_concurrent_trials, 1)
-
-    def test_neural_jumpcnf_hpo_keeps_adjoint_disabled(self):
-        raw = STPPConfig.raw_source_dict(config="unified_stpp/configs/neural_jumpcnf_hpo.yaml")
-        cfg_dict, _raw_tuning = STPPConfig.split_tuning_dict(raw)
-
-        spatial_cfg = cfg_dict["model"]["decoder"]["spatial"]
-        self.assertTrue(spatial_cfg["solve_reverse"])
-        self.assertFalse(spatial_cfg["use_adjoint"])
+    def test_deprecated_aliases_resolve_before_yaml_lookup(self):
+        self.assertEqual(
+            STPPConfig.raw_source_dict(preset="neural_cond_gmm"),
+            STPPConfig.raw_source_dict(preset="njsde"),
+        )
+        self.assertEqual(
+            STPPConfig.raw_source_dict(preset="neural_stpp_shared_cond_gmm"),
+            STPPConfig.raw_source_dict(preset="njsde"),
+        )
+        self.assertEqual(
+            STPPConfig.raw_source_dict(preset="neural_stpp_shared_jumpcnf"),
+            STPPConfig.raw_source_dict(preset="neural_jumpcnf"),
+        )
+        self.assertEqual(
+            STPPConfig.raw_source_dict(preset="neural_stpp_shared_attncnf"),
+            STPPConfig.raw_source_dict(preset="neural_attncnf"),
+        )
+        self.assertEqual(
+            STPPConfig.raw_source_dict(preset="nsmpp_deepbasis_provisional"),
+            STPPConfig.raw_source_dict(preset="nsmpp"),
+        )
 
     def test_auto_stpp_configs_use_paper_sliding_window_training_view(self):
         config_dir = Path("unified_stpp/configs")
         for name in (
             "auto_stpp.yaml",
-            "auto_stpp_hpo.yaml",
         ):
             raw = STPPConfig.raw_source_dict(config=str(config_dir / name))
             cfg_dict, raw_tuning = STPPConfig.split_tuning_dict(raw)
@@ -220,14 +241,7 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(adapter_kwargs["lookback"], 20)
             self.assertEqual(adapter_kwargs["lookahead"], 1)
             self.assertEqual(cfg_dict["training"]["batch_size"], 128)
-
-            if raw_tuning:
-                tuning = TuningConfig.from_sources(yaml_tuning=raw_tuning)
-                self.assertEqual(tuning.n_trials, 30)
-                self.assertEqual(
-                    cfg_dict["model"]["decoder"]["n_prodnet"],
-                    [2, 6, 10],
-                )
+            self.assertEqual(raw_tuning, {})
 
     def test_temporal_gmm_yaml_fields_are_forwarded_directly(self):
         for preset in ("rmtpp_gmm", "thp_gmm"):
