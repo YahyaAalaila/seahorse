@@ -551,7 +551,7 @@ class STPPRunner:
 
         Looks for ``config.yaml`` + (in order of preference):
         1. ``checkpoints/{training.checkpoint_select}.ckpt`` — Lightning checkpoint written by ``fit()``
-        2. ``model.ckpt``           — legacy plain state-dict written by ``save()``
+        2. ``model.ckpt``           — compatibility plain state-dict written by ``save()``
         """
         p = Path(path).resolve()
         cfg_path = p / "resolved_config.yaml"

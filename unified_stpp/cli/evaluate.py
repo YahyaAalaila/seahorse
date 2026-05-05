@@ -122,7 +122,7 @@ def _add_metrics_subparser(sub) -> None:
     p.add_argument(
         "--benchmark-id",
         default=None,
-        help="Optional upstream benchmark identifier to persist in the evaluation manifest.",
+        help="Optional external benchmark identifier to persist in the evaluation manifest.",
     )
     p.add_argument(
         "--out",
@@ -344,8 +344,8 @@ def _add_surface_subparser(sub) -> None:
         default="history_frame",
         choices=("history_frame", "future_exact"),
         help=(
-            "Surface profile. Neural future_exact support remains provisional until "
-            "packaged parity is proven."
+            "Surface profile. history_frame supports AutoSTPP/DeepSTPP; "
+            "future_exact supports NJSDE, Neural JumpCNF, and Neural AttnCNF."
         ),
     )
     p.add_argument("--x-nstep", type=int, default=81, help="Number of x-grid points.")
@@ -389,7 +389,7 @@ def _add_surface_subparser(sub) -> None:
         "--spatial-chunk-size",
         type=int,
         default=None,
-        help="Chunk size for provisional neural exact-family spatial queries.",
+        help="Chunk size for neural exact-family spatial queries.",
     )
     p.add_argument(
         "--device",
