@@ -12,7 +12,7 @@ from unified_stpp.config.schema import STPPConfig
 
 
 HF_SMOKE_ENABLED = os.environ.get("UNIFIED_STPP_RUN_HF_SMOKE") == "1"
-HF_SMOKE_DATASET = os.environ.get("UNIFIED_STPP_HF_SMOKE_DATASET", "yahya021/bold5000-stpp")
+HF_SMOKE_DATASET = os.environ.get("UNIFIED_STPP_HF_SMOKE_DATASET", "anonymous/bold5000-stpp")
 
 
 @unittest.skipUnless(HF_SMOKE_ENABLED, "Set UNIFIED_STPP_RUN_HF_SMOKE=1 to run HF smoke tests.")
