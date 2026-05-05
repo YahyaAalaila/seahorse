@@ -1,4 +1,4 @@
-"""StateModel for upstream-faithful DeepSTPP preprocessing and encoder."""
+"""StateModel for DeepSTPP preprocessing and encoding."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from ..model_registry import register_state
 
 @register_state("deep_stpp")
 class DeepSTPPStateModel(StateModel):
-    """Build paper windows and encode them with the upstream DeepSTPP transformer."""
+    """Build paper windows and encode them with the DeepSTPP transformer."""
 
     def __init__(
         self,

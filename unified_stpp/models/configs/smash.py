@@ -129,7 +129,7 @@ class SMASHConfig(BaseModelConfig):
     input_time_std: float = 1.0
     input_loc_mean: tuple[float, ...] = (0.0, 0.0)
     input_loc_std: tuple[float, ...] = (1.0, 1.0)
-    # Fixed global min-max stats for upstream-faithful SMASH tokens.
+    # Fixed global min-max stats for SMASH tokens.
     token_time_min_raw: float = 0.0
     token_time_range_raw: float = 1.0
     token_time_min_log: float = 0.0
@@ -289,7 +289,7 @@ class SMASHConfig(BaseModelConfig):
 
     @classmethod
     def data_init_overrides(cls, dm) -> dict:
-        """Compute upstream-faithful SMASH preprocessing stats from raw splits."""
+        """Compute SMASH preprocessing stats from raw splits."""
         bundle = getattr(dm, "_bundle", None)
         if bundle is None:
             return {}

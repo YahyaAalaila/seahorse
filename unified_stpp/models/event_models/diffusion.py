@@ -126,7 +126,7 @@ class _SinusoidalPosEmb(nn.Module):
 # ---------------------------------------------------------------------------
 
 class STDiffusionNet(nn.Module):
-    """Faithful upstream DSTPP denoiser."""
+    """DSTPP denoiser."""
 
     def __init__(
         self,
@@ -221,7 +221,7 @@ class STDiffusionNet(nn.Module):
     ) -> Tuple[Tensor, Tensor]:
         del x, x_self_cond
         if cond is None:
-            raise ValueError("STDiffusionNet requires cond for faithful DSTPP attention weights.")
+            raise ValueError("STDiffusionNet requires cond for DSTPP attention weights.")
         cond_all = self.cond_all(cond)
         t_embedding = self.time_mlp(t).unsqueeze(dim=1)
         cond_all = torch.cat((cond_all, t_embedding), dim=-1)
@@ -238,7 +238,7 @@ class STDiffusionNet(nn.Module):
     ) -> Tensor:
         del x_self_cond
         if cond is None:
-            raise ValueError("STDiffusionNet requires cond for faithful DSTPP conditioning.")
+            raise ValueError("STDiffusionNet requires cond for DSTPP conditioning.")
 
         x_spatial = x[:, :, 1:].clone()
         x_temporal = x[:, :, :1].clone()
@@ -288,16 +288,14 @@ class STDiffusionNet(nn.Module):
 # ---------------------------------------------------------------------------
 
 class GaussianDiffusionST(nn.Module):
-    """Faithful upstream DSTPP Gaussian diffusion wrapper.
+    """DSTPP Gaussian diffusion wrapper.
 
     Notes on units
     --------------
-    The upstream implementation labels its variational-bound terms as
-    "bits-per-dim", but numerically divides by ``log(e)=1``. The internal
-    tensors returned by :meth:`NLL_cal` therefore follow the upstream numeric
-    convention: effectively nats per token dimension. DiffusionEventModel then
+    The variational-bound terms are effectively nats per token dimension.
+    DiffusionEventModel then
     converts those into the benchmark-facing ``test_nll`` in nats per event
-    token and preserves the upstream-style per-dim values in ``extra_metrics``.
+    token and preserves the per-dim values in ``extra_metrics``.
     """
 
     def __init__(
@@ -588,7 +586,7 @@ class GaussianDiffusionST(nn.Module):
         clip_denoised: bool = True,
         noise: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Return upstream-style per-dim VB terms for total/temporal/spatial NLL."""
+        """Return per-dim VB terms for total/temporal/spatial NLL."""
         x_start = normalize_to_neg_one_to_one(x_start)
         device = x_start.device
         batch_size = x_start.shape[0]
@@ -756,7 +754,7 @@ class DiffusionEventModel(EventModel):
             nll_kind="approx",
             nll_description=(
                 "full DSTPP variational bound; benchmark-facing test_nll is approximate "
-                "nats/event-token, with upstream per-dim diagnostics saved in extra_metrics"
+                "nats/event-token, with per-dim diagnostics saved in extra_metrics"
             ),
             nll_footnote="‡ approx NLL (full VB)",
             has_native_sampler=True,

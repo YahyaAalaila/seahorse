@@ -16,7 +16,7 @@ from .nsmpp_deepbasis_kernel import DeepBasisKernel
 
 @register_event("nsmpp_deepbasis")
 class NSMPPDeepBasisEventModel(EventModel):
-    """Upstream-style direct conditional intensity over the full event vector."""
+    """Direct conditional intensity over the full event vector."""
 
     def __init__(
         self,
@@ -47,7 +47,7 @@ class NSMPPDeepBasisEventModel(EventModel):
             )
 
         self.data_dim = 1 + self.spatial_dim
-        # Learnable background rate — faithful to upstream where mu is an nn.Parameter.
+        # Learnable background rate stored as an unconstrained parameter.
         # Store in softplus-inverse space so softplus(raw_mu) == mu at init.
         _mu = max(float(mu), 1e-6)
         _raw_mu_init = math.log(math.expm1(_mu))  # softplus_inverse(mu)

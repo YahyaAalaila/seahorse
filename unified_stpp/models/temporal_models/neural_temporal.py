@@ -1,7 +1,7 @@
 """
 Neural temporal point process models for use in the factorized baseline family.
 
-Two models ported from Rose-STL-Lab/AutoSTPP:
+Two supported models:
 
   RMTPPTemporalProcess  — GRU encoder + closed-form exponential intensity
   THPTemporalProcess    — Transformer encoder + learned decay + fixed MC compensator
@@ -11,11 +11,11 @@ Both implement the same 2-method interface as parametric_processes.py:
     logprob(event_times, locations, input_mask, t0, t1) -> (B,)
     intensity_at(t_query, history_times, history_mask)  -> (M,)
 
-Adaptation notes vs. upstream AutoSTPP:
+Implementation notes:
   - event_times are already sequence-relative shifted (first event ≈ 0); delta_t
     is derived via diff with a zero prepended rather than from absolute timestamps.
   - Per-batch t1 (B,) is used for the survival compensator; no global t_end needed.
-  - THPTemporalProcess: upstream adaptive MC stopping loop replaced by fixed 30 samples.
+  - THPTemporalProcess: fixed 30-sample Monte Carlo compensator.
   - intensity_at assumes all M rows of history_times are identical (single sequence
     expanded to M query points) — consistent with how FactorizedEventModel calls it.
 """
@@ -187,7 +187,7 @@ class RMTPPTemporalProcess(nn.Module):
 class _PositionalEncoding(nn.Module):
     """Time-based sinusoidal positional encoding (batch-first: B, S, D).
 
-    Ported from Rose-STL-Lab/AutoSTPP src/models/transformer.py.
+    Based on the standard THP sinusoidal time encoding.
     """
 
     def __init__(self, d_model: int, dropout: float = 0.1):
@@ -241,8 +241,7 @@ class THPTemporalProcess(nn.Module):
     and the final survival interval [t_N, t1].
 
     Reference: Zuo et al., "Transformer Hawkes Process", ICML 2020.
-    Architecture follows Rose-STL-Lab/AutoSTPP src/models/transformer.py.
-    Adaptation: upstream adaptive MC stopping replaced by fixed MC_SAMPLES samples.
+    Uses a fixed ``MC_SAMPLES`` Monte Carlo compensator.
     """
 
     MC_SAMPLES: int = 30

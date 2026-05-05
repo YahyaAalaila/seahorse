@@ -90,7 +90,7 @@ class FactorizedConfig(BaseModelConfig):
             THPTemporalProcess,
         )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
+        from unified_stpp.models.state_models.factorized import FactorizedStateModel
         from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.unified_model import UnifiedSTPP
 
@@ -253,7 +253,7 @@ class FactorizedCNFConfig(BaseModelConfig):
             SelfCorrectingProcess,
         )
         from unified_stpp.models.spatial_models.independent_cnf import IndependentCNF
-        from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
+        from unified_stpp.models.state_models.factorized import FactorizedStateModel
         from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.unified_model import UnifiedSTPP
 
@@ -392,7 +392,7 @@ class THPGMMConfig(FactorizedConfig):
 
     Temporal: causal Transformer encoder + learned β decay (Zuo et al., ICML 2020).
     Spatial:  same GaussianMixtureSpatialModel as hawkes_gmm.
-    MC compensator uses fixed 30-sample Monte Carlo (upstream adaptive loop replaced).
+    MC compensator uses fixed 30-sample Monte Carlo.
 
     Note: this is a factorized STPP construction — THP was validated on pure temporal
     benchmarks. Label as "THP-GMM (extended)". Hyperparameters need a sweep.

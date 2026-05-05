@@ -1,7 +1,7 @@
 from .neural import NeuralSTPPEventModel
 from .deep_stpp import DeepSTPPEventModel
 from .auto_stpp import AutoSTPPEventModel
-from .auto_stpp_legacy_event import AutoSTPPLegacyEventModel
+from .auto_stpp_compat import AutoSTPPCompatEventModel
 from .smash import SMASHEventModel
 from .diffusion import DiffusionEventModel
 from .factorized import FactorizedEventModel
@@ -11,7 +11,7 @@ __all__ = [
     "NeuralSTPPEventModel",
     "DeepSTPPEventModel",
     "AutoSTPPEventModel",
-    "AutoSTPPLegacyEventModel",
+    "AutoSTPPCompatEventModel",
     "SMASHEventModel",
     "DiffusionEventModel",
     "FactorizedEventModel",

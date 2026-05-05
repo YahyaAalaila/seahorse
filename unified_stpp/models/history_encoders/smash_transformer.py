@@ -1,7 +1,7 @@
-"""Upstream-faithful SMASH Transformer_ST encoder.
+"""SMASH Transformer_ST encoder.
 
-This module ports the active upstream SMASH conditioning encoder into the
-unified_stpp model layer while keeping the public contract local to SMASH.
+This module implements the SMASH conditioning encoder inside the unified_stpp
+model layer while keeping the public contract local to SMASH.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ PAD_VALUE = 0.0
 
 
 def get_non_pad_mask(seq: Tensor) -> Tensor:
-    """Return the non-padding mask used by the upstream SMASH encoder."""
+    """Return the non-padding mask used by the SMASH encoder."""
     if seq.dim() != 2:
         raise ValueError(f"Expected seq shape (B, N), got {tuple(seq.shape)}")
     return seq.ne(PAD_VALUE).to(dtype=torch.float32).unsqueeze(-1)
@@ -31,7 +31,7 @@ def non_pad_mask_from_lengths(lengths: Tensor, max_len: int) -> Tensor:
 
 
 def get_attn_key_pad_mask(seq_k: Tensor, seq_q: Tensor) -> Tensor:
-    """Upstream padding-mask helper for self-attention."""
+    """Padding-mask helper for self-attention."""
     len_q = seq_q.size(1)
     padding_mask = seq_k.eq(PAD_VALUE)
     padding_mask = padding_mask.unsqueeze(1).expand(-1, len_q, -1, -1)
@@ -45,7 +45,7 @@ def get_attn_key_pad_mask_from_lengths(lengths: Tensor, len_q: int, len_k: int) 
 
 
 def get_subsequent_mask(seq: Tensor, dim: int = 2) -> Tensor:
-    """Upstream causal self-attention mask."""
+    """Causal self-attention mask."""
     sz_b, len_s = seq.size()[:2]
     subsequent_mask = torch.triu(
         torch.ones((dim, len_s, len_s), device=seq.device, dtype=torch.uint8),
@@ -76,7 +76,7 @@ class ScaledDotProductAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    """Exact attention block shape used by the upstream SMASH encoder."""
+    """Attention block used by the SMASH encoder."""
 
     def __init__(
         self,
@@ -223,7 +223,7 @@ class EncoderLayer(nn.Module):
 
 
 class EncoderST(nn.Module):
-    """Port of the active upstream SMASH Encoder_ST."""
+    """SMASH Encoder_ST."""
 
     def __init__(
         self,
@@ -393,7 +393,7 @@ class EncoderST(nn.Module):
 
 
 class RNNLayers(nn.Module):
-    """Optional recurrent layer used by the active upstream encoder."""
+    """Optional recurrent layer used by the SMASH encoder."""
 
     def __init__(self, d_model: int, d_rnn: int):
         super().__init__()

@@ -1,4 +1,4 @@
-"""EventModel for legacy AutoSTPP — owns MonotoneIntegralDecoder."""
+"""EventModel for the compatibility AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from ..model_registry import register_event
 
 
 @register_event("auto_stpp_legacy")
-class AutoSTPPLegacyEventModel(EventModel):
-    """Legacy AutoSTPP event model.  Owns MonotoneIntegralDecoder."""
+class AutoSTPPCompatEventModel(EventModel):
+    """Compatibility AutoSTPP event model with a MonotoneIntegralDecoder."""
 
     def __init__(
         self,
@@ -67,9 +67,9 @@ class AutoSTPPLegacyEventModel(EventModel):
     def _get_state_term(state_ctx: StateContext, key: str) -> Tensor:
         val = state_ctx.payload.get(key)
         if val is None:
-            raise ValueError(f"AutoSTPPLegacyEventModel requires state['{key}'].")
+            raise ValueError(f"AutoSTPPCompatEventModel requires state['{key}'].")
         if not isinstance(val, Tensor):
-            raise TypeError(f"AutoSTPPLegacyEventModel expects tensor for state['{key}'].")
+            raise TypeError(f"AutoSTPPCompatEventModel expects tensor for state['{key}'].")
         return val
 
     @staticmethod
@@ -79,7 +79,7 @@ class AutoSTPPLegacyEventModel(EventModel):
         if tensor.shape[0] == 1:
             return tensor.expand(batch_size, *tensor.shape[1:])
         raise ValueError(
-            f"AutoSTPPLegacyEventModel state['{name}'] has batch={tensor.shape[0]} "
+            f"AutoSTPPCompatEventModel state['{name}'] has batch={tensor.shape[0]} "
             f"but query batch={batch_size}."
         )
 
@@ -235,7 +235,7 @@ class AutoSTPPLegacyEventModel(EventModel):
             query_locations = query_locations.squeeze(1)
         if query_locations.ndim != 2:
             raise ValueError(
-                "AutoSTPPLegacyEventModel.intensity expects query_locations with shape (B, d)."
+                "AutoSTPPCompatEventModel.intensity expects query_locations with shape (B, d)."
             )
         if device is None:
             device = query_times.device

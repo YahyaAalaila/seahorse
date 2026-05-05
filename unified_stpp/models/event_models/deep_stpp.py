@@ -1,4 +1,4 @@
-"""EventModel for upstream-faithful DeepSTPP fixed-window likelihoods."""
+"""EventModel for DeepSTPP fixed-window likelihoods."""
 
 from __future__ import annotations
 

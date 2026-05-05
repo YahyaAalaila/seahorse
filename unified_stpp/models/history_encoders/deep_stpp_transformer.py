@@ -1,4 +1,4 @@
-"""Upstream-faithful DeepSTPP Transformer encoder over fixed paper windows."""
+"""DeepSTPP Transformer encoder over fixed paper windows."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _subsequent_mask(size: int, *, device, dtype) -> Tensor:
 
 
 class DeepSTPPPositionalEncoding(nn.Module):
-    """Sinusoidal time encoding matching the upstream DeepSTPP path."""
+    """Sinusoidal time encoding used by DeepSTPP."""
 
     def __init__(self, d_model: int, dropout: float, max_len: int):
         super().__init__()

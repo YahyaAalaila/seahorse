@@ -1,4 +1,4 @@
-"""Upstream-style low-rank DeepBasis kernel for the NSMPP DeepBasis port."""
+"""Low-rank DeepBasis kernel for the NSMPP DeepBasis preset."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from torch import Tensor, nn
 
 
 class DeepNetworkBasis(nn.Module):
-    """Neural basis map used by the upstream DeepBasis kernel."""
+    """Neural basis map used by the DeepBasis kernel."""
 
     def __init__(
         self,
@@ -45,7 +45,7 @@ class DeepNetworkBasis(nn.Module):
 
 
 class DeepBasisKernel(nn.Module):
-    """Finite-rank neural basis kernel from the upstream implementation."""
+    """Finite-rank neural basis kernel."""
 
     def __init__(
         self,

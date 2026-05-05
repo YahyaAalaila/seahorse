@@ -106,7 +106,7 @@ class _OdeDriftFn(nn.Module):
         Accept multiple config shapes for ``--tpp_hdims`` style values.
 
         Supported forms:
-          - None        -> [hidden_dim * 2] (legacy default)
+          - None        -> [hidden_dim * 2] (compatibility default)
           - int         -> [int]
           - list/tuple  -> list(int(...))
           - str         -> "32-32", "32,32", or "[32, 32]"

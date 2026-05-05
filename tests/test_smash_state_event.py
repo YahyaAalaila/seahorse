@@ -210,7 +210,7 @@ class TestSMASHStateEvent(unittest.TestCase):
         self.assertEqual(caps.training_objective, "score_matching")
         self.assertTrue(caps.has_eval_nll)           # P1-B: derived from nll_kind != "none"
         self.assertEqual(caps.nll_kind, "approx")
-        self.assertIn("non-upstream", caps.nll_description)
+        self.assertIn("framework-added approx NLL", caps.nll_description)
         self.assertTrue(caps.has_score)
         self.assertTrue(caps.has_native_sampler)
 

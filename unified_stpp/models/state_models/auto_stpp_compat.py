@@ -1,4 +1,4 @@
-"""StateModel for legacy AutoSTPP — owns TransformerEncoder and optional mark embedding."""
+"""StateModel for the compatibility AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from ..model_registry import register_state
 
 
 @register_state("auto_stpp_legacy")
-class AutoSTPPLegacyStateModel(StateModel):
-    """Legacy AutoSTPP state model.  Owns encoder and optional mark embedding."""
+class AutoSTPPCompatStateModel(StateModel):
+    """Compatibility AutoSTPP state model with a transformer encoder."""
 
     def __init__(
         self,

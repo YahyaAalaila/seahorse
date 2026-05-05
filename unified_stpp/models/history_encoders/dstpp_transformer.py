@@ -1,9 +1,8 @@
-"""Faithful DSTPP Transformer_ST port for diffusion_stpp.
+"""DSTPP Transformer_ST stack for diffusion_stpp.
 
-This module mirrors the upstream DSTPP transformer stack closely while fitting
-the unified_stpp batch contract. The only intentional adaptation is that
-padding masks can be built from explicit sequence lengths instead of relying
-solely on zero-valued absolute times.
+This module implements the DSTPP transformer stack for the unified_stpp batch
+contract. Padding masks can be built from explicit sequence lengths instead of
+relying solely on zero-valued absolute times.
 """
 
 from __future__ import annotations
@@ -349,7 +348,7 @@ class RNNLayers(nn.Module):
 
 
 class DSTPPTransformerST(nn.Module):
-    """Faithful upstream Transformer_ST for diffusion conditioning."""
+    """Transformer_ST for diffusion conditioning."""
 
     def __init__(
         self,
@@ -406,4 +405,3 @@ class DSTPPTransformerST(nn.Module):
         enc_output_loc = self.rnn_spatial(enc_output_loc, non_pad_mask)
         enc_output_all = torch.cat((enc_output_temporal, enc_output_loc, enc_output), dim=-1)
         return enc_output_all, non_pad_mask
-

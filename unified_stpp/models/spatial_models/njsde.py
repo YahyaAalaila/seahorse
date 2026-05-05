@@ -98,9 +98,8 @@ def _gmm_sample(params: Tensor, n_mixtures: int) -> Tensor:
 class ConditionalGMMSpatial(Decoder):
     """NJSDE conditional Gaussian mixture spatial decoder.
 
-    This mirrors the upstream facebookresearch/neural_stpp ``ConditionalGMM``
-    head, adapted to the unified shared-family contract where the decoder
-    directly receives the spatial aux slice from the temporal backbone.
+    The decoder receives the spatial auxiliary slice from the shared neural
+    temporal backbone and emits a per-event Gaussian mixture distribution.
     """
 
     SEQUENCE_COUPLED = True

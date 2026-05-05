@@ -22,7 +22,7 @@ from unified_stpp.models.base import Decoder
 from unified_stpp.models.configs.neural_stpp import NeuralSTPPConfig
 from unified_stpp.models.event_models.neural import NeuralSTPPEventModel
 from unified_stpp.models.model_registry import register_spatial
-from unified_stpp.models.state_models.neural_stpp_state import NeuralSTPPStateModel
+from unified_stpp.models.state_models.neural import NeuralSTPPStateModel
 from unified_stpp.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess, TimeVariableODE
 
 

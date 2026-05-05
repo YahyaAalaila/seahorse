@@ -35,8 +35,8 @@ class LossResult:
     ``spatial_nll``  — mean spatial NLL/event (scalar float); ``None`` when not
                        available or when the model uses a joint (non-factored) NLL.
     ``extra_metrics`` — additional scalar metrics that should survive into test-time
-                       logging and run artifacts (for example diffusion upstream-style
-                       per-dim diagnostics during verification).
+                       logging and run artifacts (for example diffusion per-dim
+                       diagnostics during verification).
     """
     loss:         Tensor
     nll:          Tensor
@@ -272,6 +272,6 @@ class UnifiedSTPP(nn.Module):
             if callable(projector):
                 projector()
                 continue
-            legacy_projector = getattr(module, "project", None)
-            if callable(legacy_projector):
-                legacy_projector()
+            compatibility_projector = getattr(module, "project", None)
+            if callable(compatibility_projector):
+                compatibility_projector()

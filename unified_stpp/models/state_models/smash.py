@@ -135,7 +135,7 @@ class SMASHStateModel(StateModel):
         return raw_times, raw_locations, valid_mask
 
     def _build_event_time(self, raw_times: Tensor, valid_mask: Tensor) -> Tensor:
-        """Build upstream-faithful SMASH event_time from raw absolute times."""
+        """Build SMASH event_time from raw absolute times."""
         dt = torch.zeros_like(raw_times)
         dt[:, :1] = raw_times[:, :1]
         max_len = raw_times.shape[1]

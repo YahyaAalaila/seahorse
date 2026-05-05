@@ -14,7 +14,7 @@ from .auto_stpp_kernel import AutoSTPPCuboid
 
 @register_event("auto_stpp")
 class AutoSTPPEventModel(EventModel):
-    """Exact upstream-style AutoSTPP over fixed paper windows."""
+    """Exact AutoSTPP over fixed paper windows."""
 
     def __init__(
         self,
@@ -68,7 +68,7 @@ class AutoSTPPEventModel(EventModel):
             metric_key="nll",
             objective_description="exact NLL",
             nll_kind="exact",
-            nll_description="exact joint NLL/event (upstream AutoSTPP Cuboid, normalized space)",
+            nll_description="exact joint NLL/event (AutoSTPP Cuboid, normalized space)",
             supports_raw_reporting=True,
             raw_nll_description="exact joint NLL/event (raw/original data space; AutoSTPP paper transform corrected)",
             has_intensity=True,

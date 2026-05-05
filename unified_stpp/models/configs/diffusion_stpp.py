@@ -65,7 +65,7 @@ class DiffusionSTPPConfig(BaseModelConfig):
     _EVENT_MODEL: ClassVar[str] = "diffusion_stpp"
     _SUPPORTED_PROTOCOLS: ClassVar[frozenset] = frozenset({"raw", "standard"})
 
-    # Encoder params — faithful upstream DSTPP Transformer_ST defaults
+    # Encoder params
     d_model: int = 64
     d_rnn: int = 256
     d_inner: int = 128
@@ -77,7 +77,7 @@ class DiffusionSTPPConfig(BaseModelConfig):
     CosSin: bool = True
     # Diffusion denoising network params
     hidden_units: int = 64
-    # GaussianDiffusionST params — faithful upstream DSTPP defaults
+    # GaussianDiffusionST params
     timesteps: int = 100
     sampling_timesteps: int = 100
     objective: str = "pred_noise"
@@ -124,7 +124,7 @@ class DiffusionSTPPConfig(BaseModelConfig):
         if enc_type not in {"dstpp_transformer", "smash_transformer"}:
             raise ValueError(
                 "diffusion_stpp expects encoder.type='dstpp_transformer' "
-                f"(legacy alias 'smash_transformer' also accepted), got {enc_type!r}."
+                f"(compatibility alias 'smash_transformer' also accepted), got {enc_type!r}."
             )
 
         dec_cfg = copy.deepcopy(d.get("decoder", {}))
@@ -242,7 +242,7 @@ class DiffusionSTPPConfig(BaseModelConfig):
         Diffusion tokens use a stable [0,1] coordinate system built from raw
         delta-times and locations across the available splits. The state model
         reconstructs raw coordinates from the repository-standard tensors and
-        feeds the encoder its upstream-faithful input space internally.
+        feeds the encoder its expected input space internally.
         """
         bundle = getattr(dm, "_bundle", None)
         if bundle is None:

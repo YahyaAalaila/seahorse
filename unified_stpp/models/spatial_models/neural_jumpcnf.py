@@ -264,7 +264,7 @@ class TimeVariableCNF(nn.Module):
 
         if HAS_TORCHDIFFEQ:
             odeint_fn = _odeint_adj if self.use_adjoint else _odeint_std
-            # Match torchdiffeq/upstream default: keep adaptive time bookkeeping in float64.
+            # Keep adaptive time bookkeeping in float64, matching torchdiffeq defaults.
             solver_options = {"dtype": torch.float64}
             solver_kwargs = {
                 "rtol": tol,

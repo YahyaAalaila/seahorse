@@ -1,10 +1,10 @@
-"""Faithful shared temporal backbone for the Neural STPP family.
+"""Shared temporal backbone for the Neural STPP family.
 
-This module ports the upstream facebookresearch/neural_stpp temporal model
-structure into the unified framework while keeping an explicit state-side
-contract for downstream spatial decoders.
+This module implements the neural temporal ODE structure used by the shared
+NJSDE, Neural JumpCNF, and Neural AttnCNF presets while keeping an explicit
+state-side contract for downstream spatial decoders.
 
-Key upstream semantics preserved here:
+Key semantics:
   - raw event times drive the temporal ODE
   - standardized spatial locations are the optional jump-update conditioning
   - hidden-state partition semantics:
@@ -38,7 +38,7 @@ def _normalize_hidden_dims(
     *,
     fallback: int,
 ) -> list[int]:
-    """Accept the upstream ``--tpp_hdims`` shapes."""
+    """Accept common ``tpp_hidden_dims`` shapes."""
     if hidden_dims is None:
         return [fallback, fallback]
     if isinstance(hidden_dims, int):
@@ -167,11 +167,9 @@ class ActNorm(nn.Module):
                 x_ = x.reshape(-1, x.shape[-1])
                 batch_mean = torch.mean(x_, dim=0)
                 if x_.shape[0] <= 1:
-                    # The upstream ActNorm path uses torch.var(...), which is
-                    # undefined for a singleton init batch under PyTorch's
-                    # default correction and yields NaNs. Preserve upstream
-                    # behavior for normal batches and guard only the singleton
-                    # initialization edge case.
+                    # torch.var(...) is undefined for a singleton init batch
+                    # under PyTorch's default correction and yields NaNs.
+                    # Guard only that singleton initialization edge case.
                     batch_var = torch.full_like(batch_mean, 0.2)
                 else:
                     batch_var = torch.var(x_, dim=0)
@@ -378,7 +376,7 @@ class TimeVariableODE(nn.Module):
 
         if HAS_TORCHDIFFEQ:
             odeint_fn = _odeint_adj if self.use_adjoint else _odeint_std
-            # Match torchdiffeq/upstream default: keep adaptive time bookkeeping in float64.
+            # Keep adaptive time bookkeeping in float64, matching torchdiffeq defaults.
             solver_options = {"dtype": torch.float64}
             solver_kwargs = {
                 "rtol": self.rtol,
@@ -436,7 +434,7 @@ class TimeVariableODE(nn.Module):
 
 
 class NeuralPointProcess(nn.Module):
-    """Shared neural temporal backbone from the upstream Neural STPP family."""
+    """Shared neural temporal backbone for the Neural STPP family."""
 
     dynamics_dict = {
         "split": SplitHiddenStateODEFunc,

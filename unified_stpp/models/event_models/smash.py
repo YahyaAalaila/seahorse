@@ -561,10 +561,10 @@ class SMASHEventModel(EventModel):
             objective_description="denoising score matching",
             nll_kind="approx",
             nll_description=(
-                "framework-added approx NLL (non-upstream): exact temporal "
+                "framework-added approx NLL: exact temporal "
                 "(intensity quadrature) + Tweedie spatial at fixed σ_s"
             ),
-            nll_footnote="‡ framework-added approx NLL (non-upstream)",
+            nll_footnote="‡ framework-added approx NLL",
             has_score=True,
             has_native_sampler=True,
         )
@@ -651,7 +651,7 @@ class SMASHEventModel(EventModel):
             (numerical quadrature of the compensator integral).
         Spatial NLL:  Tweedie approximation at the model's fixed sigma_s.
 
-        This metric is not part of the upstream SMASH training/evaluation code.
+        This metric is separate from the SMASH training objective.
         Neither component uses sampling, KDE, or any external density estimator.
         val/sm (validation/training) remains the score-matching objective;
         this method is invoked only at test time for benchmark reporting.
@@ -794,10 +794,10 @@ class SMASHEventModel(EventModel):
         n_samples: Optional[int] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        """Faithful upstream SMASH sampling over all flattened valid histories.
+        """SMASH sampling over all flattened valid histories.
 
-        This mirrors the upstream decoder sampling semantics more closely than
-        sample_native(), which is a framework convenience for next-event queries.
+        This follows the decoder sampling path over flattened histories;
+        sample_native() is a framework convenience for next-event queries.
         """
         cond = self._get_state_term(state, "smash_cond")
         if device is None:
@@ -846,7 +846,7 @@ class SMASHEventModel(EventModel):
                 self.score_matching.channels = prev_channels
 
         if samples is None:
-            raise RuntimeError("SMASH upstream sampling produced no samples.")
+            raise RuntimeError("SMASH flattened sampling produced no samples.")
 
         out: Dict[str, Tensor] = {"samples": samples}
         if score_mark is not None:

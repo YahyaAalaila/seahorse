@@ -1,4 +1,4 @@
-"""Construction config for the legacy coarse AutoSTPP family."""
+"""Construction config for the compatibility AutoSTPP preset."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def _bbox_from_dm(dm: "STPPDataModule") -> dict:
 
 @ConfigRegistry.register("auto_stpp_legacy", status="legacy")
 @dataclasses.dataclass
-class AutoSTPPLegacyConfig(BaseModelConfig):
+class AutoSTPPCompatConfig(BaseModelConfig):
     _STATE_MODEL: ClassVar[str] = "auto_stpp_legacy"
     _EVENT_MODEL: ClassVar[str] = "auto_stpp_legacy"
     _SUPPORTED_PROTOCOLS: ClassVar[frozenset] = frozenset({"raw", "standard", "sliding_window"})
@@ -82,19 +82,19 @@ class AutoSTPPLegacyConfig(BaseModelConfig):
         event_cov_dim: int = 0,
         field_cov_dim: int = 0,
         n_marks: int = 0,
-    ) -> "AutoSTPPLegacyConfig":
+    ) -> "AutoSTPPCompatConfig":
         enc_cfg = copy.deepcopy(d.get("encoder", {}))
         enc_type = enc_cfg.pop("type", "transformer")
         if enc_type != "transformer":
             raise ValueError(
-                f"Legacy AutoSTPP build expects encoder.type='transformer', got '{enc_type}'."
+                f"Compatibility AutoSTPP build expects encoder.type='transformer', got '{enc_type}'."
             )
 
         dec_cfg = copy.deepcopy(d.get("decoder", {}))
         dec_type = dec_cfg.pop("type", "autoint")
         if dec_type != "autoint":
             raise ValueError(
-                f"Legacy AutoSTPP build expects decoder.type='autoint', got '{dec_type}'."
+                f"Compatibility AutoSTPP build expects decoder.type='autoint', got '{dec_type}'."
             )
 
         return cls(

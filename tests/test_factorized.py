@@ -94,7 +94,7 @@ class TestFactorizedStateModelSmoke(unittest.TestCase):
     """Test 4: FactorizedStateModel — encode_history payload has correct keys."""
 
     def test_encode_history(self):
-        from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
+        from unified_stpp.models.state_models.factorized import FactorizedStateModel
 
         model = FactorizedStateModel()
         ctx = model.encode_history(times=_TIMES, locations=_LOCATIONS, lengths=_LENGTHS)
@@ -114,7 +114,7 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
             HomogeneousPoissonProcess,
         )
         from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.state_models.factorized_state import FactorizedStateModel
+        from unified_stpp.models.state_models.factorized import FactorizedStateModel
         from unified_stpp.models.event_models.factorized import FactorizedEventModel
         from unified_stpp.models.abstractions import StateContext
 

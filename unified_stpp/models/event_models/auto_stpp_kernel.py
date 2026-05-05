@@ -1,6 +1,6 @@
 """AutoSTPP Cuboid / ProdNet kernel helpers.
 
-This is a compact reimplementation of the active upstream AutoSTPP kernel path:
+This is a compact implementation of the AutoSTPP kernel path:
 
 - each ProdNet factorizes over x / y / t using three independent 1D MLPs
 - L uses a terminal sign flip (`neg=True`), M does not
@@ -8,8 +8,8 @@ This is a compact reimplementation of the active upstream AutoSTPP kernel path:
 - temporal intensity and compensator are exact via separability and
   inclusion-exclusion on the unit square
 
-The implementation keeps the upstream non-negativity constraint by clamping all
-linear weights after every optimizer step.
+The implementation keeps the monotonicity constraint by clamping all linear
+weights after every optimizer step.
 """
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ class _AxisMLP(nn.Module):
 
 
 class AutoSTPPProdNet(nn.Module):
-    """Separable ProdNet used by upstream AutoSTPP."""
+    """Separable ProdNet used by AutoSTPP."""
 
     def __init__(
         self,
@@ -243,7 +243,7 @@ class _SumProdNet(nn.Module):
 
 
 class AutoSTPPCuboid(nn.Module):
-    """Exact Cuboid kernel used by upstream AutoSTPP."""
+    """Exact Cuboid kernel used by AutoSTPP."""
 
     def __init__(
         self,

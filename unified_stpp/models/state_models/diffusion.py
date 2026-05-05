@@ -1,4 +1,4 @@
-"""StateModel for upstream-faithful Diffusion STPP conditioning (unmarked only).
+"""StateModel for Diffusion STPP conditioning (unmarked only).
 
 Follows the same Batch2toModel flattening semantics as SMASHStateModel but:
 - supports only the unmarked case (loc_dim = 2)
