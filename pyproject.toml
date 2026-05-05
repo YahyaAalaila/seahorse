@@ -50,6 +50,7 @@ include = ["unified_stpp", "unified_stpp.*"]
 minversion = "8.0"
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
