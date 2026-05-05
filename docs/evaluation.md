@@ -1,6 +1,11 @@
 # Evaluation
 
-Use `evaluate` after `fit` or `bench` has produced a saved run directory.
+Use `evaluate` after `fit` or `bench` has produced a saved run directory. This
+is the current supported path for benchmark-aligned metrics and diagnostic
+artifacts.
+
+The planned Python API will eventually expose a normal programmatic evaluation
+workflow for one fitted model. That wrapper is not stable on this branch yet.
 
 ## Metric Reports
 

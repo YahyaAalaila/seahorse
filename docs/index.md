@@ -1,10 +1,27 @@
 # Seahorse
 
 Seahorse, packaged as `unified-stpp`, is a framework for spatio-temporal point
-process experiments. It gives you one CLI for training, tuning, benchmarking,
-and evaluating STPP models.
+process experiments. It is intended to support two user-facing interfaces:
 
-Start with a local smoke run:
+- A Python-first API for normal users training and evaluating one model
+  programmatically.
+- A CLI/config interface for reproducible runs, HPO, benchmark campaigns, and
+  paper-style artifacts.
+
+## Python-First Path
+
+The planned Python workflow is:
+
+```text
+load data -> instantiate a model -> fit -> predict/evaluate
+```
+
+That wrapper is not exposed as a stable public API in this branch yet. See
+[Python API](python-api.md) for the current status.
+
+## CLI Quickstart
+
+Use the CLI when you need reproducible run artifacts:
 
 ```bash
 python -m unified_stpp fit \
@@ -37,7 +54,8 @@ Replace `<run_id>` with the run directory created by `fit`.
 
 ## Where To Go Next
 
-- [Getting Started](getting-started.md) for installation and first commands.
+- [Python API](python-api.md) for the normal-user API status.
+- [Getting Started](getting-started.md) for installation and supported commands.
 - [Data Format](data-format.md) for JSONL records and dataset layouts.
 - [CLI Reference](cli.md) for the supported module CLI.
 - [Benchmarks](benchmarks.md) for benchmark grids and outputs.

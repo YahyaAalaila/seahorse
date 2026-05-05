@@ -1,5 +1,8 @@
 # Data Format
 
+The same JSONL split format is the public data contract for the current CLI and
+for the planned Python-first API.
+
 ## Minimal JSONL Record
 
 Each line in a split file is one event sequence. The minimal public record has

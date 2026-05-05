@@ -1,5 +1,8 @@
 # Benchmarks
 
+Benchmarks are a CLI/config workflow. Use this path when you need reproducible
+campaigns, HPO, benchmark reports, and paper-style artifacts.
+
 Run a benchmark grid with one or more presets, one or more datasets, and one or
 more seeds:
 

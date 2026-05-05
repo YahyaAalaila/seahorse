@@ -22,6 +22,21 @@ Install HPO support when you use `tune` or benchmark HPO:
 python -m pip install -e ".[hpo]"
 ```
 
+## Choose An Interface
+
+Use the Python API when you want to train and evaluate one model
+programmatically. That wrapper is under active integration and is not stable on
+this branch yet:
+
+```text
+load data -> instantiate a model -> fit -> predict/evaluate
+```
+
+See [Python API](python-api.md) for the current status.
+
+Use the CLI when you want reproducible runs, HPO, benchmark campaigns, and
+paper-style artifacts.
+
 ## Verify The CLI
 
 ```bash
@@ -34,7 +49,7 @@ python -m unified_stpp evaluate --help
 
 The top-level CLI exposes four modes: `fit`, `tune`, `bench`, and `evaluate`.
 
-## Train A Local Run
+## CLI: Train A Local Run
 
 Start with explicit JSONL split files:
 
@@ -64,7 +79,7 @@ python -m unified_stpp evaluate metrics \
   --metric-profile core
 ```
 
-## Use A Hugging Face Dataset
+## CLI: Use A Hugging Face Dataset
 
 Pass a dataset repository, optionally with a subdirectory:
 
@@ -79,7 +94,7 @@ python -m unified_stpp fit \
 The resolved dataset path must contain `train.jsonl` and `val.jsonl`. `test.jsonl`
 is used when available for `fit`.
 
-## Use Explicit Local Paths
+## CLI: Use Explicit Local Paths
 
 ```bash
 python -m unified_stpp fit \

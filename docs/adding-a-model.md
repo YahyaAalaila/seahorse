@@ -4,6 +4,10 @@ Seahorse models are connected through registries and preset configs. Follow the
 nearest existing model family first; it is the best source of truth for required
 interfaces and artifact behavior.
 
+New model families should continue to integrate with the registry/config path
+because the CLI uses it for reproducibility. The planned Python-first wrapper
+should sit on top of the same model and data contracts once it is integrated.
+
 ## Extension Checklist
 
 1. Add or reuse model components under `unified_stpp/models/`.
