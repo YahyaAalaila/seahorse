@@ -70,16 +70,16 @@ class DataConfigResolutionTest(unittest.TestCase):
 
     def test_resolve_data_explicit_paths_preserves_backward_compatibility(self):
         cfg = DataConfig(
-            train_path="data/train.jsonl",
-            val_path="data/val.jsonl",
-            test_path="data/test.jsonl",
+            train_path="splits/train.jsonl",
+            val_path="splits/val.jsonl",
+            test_path="splits/test.jsonl",
         )
 
         resolved = cfg.resolve_data(mode="single", include_test=True)
 
-        self.assertEqual(resolved.train_path, Path("data/train.jsonl"))
-        self.assertEqual(resolved.val_path, Path("data/val.jsonl"))
-        self.assertEqual(resolved.test_path, Path("data/test.jsonl"))
+        self.assertEqual(resolved.train_path, Path("splits/train.jsonl"))
+        self.assertEqual(resolved.val_path, Path("splits/val.jsonl"))
+        self.assertEqual(resolved.test_path, Path("splits/test.jsonl"))
         self.assertEqual(resolved.dataset_id, "train")
 
     def test_resolve_data_benchmark_uses_splits_dir(self):

@@ -12,8 +12,8 @@ from unified_stpp.registry import build_model
 def _tiny_batch():
     times = torch.tensor(
         [
-            [0.00, 0.20, 0.50, 0.90, 1.30],
-            [0.00, 0.30, 0.60, 1.00, 1.20],
+            [0.10, 0.30, 0.60, 1.00, 1.40],
+            [0.10, 0.40, 0.70, 1.10, 1.30],
         ],
         dtype=torch.float32,
     )

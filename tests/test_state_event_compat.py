@@ -63,7 +63,7 @@ class TestStateEventCompat(unittest.TestCase):
         times, locations, lengths = _tiny_batch()
         for preset in _FORWARD_SMOKE_PRESETS:
             with self.subTest(preset=preset):
-                self.assertIn(ConfigRegistry.canonical_status(preset), {"canonical", "legacy"})
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "canonical")
                 torch.manual_seed(7)
                 model = build_model(
                     config={},

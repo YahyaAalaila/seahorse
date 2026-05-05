@@ -28,6 +28,20 @@ def _write_jsonl(path: Path) -> None:
         f.write(json.dumps(payload) + "\n")
 
 
+def _write_run_result(run_dir: Path, *, preset: str, dataset_id: str, seed: int) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    with open(run_dir / "run_result.json", "w") as f:
+        json.dump(
+            {
+                "preset": preset,
+                "dataset_id": dataset_id,
+                "seed": seed,
+                "run_dir": str(run_dir),
+            },
+            f,
+        )
+
+
 class ResolveBenchEvalTargetsTest(unittest.TestCase):
     def test_single_dataset_bench_root_resolves_paths(self):
         module = _load_module()
@@ -40,7 +54,7 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
             bench_root = root / "bench" / "covid-stpp__gen__04231151"
             bench_root.mkdir(parents=True, exist_ok=True)
             run_dir = bench_root / "fit" / "smash" / "covid-stpp" / "seed_42" / "run_0"
-            run_dir.mkdir(parents=True, exist_ok=True)
+            _write_run_result(run_dir, preset="smash", dataset_id="covid-stpp", seed=42)
             with open(bench_root / "bench_meta.json", "w") as f:
                 json.dump({"bench_id": "covid-stpp__gen__04231151", "splits_dir": str(splits_dir)}, f)
             with open(bench_root / "cell_index.json", "w") as f:
@@ -77,7 +91,7 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
             bench_root = root / "bench" / "suite4__rest__04231151"
             bench_root.mkdir(parents=True, exist_ok=True)
             run_dir = bench_root / "fit" / "auto_stpp" / "H0" / "seed_3" / "run_0"
-            run_dir.mkdir(parents=True, exist_ok=True)
+            _write_run_result(run_dir, preset="auto_stpp", dataset_id="H0", seed=3)
             with open(bench_root / "bench_meta.json", "w") as f:
                 json.dump({"bench_id": "suite4__rest__04231151", "splits_dir": str(splits_dir)}, f)
             with open(bench_root / "cell_index.json", "w") as f:
@@ -111,7 +125,7 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
             bench_root = root / "bench" / "covid-stpp__rest__04231151"
             bench_root.mkdir(parents=True, exist_ok=True)
             run_dir = bench_root / "fit" / "auto_stpp" / "covid-stpp" / "seed_42" / "run_0"
-            run_dir.mkdir(parents=True, exist_ok=True)
+            _write_run_result(run_dir, preset="auto_stpp", dataset_id="covid-stpp", seed=42)
             with open(bench_root / "bench_meta.json", "w") as f:
                 json.dump({"bench_id": "covid-stpp__rest__04231151", "splits_dir": str(splits_dir)}, f)
             with open(bench_root / "data_manifest.json", "w") as f:
@@ -159,6 +173,8 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
                 "split": "test",
                 "dataset_ref": "yahya021/covid-stpp",
                 "dataset_revision": "v1",
+                "ground_truth_intensity_path": None,
+                "ground_truth_params_path": None,
             }
         ]
 
@@ -174,12 +190,14 @@ class ResolveBenchEvalTargetsTest(unittest.TestCase):
 
             emitted = out_path.read_text(encoding="utf-8").strip("\n")
             fields = emitted.split("\x1f")
-            self.assertEqual(len(fields), 10)
+            self.assertEqual(len(fields), 12)
             self.assertEqual(fields[5], "")
             self.assertEqual(fields[6], "")
             self.assertEqual(fields[7], "test")
             self.assertEqual(fields[8], "yahya021/covid-stpp")
             self.assertEqual(fields[9], "v1")
+            self.assertEqual(fields[10], "")
+            self.assertEqual(fields[11], "")
 
 
 if __name__ == "__main__":

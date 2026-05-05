@@ -1,12 +1,11 @@
 """Shared-foundation invariants for the Neural STPP family.
 
-These tests lock the shared contract before any faithful spatial variant ports
-land. They verify:
+These tests lock the shared contract for the spatial variants. They verify:
   - local raw-time reconstruction while standardized space stays untouched
   - hidden-state partition semantics (intensity slice vs. spatial aux slice)
   - what the temporal backbone consumes
   - what spatial decoders will receive from the event-side contract
-  - upstream-style integrate_lambda output shapes and masking behavior
+  - reference integrate_lambda output shapes and masking behavior
 """
 
 from __future__ import annotations
@@ -320,7 +319,7 @@ class TestNeuralSTPPSharedFoundation(unittest.TestCase):
             atol=1e-6,
         )
 
-    def test_integrate_lambda_shapes_and_masking_follow_upstream_contract(self):
+    def test_integrate_lambda_shapes_and_masking_follow_reference_contract(self):
         torch.manual_seed(0)
         model = NeuralPointProcess(
             cond_dim=2,

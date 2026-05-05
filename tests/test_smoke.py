@@ -20,7 +20,7 @@ class SmokeTest(unittest.TestCase):
             "smash",
         ):
             with self.subTest(preset=preset):
-                self.assertNotEqual(ConfigRegistry.canonical_status(preset), "provisional")
+                self.assertEqual(ConfigRegistry.canonical_status(preset), "canonical")
                 torch.manual_seed(0)
                 model = build_model(
                     config={},

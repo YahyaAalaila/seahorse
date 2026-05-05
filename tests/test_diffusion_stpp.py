@@ -334,7 +334,7 @@ class TestDiffusionSTPPApproxNLL(unittest.TestCase):
         self.assertTrue(torch.isfinite(nll_out["extra_metrics"]["temporal_nll_upstream_per_dim"]))
         self.assertTrue(torch.isfinite(nll_out["extra_metrics"]["spatial_nll_upstream_per_dim"]))
 
-    def test_eval_nll_reports_benchmark_and_upstream_units(self):
+    def test_eval_nll_reports_benchmark_and_per_dim_units(self):
         torch.manual_seed(9)
         model = _build(timesteps=4, sampling_timesteps=2)
         times, locations, lengths = _tiny_batch()
@@ -348,13 +348,13 @@ class TestDiffusionSTPPApproxNLL(unittest.TestCase):
         total = float(nll_out["nll"].item())
         temporal = float(nll_out["temporal_nll"].item())
         spatial = float(nll_out["spatial_nll"].item())
-        upstream = float(extra["test_nll_upstream_per_dim"].item())
-        temporal_up = float(extra["temporal_nll_upstream_per_dim"].item())
-        spatial_up = float(extra["spatial_nll_upstream_per_dim"].item())
+        total_per_dim = float(extra["test_nll_upstream_per_dim"].item())
+        temporal_per_dim = float(extra["temporal_nll_upstream_per_dim"].item())
+        spatial_per_dim = float(extra["spatial_nll_upstream_per_dim"].item())
 
-        self.assertAlmostEqual(total, upstream * 3.0, places=5)
-        self.assertAlmostEqual(temporal, temporal_up, places=5)
-        self.assertAlmostEqual(spatial, spatial_up * 2.0, places=5)
+        self.assertAlmostEqual(total, total_per_dim * 3.0, places=5)
+        self.assertAlmostEqual(temporal, temporal_per_dim, places=5)
+        self.assertAlmostEqual(spatial, spatial_per_dim * 2.0, places=5)
         self.assertAlmostEqual(total, temporal + spatial, places=5)
 
     def test_eval_nll_empty_sequences(self):

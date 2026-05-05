@@ -162,8 +162,8 @@ class TestSchedulerSelection(unittest.TestCase):
         with self.assertRaises(ValueError, msg="Unknown lr_schedule should raise"):
             lm.configure_optimizers()
 
-    def test_legacy_lr_step_size_without_schedule_name_still_works(self):
-        # Backward compat: lr_step_size set with default lr_schedule="constant"
+    def test_compat_lr_step_size_without_schedule_name_still_works(self):
+        # Compatibility: lr_step_size set with default lr_schedule="constant"
         # should still produce StepLR, not a constant schedule.
         sched = _scheduler_from(_make_lm("constant", lr_step_size=5))
         self.assertIsInstance(sched, torch.optim.lr_scheduler.StepLR)
@@ -207,7 +207,7 @@ class TestTrainingConfigWarnings(unittest.TestCase):
 
 
 class TestYamlConfigCompatibility(unittest.TestCase):
-    def test_from_yaml_accepts_legacy_python_tuple_tag(self):
+    def test_from_yaml_accepts_python_tuple_tag_for_compatibility(self):
         raw = """
 data:
   protocol: raw
@@ -219,7 +219,7 @@ training:
 extra_tuple: !!python/tuple [1, 2, 3]
 """
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "legacy.yaml"
+            path = Path(td) / "compat.yaml"
             path.write_text(raw)
             cfg = STPPConfig.from_yaml(path, sanitize=False)
         self.assertEqual(cfg.model.preset, "auto_stpp")

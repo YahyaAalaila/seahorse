@@ -1,4 +1,4 @@
-"""Regression tests for the raw-first data/transform path."""
+"""Regression tests for the raw-first loading and transform path."""
 
 from __future__ import annotations
 

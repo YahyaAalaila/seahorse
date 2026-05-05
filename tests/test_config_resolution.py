@@ -254,7 +254,7 @@ class ConfigResolutionTest(unittest.TestCase):
             self.assertEqual(overrides["sigma_kernel"], 0.5)
             self.assertEqual(overrides["tau"], 1.0)
 
-    def test_hpo_does_not_pass_seed_to_legacy_tune_run(self):
+    def test_hpo_does_not_pass_seed_to_direct_tune_run(self):
         captured_kwargs = {}
 
         fake_tune = types.ModuleType("ray.tune")

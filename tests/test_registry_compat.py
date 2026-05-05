@@ -30,17 +30,17 @@ class TestRegistryCompat(unittest.TestCase):
         self.assertEqual(neural.status, "canonical")
         self.assertFalse(neural.is_alias)
 
-        legacy_neural = ConfigRegistry.describe("neural_cond_gmm")
-        self.assertEqual(legacy_neural.canonical_name, "njsde")
-        self.assertEqual(legacy_neural.status, "deprecated")
-        self.assertEqual(legacy_neural.canonical_status, "canonical")
-        self.assertTrue(legacy_neural.is_alias)
+        deprecated_neural = ConfigRegistry.describe("neural_cond_gmm")
+        self.assertEqual(deprecated_neural.canonical_name, "njsde")
+        self.assertEqual(deprecated_neural.status, "deprecated")
+        self.assertEqual(deprecated_neural.canonical_status, "canonical")
+        self.assertTrue(deprecated_neural.is_alias)
 
     def test_config_loading_supports_nsmpp_without_direct_module_import(self):
         cfg = STPPConfig.from_source(preset="nsmpp", config=None)
         self.assertEqual(cfg.model.preset, "nsmpp")
 
-    def test_legacy_neural_cond_gmm_alias_loads_njsde(self):
+    def test_deprecated_neural_cond_gmm_alias_loads_njsde(self):
         cfg = STPPConfig.from_source(preset="neural_cond_gmm", config=None)
         self.assertEqual(cfg.model.preset, "njsde")
 

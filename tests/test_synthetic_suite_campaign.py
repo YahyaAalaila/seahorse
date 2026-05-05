@@ -132,8 +132,20 @@ class SyntheticSuiteCampaignTest(unittest.TestCase):
                 out_path.with_suffix(".trials.csv").write_text("trial_id,val_objective\n")
                 out_path.with_suffix(".hpo_manifest.json").write_text("{}\n")
 
-            def fake_fit(*, suite_name, config, preset, seed, best_yaml, out_root, curve_step, device, run_batch_size):
-                del best_yaml, curve_step, device, run_batch_size
+            def fake_fit(
+                *,
+                suite_name,
+                config,
+                preset,
+                seed,
+                best_yaml,
+                out_root,
+                curve_step,
+                device,
+                run_batch_size,
+                resume_checkpoint=None,
+            ):
+                del best_yaml, curve_step, device, run_batch_size, resume_checkpoint
                 run_dir = out_root / "fit" / suite_name / config.config_id / preset / f"seed_{seed}" / "run_0"
                 run_dir.mkdir(parents=True, exist_ok=True)
                 (run_dir / "run_result.json").write_text(
