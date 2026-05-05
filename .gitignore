@@ -22,16 +22,16 @@ dist/
 .ruff_cache/
 
 # Project outputs
-docs/
-data/
-local_data/
-datasets/
-examples/tiny_jsonl/
-runs/
-runs2/
-runs3/
-artifacts/
-bench_out/
+/docs/
+/data/
+/local_data/
+/datasets/
+/examples/tiny_jsonl/
+/runs/
+/runs2/
+/runs3/
+/artifacts/
+/bench_out/
 bench_*/
 checkpoints/
 logs/
@@ -60,8 +60,8 @@ htmlcov/
 *.ckpt
 
 # Local junk
-archive/
-configs
+/archive/
+/configs
 unnified_stpp/
 train.py
 temp_*.py
