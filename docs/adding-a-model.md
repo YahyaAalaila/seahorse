@@ -5,8 +5,17 @@ nearest existing model family first; it is the best source of truth for required
 interfaces and artifact behavior.
 
 New model families should continue to integrate with the registry/config path
-because the CLI uses it for reproducibility. The planned Python-first wrapper
-should sit on top of the same model and data contracts once it is integrated.
+because the CLI uses it for reproducibility. The Python-first wrapper sits on
+top of the same model and data contracts.
+
+Use the Python API for quick local testing of an already registered model. Use
+the config/registry path when the model should enter benchmark comparisons.
+
+```python
+from unified_stpp import STPPEstimator
+
+model = STPPEstimator("my_preset", device="cpu")
+```
 
 ## Extension Checklist
 

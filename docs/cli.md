@@ -4,8 +4,7 @@ The CLI/config interface is the stable path for reproducible runs, HPO,
 benchmark campaigns, and paper-style artifacts.
 
 Use the Python API when you want a normal programmatic workflow for one model.
-That wrapper is still under active integration on this branch; see
-[Python API](python-api.md).
+See [Python API](python-api.md).
 
 The public CLI is the module entrypoint:
 

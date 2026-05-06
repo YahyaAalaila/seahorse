@@ -22,22 +22,44 @@ Install HPO support when you use `tune` or benchmark HPO:
 python -m pip install -e ".[hpo]"
 ```
 
-## Choose An Interface
+## Run One Model With The Python API
 
 Use the Python API when you want to train and evaluate one model
-programmatically. That wrapper is under active integration and is not stable on
-this branch yet:
+programmatically.
 
-```text
-load data -> instantiate a model -> fit -> predict/evaluate
+```python
+from unified_stpp import AutoSTPP, PoissonGMM
+
+model = AutoSTPP(device="cpu")
+baseline = PoissonGMM()
 ```
 
-See [Python API](python-api.md) for the current status.
+Load JSONL splits and fit the model:
+
+```python
+from unified_stpp import load_jsonl
+
+train = load_jsonl("path/to/train.jsonl")
+val = load_jsonl("path/to/val.jsonl")
+test = load_jsonl("path/to/test.jsonl")
+
+model.fit(train, val, test, epochs=10, batch_size=64)
+scores = model.evaluate(test)
+samples = model.predict_next(test, n_samples=32)
+```
+
+`evaluate()` currently reports implemented likelihood metrics. The implemented
+predictive method is `predict_next()`; there is no generic `predict()` method in
+this API.
+
+See [Python API](python-api.md) for method details.
+
+## Use The CLI For Reproducible Runs
 
 Use the CLI when you want reproducible runs, HPO, benchmark campaigns, and
 paper-style artifacts.
 
-## Verify The CLI
+Verify the CLI:
 
 ```bash
 python -m unified_stpp --help

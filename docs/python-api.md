@@ -1,55 +1,148 @@
 # Python API
 
-## Status
+The Python-first API is for running one model programmatically. It wraps the
+same presets and runner used by the CLI while presenting model classes with a
+small sklearn-style surface.
 
-The Python-first wrapper API is under active integration. It is not exposed as a
-stable public API in this branch yet.
+## Imports
 
-The intended normal-user workflow is:
-
-```text
-load data -> instantiate a model -> fit -> predict/evaluate
+```python
+from unified_stpp import AutoSTPP, PoissonGMM, STPPEstimator, load_jsonl
 ```
 
-No stable class name, import path, or method contract for that wrapper is
-documented here because it does not exist in the current branch.
+Use concrete classes when they exist:
 
-## What To Use Today
+```python
+model = AutoSTPP(device="cpu")
+baseline = PoissonGMM()
+```
 
-Use the CLI for supported training, evaluation, HPO, and benchmark workflows:
+Use `STPPEstimator` when you want to choose by model name or registered preset:
+
+```python
+model = STPPEstimator("AutoSTPP", device="cpu")
+same_model = STPPEstimator("auto_stpp", device="cpu")
+```
+
+## Data
+
+Load canonical JSONL split files with `load_jsonl`:
+
+```python
+train = load_jsonl("path/to/train.jsonl")
+val = load_jsonl("path/to/val.jsonl")
+test = load_jsonl("path/to/test.jsonl")
+```
+
+Each split is a list of sequence dictionaries with `times` and `locations`.
+
+## Fit
+
+`fit` trains from in-memory train, validation, and optional test sequences. A
+validation split is required.
+
+```python
+model = AutoSTPP(device="cpu", seed=42)
+model.fit(
+    train,
+    val,
+    test,
+    epochs=10,
+    lr=1e-3,
+    batch_size=64,
+    dataset_id="my_dataset",
+)
+```
+
+`fit` returns the estimator itself. The fitted runner is available as
+`model.runner`, and the underlying model is available as `model.model`.
+
+## Evaluate
+
+`evaluate` currently supports implemented likelihood metrics:
+
+```python
+scores = model.evaluate(test)
+```
+
+The default `core` profile returns:
+
+- `test_nll`
+- `mean_seq_nll`
+
+You can request supported metrics explicitly:
+
+```python
+scores = model.evaluate(test, metrics=["test_nll"])
+```
+
+Unsupported estimator metrics raise `NotImplementedError`. Use
+`python -m unified_stpp evaluate metrics ...` for the full artifact-backed
+evaluation profiles.
+
+## Predict Next Events
+
+The implemented predictive method is `predict_next`, not `predict`:
+
+```python
+samples = model.predict_next(test, n_samples=32)
+```
+
+The returned dictionary includes arrays such as:
+
+- `next_times`
+- `next_locations`
+- `true_next_times`
+- `true_next_locations`
+- `sequence_index`
+- `target_event_index`
+- `sampling_succeeded`
+- `sampling_backend`
+
+`predict_next` raises `NotImplementedError` when the fitted model does not
+support the required native or exact-intensity sampling path.
+
+## Tune
+
+The Python API exposes a thin HPO wrapper:
+
+```python
+best_config = model.tune(train, val, n_trials=10, max_epochs=20)
+```
+
+This uses the existing Ray Tune path. Install HPO dependencies before using it:
 
 ```bash
-python -m unified_stpp fit --help
-python -m unified_stpp evaluate --help
+python -m pip install -e ".[hpo]"
 ```
 
-For one-model experiments, start with:
+## Save And Load
 
-```bash
-python -m unified_stpp fit \
-  --preset poisson_gmm \
-  --train path/to/train.jsonl \
-  --val path/to/val.jsonl \
-  --test path/to/test.jsonl \
-  --out runs/quickstart
+Save a fitted estimator through the underlying runner:
+
+```python
+model.save("path/to/saved-run")
 ```
 
-Then evaluate the saved run:
+Load through the base estimator or a matching concrete class:
 
-```bash
-python -m unified_stpp evaluate metrics \
-  --run runs/quickstart/fit/poisson_gmm/<run_id> \
-  --data path/to/test.jsonl \
-  --split test \
-  --metric-profile core
+```python
+loaded = AutoSTPP.load("path/to/saved-run")
 ```
 
-## Current Lower-Level Exports
+## Plotting
 
-The package currently exports lower-level building blocks such as `STPPConfig`,
-`STPPRunner`, `RunResult`, `Benchmark`, and `BenchmarkTable`. These are useful
-for internal orchestration and advanced experiments, but they are not the
-planned sklearn-style normal-user wrapper.
+Fitted estimators expose plotting helpers:
 
-The public Python API page will be updated once the lightweight wrapper is
-integrated on this branch.
+```python
+surface = model.plot_intensity(test[0], output_path="runs/plots/intensity")
+kde = model.plot_kde_surface(test[0], n_samples=128, output_path="runs/plots/kde")
+```
+
+`plot_intensity` requires a fitted or loaded runner with a run directory.
+`plot_kde_surface` requires `plotly`.
+
+## CLI Boundary
+
+Do not use the Python API for benchmark campaign orchestration yet. Use the CLI
+for reproducible fit/tune/bench/evaluate workflows and paper-style artifacts.

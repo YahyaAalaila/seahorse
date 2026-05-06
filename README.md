@@ -3,25 +3,11 @@
 Seahorse, packaged as `unified-stpp` and imported as `unified_stpp`, is a
 research framework for spatio-temporal point process models.
 
-Seahorse is intended to support two user-facing interfaces:
+Use the Python API when you want to train and evaluate one model
+programmatically. Use the CLI when you want reproducible runs, HPO, benchmark
+campaigns, and paper-style artifacts.
 
-- Use the Python API when you want to train and evaluate one model
-  programmatically.
-- Use the CLI when you want reproducible runs, HPO, benchmark campaigns, and
-  paper-style artifacts.
-
-The Python-first wrapper API is under active integration and is not exposed as a
-stable public API on this branch yet. The stable interface available today is
-the module CLI:
-
-```bash
-python -m unified_stpp fit --help
-python -m unified_stpp tune --help
-python -m unified_stpp bench --help
-python -m unified_stpp evaluate --help
-```
-
-## Installation
+## Install
 
 ```bash
 python -m venv .venv
@@ -29,40 +15,30 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
-For development checks:
+## Python Quickstart
 
-```bash
-python -m pip install -e ".[dev]"
+```python
+from unified_stpp import AutoSTPP, PoissonGMM, load_jsonl
+
+train = load_jsonl("path/to/train.jsonl")
+val = load_jsonl("path/to/val.jsonl")
+test = load_jsonl("path/to/test.jsonl")
+
+model = AutoSTPP(device="cpu")
+baseline = PoissonGMM()
+
+model.fit(train, val, test, epochs=10, batch_size=64)
+scores = model.evaluate(test)
+samples = model.predict_next(test, n_samples=32)
 ```
 
-For HPO workflows that use Ray Tune:
-
-```bash
-python -m pip install -e ".[hpo]"
-```
-
-For the documentation site:
-
-```bash
-python -m pip install -e ".[docs]"
-python -m mkdocs build --strict
-```
-
-## Python API
-
-The planned normal-user workflow is:
-
-```text
-load data -> instantiate a model -> fit -> predict/evaluate
-```
-
-This branch does not yet contain the lightweight public wrapper that provides
-that workflow, so the documentation does not publish stable Python API calls
-yet. See [docs/python-api.md](docs/python-api.md) for the current API status.
+`evaluate()` currently reports implemented likelihood metrics such as
+`test_nll` and `mean_seq_nll`. `predict_next()` samples held-out next-event
+contexts when the fitted model supports the required sampling path.
 
 ## CLI Quickstart
 
-Train one model on local JSONL splits:
+The CLI/config interface is the reproducibility and benchmarking path:
 
 ```bash
 python -m unified_stpp fit \
@@ -70,25 +46,8 @@ python -m unified_stpp fit \
   --train path/to/train.jsonl \
   --val path/to/val.jsonl \
   --test path/to/test.jsonl \
-  --out runs/quickstart \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
+  --out runs/quickstart
 
-Run a benchmark grid over presets, datasets, and seeds:
-
-```bash
-python -m unified_stpp bench \
-  --preset poisson_gmm \
-  --dataset path/to/dataset_root \
-  --seeds 1 \
-  --out runs/quickstart_bench \
-  --n_workers 1 \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
-
-Evaluate a saved run:
-
-```bash
 python -m unified_stpp evaluate metrics \
   --run runs/quickstart/fit/poisson_gmm/<run_id> \
   --data path/to/test.jsonl \
@@ -96,13 +55,17 @@ python -m unified_stpp evaluate metrics \
   --metric-profile core
 ```
 
-Replace `<run_id>` with the timestamped run directory created by `fit`.
+Benchmark campaigns use:
+
+```bash
+python -m unified_stpp bench \
+  --presets poisson_gmm njsde auto_stpp \
+  --splits_dir splits_root \
+  --seeds 1 2 3 \
+  --out runs/bench
+```
 
 ## Data
-
-Seahorse resolves data from either Hugging Face dataset repositories or explicit
-local JSONL paths. Use `--dataset owner/repo[/subdir]` for Hugging Face-backed
-data, or pass `--train`, `--val`, and optionally `--test` for local files.
 
 The canonical local layout is:
 
@@ -121,8 +84,12 @@ Each JSONL line is one event sequence:
 
 ## Documentation
 
-The documentation source starts at [docs/index.md](docs/index.md). This
-repository includes `mkdocs.yml` for a dark MkDocs Material site.
+Start at [docs/index.md](docs/index.md). The docs site builds with:
+
+```bash
+python -m pip install -e ".[docs]"
+python -m mkdocs build --strict
+```
 
 ## Citation
 

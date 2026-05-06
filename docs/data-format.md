@@ -1,7 +1,7 @@
 # Data Format
 
-The same JSONL split format is the public data contract for the current CLI and
-for the planned Python-first API.
+The same JSONL split format is the public data contract for the CLI and the
+Python-first API.
 
 ## Minimal JSONL Record
 
