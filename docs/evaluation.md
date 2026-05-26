@@ -1,30 +1,38 @@
-# Evaluation
+# Evaluation And Visualization
 
 Use `evaluate` after `fit` or `bench` has produced a saved run directory. This
-is the current supported path for benchmark-aligned metrics and diagnostic
-artifacts.
+is the supported path for benchmark-aligned metrics and diagnostic artifacts.
 
 For one fitted model in Python, use `model.evaluate(test)`. Use this CLI page
-when you need artifact-backed evaluation profiles or benchmark-aligned outputs.
+when you need artifact-backed evaluation profiles, benchmark-aligned outputs,
+or visual diagnostics.
 
-## Metric Reports
+## Metric Profiles
 
-Run the core metric profile on a saved run:
+The installed evaluation registry defines these profile families:
+
+| Profile | Purpose | Heavy artifacts |
+| --- | --- | --- |
+| `core` | Basic NLL/report metrics | none |
+| `nll` | Extended NLL-family checks | none |
+| `predictive` | Next-event predictive scores | predictive samples |
+| `generative` | Full-rollout distribution metrics | generative rollouts |
+| `autoregressive` | Fixed-prefix autoregressive degradation | generative rollouts |
+| `surface` | Intensity-grid diagnostics | intensity grids or rollout approximations |
+| `full` | All registered benchmark metrics | all planned heavy artifact families |
+
+Run `python -m unified_stpp evaluate metrics --help` for the exact metric names
+and controls in the installed version.
+
+## Core Metric Report
 
 ```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric-profile core \
   --out runs/evaluate/core_test
-```
-
-Use `--metric-profile` when you want a predefined profile. The installed CLI
-prints the current profile names:
-
-```bash
-python -m unified_stpp evaluate metrics --help
 ```
 
 Use `--metric` when you want explicit metric names:
@@ -32,7 +40,7 @@ Use `--metric` when you want explicit metric names:
 ```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric nll \
   --out runs/evaluate/nll_test
@@ -48,6 +56,20 @@ Useful controls:
 - `--device`: `auto`, `cpu`, `cuda`, `cuda:0`, `mps`, or another supported device string.
 - `--artifact-dir`: root directory for persisted evaluation artifacts.
 
+## Output Artifacts
+
+Evaluation outputs depend on the chosen profile and model capabilities. Common
+outputs include:
+
+- metric summary files under the `--out` directory.
+- predictive sample artifacts for `predictive` profiles.
+- generative rollout artifacts for `generative` and `autoregressive` profiles.
+- intensity-grid artifacts for `surface` profiles.
+- rendered HTML or image files for visualization commands.
+
+Heavy artifacts are intentionally profile-gated so expensive sampling or grid
+work is explicit.
+
 ## Sharded Metric Evaluation
 
 Evaluate sequence ranges with `--seq-shard`:
@@ -55,7 +77,7 @@ Evaluate sequence ranges with `--seq-shard`:
 ```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric-profile predictive \
   --seq-shard 0:50 \
@@ -83,13 +105,13 @@ python -m unified_stpp evaluate predictive-compare \
   --run path/to/run_b \
   --label model_a \
   --label model_b \
-  --history path/to/test.jsonl \
+  --history data/my_dataset/test.jsonl \
   --split test \
   --horizon 1.0 \
   --out runs/evaluate/predictive_compare
 ```
 
-`predictive-compare` is a qualitative diagnostic workflow. Use
+`predictive-compare` is a qualitative visualization workflow. Use
 `evaluate metrics --metric-profile predictive` for benchmark-aligned predictive
 metric artifacts.
 
@@ -100,13 +122,25 @@ Render a surface diagnostic for one saved run:
 ```bash
 python -m unified_stpp evaluate surface \
   --run path/to/run_dir \
-  --history path/to/test.jsonl \
+  --history data/my_dataset/test.jsonl \
   --split test \
   --seq-idx 0 \
   --profile history_frame \
   --out runs/evaluate/surface
 ```
 
-The `surface` command supports `history_frame` and `future_exact` profiles. Run
-`python -m unified_stpp evaluate surface --help` for the exact options in your
-installed version.
+The `surface` command supports profiles such as `history_frame` and
+`future_exact`. Run `python -m unified_stpp evaluate surface --help` for the
+exact options in your installed version.
+
+## Python Visualization Helpers
+
+For one fitted estimator, the Python API exposes lightweight helpers:
+
+```python
+surface = model.plot_intensity(test[0], output_path="runs/plots/intensity")
+kde = model.plot_kde_surface(test[0], n_samples=128, output_path="runs/plots/kde")
+```
+
+Use CLI visualization commands when the output needs to line up with benchmark
+artifacts or paper reproduction.

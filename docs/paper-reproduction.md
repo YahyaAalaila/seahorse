@@ -1,7 +1,11 @@
 # Paper Reproduction
 
-This page is the public place for paper reproduction commands once the final
-artifact bundle, dataset revisions, and citation details are available.
+This page is the public checklist for paper reproduction commands once the
+final artifact bundle, dataset revisions, and citation details are available.
+
+Use CLI workflows for reproduction. They record the model preset or config,
+dataset source, seeds, overrides, and output artifacts more explicitly than a
+notebook-only workflow.
 
 ## Reproduction Inputs
 
@@ -13,6 +17,7 @@ A reproducible run should record:
 - The benchmark seeds.
 - Any `--override` values.
 - The evaluation metric profile and sampling controls.
+- Hardware-relevant settings such as device, worker count, and HPO concurrency.
 
 ## Benchmark Template
 
@@ -21,7 +26,7 @@ Use a fixed split collection or a pinned Hugging Face dataset revision:
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --seeds 1 2 3 \
   --out runs/paper_bench \
   --n_workers 1
@@ -45,7 +50,7 @@ Run post-fit metrics on each saved run:
 ```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric-profile core \
   --out runs/paper_eval/core_test
@@ -56,12 +61,40 @@ For predictive benchmark artifacts:
 ```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric-profile predictive \
   --out runs/paper_eval/predictive_test
 ```
 
-## Citation
+For qualitative visual diagnostics:
 
-Citation details will be added before publication.
+```bash
+python -m unified_stpp evaluate predictive-compare \
+  --run path/to/run_a \
+  --run path/to/run_b \
+  --label model_a \
+  --label model_b \
+  --history data/my_dataset/test.jsonl \
+  --split test \
+  --horizon 1.0 \
+  --out runs/paper_eval/predictive_compare
+```
+
+## Artifact Checklist
+
+Keep the following with a paper reproduction bundle:
+
+- `bench_meta.json`
+- `cell_index.json`
+- `results.json`
+- benchmark tables such as `table_test_nll_all.csv`
+- per-run `run_result.json` files
+- metric output directories
+- predictive, generative, or surface artifacts used in tables and figures
+- exact command lines and git commit
+
+## Current Gaps
+
+Citation details, final public dataset revisions, and maintained Colab
+notebooks will be added before publication.

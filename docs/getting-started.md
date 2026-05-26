@@ -1,5 +1,8 @@
 # Getting Started
 
+This page gets you from a fresh checkout to the two main Seahorse workflows:
+one-model Python experiments and reproducible CLI runs.
+
 ## Install
 
 Create an environment and install the package in editable mode:
@@ -22,44 +25,55 @@ Install HPO support when you use `tune` or benchmark HPO:
 python -m pip install -e ".[hpo]"
 ```
 
-## Run One Model With The Python API
+## Prepare Data
 
-Use the Python API when you want to train and evaluate one model
-programmatically.
+For local runs, create JSONL split files:
 
-```python
-from unified_stpp import AutoSTPP, PoissonGMM
-
-model = AutoSTPP(device="cpu")
-baseline = PoissonGMM()
+```text
+data/my_dataset/
+  train.jsonl
+  val.jsonl
+  test.jsonl
 ```
 
-Load JSONL splits and fit the model:
+Each line is one sequence with `times` and `locations`:
+
+```json
+{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
+```
+
+See [Data Format](data-format.md) for local and Hugging Face data sources.
+
+## Run One Model With Python
+
+Use the Python API when you want one model in a script or notebook:
 
 ```python
-from unified_stpp import load_jsonl
+from unified_stpp import AutoSTPP, load_jsonl
 
-train = load_jsonl("path/to/train.jsonl")
-val = load_jsonl("path/to/val.jsonl")
-test = load_jsonl("path/to/test.jsonl")
+train = load_jsonl("data/my_dataset/train.jsonl")
+val = load_jsonl("data/my_dataset/val.jsonl")
+test = load_jsonl("data/my_dataset/test.jsonl")
 
+model = AutoSTPP(device="cpu", seed=42)
 model.fit(train, val, test, epochs=10, batch_size=64)
 scores = model.evaluate(test)
 samples = model.predict_next(test, n_samples=32)
 ```
 
-`evaluate()` currently reports implemented likelihood metrics. The implemented
-predictive method is `predict_next()`; there is no generic `predict()` method in
-this API.
+The Python `evaluate()` method currently reports the implemented likelihood
+metrics exposed by the estimator. The predictive method is `predict_next()`.
+There is no generic `predict()` method in this API.
 
-See [Python API](python-api.md) for method details.
+Continue with [Python API](python-api.md) or
+[Train One Model](examples/train-one-model.md).
 
 ## Use The CLI For Reproducible Runs
 
-Use the CLI when you want reproducible runs, HPO, benchmark campaigns, and
-paper-style artifacts.
+Use the CLI when you need saved run artifacts, HPO, benchmark campaigns, or
+paper-style reproducibility.
 
-Verify the CLI:
+Verify the installed commands:
 
 ```bash
 python -m unified_stpp --help
@@ -71,16 +85,14 @@ python -m unified_stpp evaluate --help
 
 The top-level CLI exposes four modes: `fit`, `tune`, `bench`, and `evaluate`.
 
-## CLI: Train A Local Run
-
-Start with explicit JSONL split files:
+## Train A Local CLI Run
 
 ```bash
 python -m unified_stpp fit \
   --preset poisson_gmm \
-  --train path/to/train.jsonl \
-  --val path/to/val.jsonl \
-  --test path/to/test.jsonl \
+  --train data/my_dataset/train.jsonl \
+  --val data/my_dataset/val.jsonl \
+  --test data/my_dataset/test.jsonl \
   --out runs/quickstart \
   --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
 ```
@@ -91,17 +103,17 @@ python -m unified_stpp fit \
 runs/quickstart/fit/poisson_gmm/<run_id>/
 ```
 
-Use that run directory for post-fit evaluation:
+Evaluate that saved run:
 
 ```bash
 python -m unified_stpp evaluate metrics \
   --run runs/quickstart/fit/poisson_gmm/<run_id> \
-  --data path/to/test.jsonl \
+  --data data/my_dataset/test.jsonl \
   --split test \
   --metric-profile core
 ```
 
-## CLI: Use A Hugging Face Dataset
+## Use A Hugging Face Dataset
 
 Pass a dataset repository, optionally with a subdirectory:
 
@@ -113,19 +125,6 @@ python -m unified_stpp fit \
   --out runs/hf_fit
 ```
 
-The resolved dataset path must contain `train.jsonl` and `val.jsonl`. `test.jsonl`
-is used when available for `fit`.
-
-## CLI: Use Explicit Local Paths
-
-```bash
-python -m unified_stpp fit \
-  --preset poisson_gmm \
-  --train path/to/train.jsonl \
-  --val path/to/val.jsonl \
-  --test path/to/test.jsonl \
-  --out runs/local_fit
-```
-
-Use explicit paths when the data is private, generated locally, or not hosted on
-Hugging Face.
+The resolved dataset path must contain `train.jsonl` and `val.jsonl`.
+`test.jsonl` is used when available for `fit` and is normally required for
+post-fit evaluation.

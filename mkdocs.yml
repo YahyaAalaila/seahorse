@@ -15,13 +15,23 @@ theme:
 
 nav:
   - Home: index.md
-  - Python API: python-api.md
-  - Getting Started: getting-started.md
-  - Data Format: data-format.md
-  - CLI Reference: cli.md
-  - Benchmarks: benchmarks.md
-  - Evaluation: evaluation.md
-  - Adding a Model: adding-a-model.md
+  - Getting Started:
+      - Overview: getting-started.md
+      - Data Format: data-format.md
+  - Python API:
+      - Run One Model: python-api.md
+  - CLI Workflows:
+      - CLI Reference: cli.md
+      - Evaluation And Visualization: evaluation.md
+  - Benchmarking:
+      - Benchmark Campaigns: benchmarks.md
+  - Model Developers:
+      - Adding A Model: adding-a-model.md
+  - Examples:
+      - Inspect Data: examples/inspect-data.md
+      - Train One Model: examples/train-one-model.md
+      - Benchmark Models: examples/benchmark-models.md
+      - Evaluate And Visualize: examples/evaluate-and-visualize.md
   - Paper Reproduction: paper-reproduction.md
 
 markdown_extensions:
@@ -43,6 +53,5 @@ exclude_docs: |
   original_models_manifesto.md
   wrapper_audit.md
   appendix_evaluation.md
-  examples/**
   internal/**
   release/**

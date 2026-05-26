@@ -1,4 +1,4 @@
-# Benchmarks
+# Benchmark Campaigns
 
 Benchmarks are a CLI/config workflow. Use this path when you need reproducible
 campaigns, HPO, benchmark reports, and paper-style artifacts.
@@ -9,7 +9,7 @@ more seeds:
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --seeds 1 2 3 \
   --out runs/bench \
   --n_workers 1
@@ -23,6 +23,7 @@ For one dataset, pass a local dataset directory or Hugging Face dataset source:
 python -m unified_stpp bench \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
+  --dataset-revision main \
   --seeds 1 \
   --out runs/bench_one
 ```
@@ -30,7 +31,7 @@ python -m unified_stpp bench \
 For a collection of datasets, use `--splits_dir`:
 
 ```text
-splits_root/
+splits/
   dataset_a/train.jsonl
   dataset_a/val.jsonl
   dataset_a/test.jsonl
@@ -44,11 +45,38 @@ Filter a collection with `--datasets`:
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --datasets dataset_a dataset_b \
   --seeds 1 \
   --out runs/bench_subset
 ```
+
+## Model Families
+
+Seahorse presets cover several public families:
+
+| Family | Example presets or aliases | Notes |
+| --- | --- | --- |
+| Parametric baselines | `poisson_gmm`, `hawkes_gmm`, `selfcorrecting_gmm` | Compact temporal process plus GMM spatial components. |
+| Flow spatial baselines | `poisson_cnf`, `hawkes_cnf`, `selfcorrecting_cnf` | Continuous normalizing-flow spatial components. |
+| Time-varying CNF baselines | `poisson_tvcnf`, `hawkes_tvcnf`, `selfcorrecting_tvcnf` | Time-conditioned flow spatial components. |
+| Neural temporal baselines | `rmtpp_gmm`, `thp_gmm` | Neural temporal model with GMM spatial output. |
+| Neural STPP variants | `neural_stpp_attn_sc`, `neural_jumpcnf`, `neural_attncnf`, `neural_cond_gmm` | Neural conditioning with sampler or exact-density variants depending on preset. |
+| Paper-style families | `auto_stpp`, `deep_stpp`, `smash`, `diffusion_stpp`, `nsmpp` | Wrapped behind registered presets and Python aliases. |
+
+Use `python -m unified_stpp fit --help` and the registered preset list in the
+installed package as the source of truth for the current build.
+
+## Capability Notes
+
+Metric and visualization support depends on model capabilities:
+
+- Exact likelihood paths support NLL-family metrics.
+- Native or exact sampling paths support next-event predictive metrics.
+- Surface diagnostics require an intensity grid path or an approximation path
+  planned by the selected evaluation profile.
+- Unsupported combinations fail explicitly rather than silently producing fake
+  metrics.
 
 ## Benchmark Policy
 
@@ -61,7 +89,7 @@ Use `--override` for cross-preset config values that are part of the invocation:
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --seeds 1 \
   --out runs/bench_short \
   --override training.n_epochs=10 training.batch_size=64
@@ -74,7 +102,7 @@ Benchmark HPO requires an explicit tuning dataset:
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --tune \
   --tune-dataset dataset_a \
   --n_trials 20 \
@@ -88,7 +116,7 @@ To reuse previously tuned configs, pass a directory containing
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
+  --splits_dir splits \
   --hpo_configs_dir runs/hpo \
   --seeds 1 \
   --out runs/bench_reuse_hpo
@@ -106,5 +134,11 @@ the output directory. Public outputs include:
 - `table_test_nll_all.csv`: table over all reported runs when available.
 - `table_test_nll_exact.csv`: exact/raw-space NLL table when available.
 
-Each fit run under the benchmark also writes its own config, metrics, checkpoint,
-and `run_result.json` artifacts.
+Each fit run under the benchmark also writes its own config, metrics,
+checkpoint, and `run_result.json` artifacts.
+
+## Next Steps
+
+- Use [Benchmark Models](examples/benchmark-models.md) for a concrete example.
+- Use [Evaluation And Visualization](evaluation.md) for post-fit metrics and
+  plots.

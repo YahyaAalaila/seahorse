@@ -4,6 +4,9 @@ The Python-first API is for running one model programmatically. It wraps the
 same presets and runner used by the CLI while presenting model classes with a
 small sklearn-style surface.
 
+Use the CLI for benchmark campaign orchestration, paper reproduction, and
+artifact-backed metric profiles.
+
 ## Imports
 
 ```python
@@ -14,7 +17,7 @@ Use concrete classes when they exist:
 
 ```python
 model = AutoSTPP(device="cpu")
-baseline = PoissonGMM()
+baseline = PoissonGMM(device="cpu")
 ```
 
 Use `STPPEstimator` when you want to choose by model name or registered preset:
@@ -24,17 +27,38 @@ model = STPPEstimator("AutoSTPP", device="cpu")
 same_model = STPPEstimator("auto_stpp", device="cpu")
 ```
 
+## Supported Model Aliases
+
+The Python API exposes friendly classes for registered presets, including:
+
+- `PoissonGMM`, `PoissonCNF`, `PoissonTVCNF`
+- `HawkesGMM`, `HawkesCNF`, `HawkesTVCNF`
+- `SelfCorrectingGMM`, `SelfCorrectingCNF`, `SelfCorrectingTVCNF`
+- `RMTPPGMM`, `THPGMM`
+- `NeuralSTPP`, `NeuralJumpSC`, `NeuralAttnSC`
+- `NeuralJumpCNF`, `NeuralAttnCNF`, `NeuralCondGMM`
+- `DeepSTPP`, `AutoSTPP`, `SMASH`, `DiffusionSTPP`, `NSMPP`
+
+Programmatic discovery is available:
+
+```python
+from unified_stpp import list_available_models
+
+print(list_available_models())
+```
+
 ## Data
 
 Load canonical JSONL split files with `load_jsonl`:
 
 ```python
-train = load_jsonl("path/to/train.jsonl")
-val = load_jsonl("path/to/val.jsonl")
-test = load_jsonl("path/to/test.jsonl")
+train = load_jsonl("data/my_dataset/train.jsonl")
+val = load_jsonl("data/my_dataset/val.jsonl")
+test = load_jsonl("data/my_dataset/test.jsonl")
 ```
 
 Each split is a list of sequence dictionaries with `times` and `locations`.
+See [Data Format](data-format.md) for the full data contract.
 
 ## Fit
 
@@ -121,16 +145,16 @@ python -m pip install -e ".[hpo]"
 Save a fitted estimator through the underlying runner:
 
 ```python
-model.save("path/to/saved-run")
+save_dir = model.save("runs/api/auto_stpp")
 ```
 
 Load through the base estimator or a matching concrete class:
 
 ```python
-loaded = AutoSTPP.load("path/to/saved-run")
+loaded = AutoSTPP.load(save_dir)
 ```
 
-## Plotting
+## Visualization Helpers
 
 Fitted estimators expose plotting helpers:
 
@@ -142,7 +166,5 @@ kde = model.plot_kde_surface(test[0], n_samples=128, output_path="runs/plots/kde
 `plot_intensity` requires a fitted or loaded runner with a run directory.
 `plot_kde_surface` requires `plotly`.
 
-## CLI Boundary
-
-Do not use the Python API for benchmark campaign orchestration yet. Use the CLI
-for reproducible fit/tune/bench/evaluate workflows and paper-style artifacts.
+For benchmark-aligned visual artifacts, use the CLI workflows in
+[Evaluation And Visualization](evaluation.md).

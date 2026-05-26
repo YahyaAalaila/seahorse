@@ -28,6 +28,18 @@ model = STPPEstimator("my_preset", device="cpu")
 6. Add a bundled YAML config under `unified_stpp/configs/` when the preset needs
    public defaults.
 7. Add focused tests for config loading, model construction, and a tiny fit path.
+8. Document supported evaluation and sampling capabilities before adding the
+   preset to benchmark examples.
+
+## Existing Model Families
+
+Use these files as starting points:
+
+- `factorized.py` for compact temporal plus spatial families.
+- `auto_stpp.py` and `deep_stpp.py` for paper-style model families.
+- `neural_stpp.py` for neural exact-family presets.
+- `smash.py` and `diffusion_stpp.py` for specialized neural architectures.
+- `nsmpp_deepbasis.py` for the public `nsmpp` preset.
 
 ## Component Registries
 
@@ -55,12 +67,21 @@ class MyPresetConfig(BaseModelConfig):
 ```
 
 A preset config owns construction-time parameters and builds a `UnifiedSTPP`
-model. Existing configs show the supported patterns:
+model.
 
-- `factorized.py` for compact temporal plus spatial families.
-- `auto_stpp.py` and `deep_stpp.py` for paper-style model families.
-- `neural_stpp.py` for neural exact-family presets.
-- `nsmpp_deepbasis.py` for the public `nsmpp` preset.
+## Capability Contract
+
+Before documenting a new preset, decide and test which capabilities it supports:
+
+- exact or approximate likelihood evaluation.
+- native next-event sampling.
+- generative rollouts.
+- intensity surface queries.
+- save/load through the runner.
+- benchmark execution across multiple seeds.
+
+Evaluation profiles use these capabilities to decide which metrics and
+artifacts are valid. Unsupported paths should raise clear errors.
 
 ## Bundled YAML
 
@@ -75,9 +96,9 @@ The CLI can then load it with:
 ```bash
 python -m unified_stpp fit \
   --preset my_preset \
-  --train path/to/train.jsonl \
-  --val path/to/val.jsonl \
-  --test path/to/test.jsonl \
+  --train data/my_dataset/train.jsonl \
+  --val data/my_dataset/val.jsonl \
+  --test data/my_dataset/test.jsonl \
   --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
 ```
 
@@ -93,6 +114,8 @@ Keep the first tests narrow:
 - The model builds for a tiny config.
 - A one-epoch fit on a small local JSONL split completes or fails with a clear,
   intentional unsupported-capability error.
+- `evaluate metrics --metric-profile core` works when the model claims NLL
+  support.
 
 Do not add a preset to benchmark examples until the fit, save/load, and
 evaluation path you document has been exercised.

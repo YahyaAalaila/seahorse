@@ -1,73 +1,96 @@
 # Seahorse
 
 Seahorse, packaged as `unified-stpp`, is a framework for spatio-temporal point
-process experiments. It is intended to support two user-facing interfaces:
+process experiments. The docs are organized around the task you are trying to
+complete.
 
-- A Python-first API for normal users training and evaluating one model
-  programmatically.
-- A CLI/config interface for reproducible runs, HPO, benchmark campaigns, and
-  paper-style artifacts.
+## What Do You Want To Do?
 
-## Python-First Quickstart
+### Run One Model
 
-Run one model programmatically:
+Use the Python API when you want a script or notebook that trains one model,
+evaluates it, and samples next events.
 
 ```python
-from unified_stpp import AutoSTPP, PoissonGMM, load_jsonl
+from unified_stpp import AutoSTPP, load_jsonl
 
-train = load_jsonl("path/to/train.jsonl")
-val = load_jsonl("path/to/val.jsonl")
-test = load_jsonl("path/to/test.jsonl")
+train = load_jsonl("data/my_dataset/train.jsonl")
+val = load_jsonl("data/my_dataset/val.jsonl")
+test = load_jsonl("data/my_dataset/test.jsonl")
 
-model = AutoSTPP(device="cpu")
-baseline = PoissonGMM()
-
+model = AutoSTPP(device="cpu", seed=42)
 model.fit(train, val, test, epochs=10, batch_size=64)
 scores = model.evaluate(test)
 samples = model.predict_next(test, n_samples=32)
 ```
 
-See [Python API](python-api.md) for method details and current limits.
+Start with [Train One Model](examples/train-one-model.md) or the
+[Python API](python-api.md).
 
-## CLI Quickstart
+### Benchmark Many Models
 
-Use the CLI when you need reproducible run artifacts:
-
-```bash
-python -m unified_stpp fit \
-  --preset poisson_gmm \
-  --train path/to/train.jsonl \
-  --val path/to/val.jsonl \
-  --test path/to/test.jsonl \
-  --out runs/quickstart \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
-
-Then evaluate the saved run:
+Use the CLI when you need reproducible grids across presets, datasets, and
+seeds.
 
 ```bash
-python -m unified_stpp evaluate metrics \
-  --run runs/quickstart/fit/poisson_gmm/<run_id> \
-  --data path/to/test.jsonl \
-  --split test \
-  --metric-profile core
+python -m unified_stpp bench \
+  --presets poisson_gmm hawkes_gmm neural_attncnf \
+  --splits_dir splits \
+  --seeds 1 2 3 \
+  --out runs/bench
 ```
 
-Replace `<run_id>` with the run directory created by `fit`.
+Start with [Benchmark Models](examples/benchmark-models.md) or
+[Benchmark Campaigns](benchmarks.md).
 
-## What Seahorse Provides
+### Add A Model
 
-- `fit`: train one preset or YAML config.
-- `tune`: run HPO for one preset or YAML config.
-- `bench`: run benchmark grids across presets, datasets, and seeds.
-- `evaluate`: run post-fit metrics, predictive comparisons, surfaces, or artifact merges.
+Use the registry/config path when a model should become a preset that works
+with `fit`, `bench`, and `evaluate`.
 
-## Where To Go Next
+```python
+from unified_stpp import STPPEstimator
 
-- [Python API](python-api.md) for the normal-user model API.
-- [Getting Started](getting-started.md) for installation and supported commands.
-- [Data Format](data-format.md) for JSONL records and dataset layouts.
-- [CLI Reference](cli.md) for the supported module CLI.
-- [Benchmarks](benchmarks.md) for benchmark grids and outputs.
-- [Evaluation](evaluation.md) for post-fit metrics and diagnostics.
-- [Adding a Model](adding-a-model.md) for the registry-based extension path.
+model = STPPEstimator("my_preset", device="cpu")
+```
+
+Start with [Adding A Model](adding-a-model.md).
+
+### Reproduce Paper Results
+
+Use pinned datasets, explicit presets/configs, fixed seeds, and CLI evaluation
+profiles. The reproduction page is the public checklist for paper-grade runs.
+
+```bash
+python -m unified_stpp bench \
+  --presets poisson_gmm hawkes_gmm \
+  --dataset owner/repo[/subdir] \
+  --dataset-revision <revision> \
+  --seeds 1 2 3 \
+  --out runs/paper_bench
+```
+
+Start with [Paper Reproduction](paper-reproduction.md).
+
+## Core Concepts
+
+- Data is JSONL split files with one event sequence per line.
+- The Python API is the shortest path for one-model experiments.
+- The CLI is the supported path for reproducible runs, HPO, benchmarks,
+  artifact-backed metrics, visual diagnostics, and paper reproduction.
+- Model developers integrate through registries and preset configs so new
+  models can use the same CLI and benchmark machinery.
+
+## Local Documentation
+
+Serve these docs locally from the repository root:
+
+```bash
+python -m mkdocs serve
+```
+
+If port `8000` is busy, choose another port:
+
+```bash
+python -m mkdocs serve -a 127.0.0.1:8002
+```
