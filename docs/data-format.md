@@ -9,15 +9,13 @@ The same format is used by the Python API and the CLI.
 {"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
 ```
 
-`times[i]` and `locations[i]` describe the same event. `locations` should be a
-list of coordinate pairs. Optional per-event arrays such as `marks`,
-`event_covariates`, and `field_covariates` must have the same length as
-`times`.
+`times[i]` and `locations[i]` describe the same event. `locations` is a list of
+coordinate pairs. Optional per-event arrays (`marks`, `event_covariates`,
+`field_covariates`) must have the same length as `times`.
 
 ## Local Data For One Run
 
-Use this layout for Python API experiments, `fit`, `tune`, or one-dataset
-`bench` runs:
+Use this layout for Python API experiments, `fit`, `tune`, or one-dataset `bench` runs:
 
 ```text
 dataset_root/
@@ -26,45 +24,44 @@ dataset_root/
   test.jsonl
 ```
 
-`train.jsonl` and `val.jsonl` are required for fitting. `test.jsonl` is optional
-for resolution but is normally needed for evaluation and examples.
+`train.jsonl` and `val.jsonl` are required for fitting. `test.jsonl` is normally
+needed for evaluation.
 
-Python code can load the files directly:
+??? example "Show Python example"
+    ```python
+    from unified_stpp import load_jsonl
 
-```python
-from unified_stpp import load_jsonl
+    train = load_jsonl("dataset_root/train.jsonl")
+    val   = load_jsonl("dataset_root/val.jsonl")
+    test  = load_jsonl("dataset_root/test.jsonl")
+    ```
 
-train = load_jsonl("dataset_root/train.jsonl")
-val = load_jsonl("dataset_root/val.jsonl")
-test = load_jsonl("dataset_root/test.jsonl")
-```
-
-CLI `fit` can use explicit paths:
-
-```bash
-python -m unified_stpp fit \
-  --preset poisson_gmm \
-  --train dataset_root/train.jsonl \
-  --val dataset_root/val.jsonl \
-  --test dataset_root/test.jsonl \
-  --out runs/local_fit
-```
+??? example "Show CLI command"
+    ```bash
+    python -m unified_stpp fit \
+      --preset poisson_gmm \
+      --train dataset_root/train.jsonl \
+      --val dataset_root/val.jsonl \
+      --test dataset_root/test.jsonl \
+      --out runs/local_fit
+    ```
 
 ## Local Data For Benchmarks
 
 Use a split collection when benchmarking multiple datasets:
 
-```text
-splits_root/
-  dataset_a/
-    train.jsonl
-    val.jsonl
-    test.jsonl
-  dataset_b/
-    train.jsonl
-    val.jsonl
-    test.jsonl
-```
+??? example "Show benchmark layout"
+    ```text
+    splits_root/
+      dataset_a/
+        train.jsonl
+        val.jsonl
+        test.jsonl
+      dataset_b/
+        train.jsonl
+        val.jsonl
+        test.jsonl
+    ```
 
 Run all datasets found under the root:
 
@@ -76,20 +73,17 @@ python -m unified_stpp bench \
   --out runs/bench
 ```
 
-Restrict a split collection to selected dataset names:
-
-```bash
-python -m unified_stpp bench \
-  --presets poisson_gmm hawkes_gmm \
-  --splits_dir splits_root \
-  --datasets dataset_a dataset_b \
-  --seeds 1 \
-  --out runs/bench_subset
-```
+??? example "Show CLI command — filter to specific datasets"
+    ```bash
+    python -m unified_stpp bench \
+      --presets poisson_gmm hawkes_gmm \
+      --splits_dir splits_root \
+      --datasets dataset_a dataset_b \
+      --seeds 1 \
+      --out runs/bench_subset
+    ```
 
 ## Hugging Face Data
-
-CLI workflows can resolve a Hugging Face dataset repository:
 
 ```bash
 python -m unified_stpp fit \
@@ -103,16 +97,15 @@ Use `--dataset-revision` to pin the source for reproducible runs. The resolved
 dataset must expose `train.jsonl` and `val.jsonl`; `test.jsonl` is used when
 present.
 
-Benchmark campaigns can also use a Hugging Face source:
-
-```bash
-python -m unified_stpp bench \
-  --preset poisson_gmm \
-  --dataset owner/repo[/subdir] \
-  --dataset-revision main \
-  --seeds 1 \
-  --out runs/bench_hf
-```
+??? example "Show CLI command — HuggingFace benchmark source"
+    ```bash
+    python -m unified_stpp bench \
+      --preset poisson_gmm \
+      --dataset owner/repo[/subdir] \
+      --dataset-revision main \
+      --seeds 1 \
+      --out runs/bench_hf
+    ```
 
 ## Command Support Matrix
 

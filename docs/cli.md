@@ -13,21 +13,10 @@ The public CLI is the module entrypoint:
 python -m unified_stpp --help
 ```
 
-It exposes:
-
-```text
-fit
-tune
-bench
-evaluate
-```
-
-Use `--help` on each command for the exact arguments supported by the installed
-version.
+It exposes four modes: `fit`, `tune`, `bench`, `evaluate`. Use `--help` on each
+for exact arguments supported by the installed version.
 
 ## fit: Train One Reproducible Run
-
-Train one model from a registered preset or YAML config:
 
 ```bash
 python -m unified_stpp fit \
@@ -39,15 +28,14 @@ python -m unified_stpp fit \
   --override training.n_epochs=10 training.batch_size=64
 ```
 
-Use a YAML config instead of a preset:
-
-```bash
-python -m unified_stpp fit \
-  --config path/to/config.yaml \
-  --train data/my_dataset/train.jsonl \
-  --val data/my_dataset/val.jsonl \
-  --test data/my_dataset/test.jsonl
-```
+??? example "Show CLI command — use a YAML config instead of a preset"
+    ```bash
+    python -m unified_stpp fit \
+      --config path/to/config.yaml \
+      --train data/my_dataset/train.jsonl \
+      --val data/my_dataset/val.jsonl \
+      --test data/my_dataset/test.jsonl
+    ```
 
 Key options:
 
@@ -61,24 +49,19 @@ Key options:
 
 ## tune: Search Hyperparameters
 
-Run HPO and write a best-config YAML:
+Requires HPO dependencies: `python -m pip install -e ".[hpo]"`
 
-```bash
-python -m unified_stpp tune \
-  --preset poisson_gmm \
-  --train data/my_dataset/train.jsonl \
-  --val data/my_dataset/val.jsonl \
-  --n_trials 20 \
-  --search-alg random \
-  --scheduler asha \
-  --out runs/hpo/poisson_gmm_best.yaml
-```
-
-`tune` requires HPO dependencies:
-
-```bash
-python -m pip install -e ".[hpo]"
-```
+??? example "Show CLI command"
+    ```bash
+    python -m unified_stpp tune \
+      --preset poisson_gmm \
+      --train data/my_dataset/train.jsonl \
+      --val data/my_dataset/val.jsonl \
+      --n_trials 20 \
+      --search-alg random \
+      --scheduler asha \
+      --out runs/hpo/poisson_gmm_best.yaml
+    ```
 
 Key options:
 
@@ -93,8 +76,6 @@ Key options:
 
 ## bench: Run Benchmark Campaigns
 
-Run a benchmark grid:
-
 ```bash
 python -m unified_stpp bench \
   --presets poisson_gmm hawkes_gmm \
@@ -104,16 +85,15 @@ python -m unified_stpp bench \
   --n_workers 1
 ```
 
-Benchmark one dataset directory or Hugging Face dataset source:
-
-```bash
-python -m unified_stpp bench \
-  --preset poisson_gmm \
-  --dataset owner/repo[/subdir] \
-  --dataset-revision main \
-  --seeds 1 \
-  --out runs/bench_one
-```
+??? example "Show CLI command — single dataset or HuggingFace source"
+    ```bash
+    python -m unified_stpp bench \
+      --preset poisson_gmm \
+      --dataset owner/repo[/subdir] \
+      --dataset-revision main \
+      --seeds 1 \
+      --out runs/bench_one
+    ```
 
 Key options:
 
@@ -134,19 +114,6 @@ Key options:
 `evaluate` is for post-fit analysis on saved runs:
 
 ```bash
-python -m unified_stpp evaluate --help
-```
-
-Supported modes:
-
-- `metrics`: metric reports with artifact-backed profiles.
-- `predictive-compare`: qualitative future-window predictive comparisons.
-- `surface`: single-run exact or factorized surface diagnostics.
-- `merge-artifacts`: merge predictive sample artifacts from sharded runs.
-
-Metric evaluation:
-
-```bash
 python -m unified_stpp evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
@@ -155,10 +122,6 @@ python -m unified_stpp evaluate metrics \
   --out runs/evaluate/core_test
 ```
 
-The available metric profiles are reported by:
-
-```bash
-python -m unified_stpp evaluate metrics --help
-```
+Supported modes: `metrics`, `predictive-compare`, `surface`, `merge-artifacts`.
 
 Continue with [Evaluation And Visualization](evaluation.md).

@@ -7,8 +7,7 @@ in Google Colab.
 ## Goal
 
 Run a small benchmark across several presets on one dataset using the CLI/config
-path. This records presets, data source, seed, overrides, and benchmark
-artifacts.
+path. This records presets, data source, seed, overrides, and benchmark artifacts.
 
 ## When To Use This Instead Of The Python API
 
@@ -39,43 +38,47 @@ python -m unified_stpp bench \
   --n_workers 1
 ```
 
-For a quick smoke test, add training overrides:
+??? example "Show CLI command — quick smoke test with training overrides"
+    ```bash
+    python -m unified_stpp bench \
+      --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
+      --dataset data/my_dataset \
+      --seeds 1 \
+      --out runs/examples/small_benchmark \
+      --n_workers 1 \
+      --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
+    ```
 
-```bash
-python -m unified_stpp bench \
-  --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
-  --dataset data/my_dataset \
-  --seeds 1 \
-  --out runs/examples/small_benchmark \
-  --n_workers 1 \
-  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
-```
-
-The notebook uses additional tiny-model overrides so `auto_stpp` and
-`deep_stpp` finish quickly on CPU.
+    The notebook uses additional tiny-model overrides so `auto_stpp` and
+    `deep_stpp` finish quickly on CPU.
 
 ## Inspect Output Directory
 
-Look under:
+Common campaign artifacts under `runs/examples/small_benchmark/`:
 
-```text
-runs/examples/small_benchmark/
-```
+??? example "Show expected output"
+    ```text
+    runs/examples/small_benchmark/
+      bench_meta.json
+      cell_index.json
+      results.json
+      report.html
+      table_test_nll_all.csv
+    ```
 
-Common campaign artifacts include `bench_meta.json`, `cell_index.json`,
-`results.json`, `report.html`, and benchmark CSV tables when available. Use
-`cell_index.json` to map benchmark cells to saved run directories.
+    Use `cell_index.json` to map benchmark cells to saved run directories.
 
-## Generate/Evaluate Metrics If Needed
+## Evaluate Metrics
 
-```bash
-python -m unified_stpp evaluate metrics \
-  --run path/to/run_dir \
-  --data data/my_dataset/test.jsonl \
-  --split test \
-  --metric-profile core \
-  --out runs/examples/small_benchmark/evaluate_core
-```
+??? example "Show CLI command"
+    ```bash
+    python -m unified_stpp evaluate metrics \
+      --run path/to/run_dir \
+      --data data/my_dataset/test.jsonl \
+      --split test \
+      --metric-profile core \
+      --out runs/examples/small_benchmark/evaluate_core
+    ```
 
 ## Common Errors
 

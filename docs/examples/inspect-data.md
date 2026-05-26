@@ -3,12 +3,6 @@
 Use this example before fitting or benchmarking. Seahorse expects JSONL split
 files where each line is one event sequence.
 
-## Placeholder Notebook
-
-[Colab badge placeholder]
-
-A Colab notebook can be linked here when a maintained notebook exists.
-
 ## Local Split Layout
 
 For a single run, keep the data in one directory:
@@ -20,19 +14,18 @@ data/my_dataset/
   test.jsonl
 ```
 
-For benchmark campaigns, use one directory per dataset:
-
-```text
-splits/
-  dataset_a/
-    train.jsonl
-    val.jsonl
-    test.jsonl
-  dataset_b/
-    train.jsonl
-    val.jsonl
-    test.jsonl
-```
+??? example "Show benchmark layout — one directory per dataset"
+    ```text
+    splits/
+      dataset_a/
+        train.jsonl
+        val.jsonl
+        test.jsonl
+      dataset_b/
+        train.jsonl
+        val.jsonl
+        test.jsonl
+    ```
 
 ## Read A Split In Python
 
@@ -49,8 +42,7 @@ print(first["locations"][:3])
 ```
 
 Every record needs matching `times` and `locations` arrays. Optional arrays such
-as `marks`, `event_covariates`, and `field_covariates` must align with
-`times`.
+as `marks`, `event_covariates`, and `field_covariates` must align with `times`.
 
 ## Quick Validation Checklist
 
@@ -62,8 +54,6 @@ as `marks`, `event_covariates`, and `field_covariates` must align with
 - Every per-event array has the same length as `times`.
 
 ## Hugging Face Sources
-
-CLI workflows can resolve a dataset repository directly:
 
 ```bash
 python -m unified_stpp fit \
