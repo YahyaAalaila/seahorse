@@ -1,72 +1,64 @@
 # Getting Started
 
-This page gets you from a fresh checkout to the two main Seahorse workflows:
-one-model Python experiments and reproducible CLI runs.
+Two main workflows: one-model Python experiments and reproducible CLI runs.
 
 ## Install
 
-Create an environment and install the package in editable mode:
+=== "Core"
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-```
+    ```bash
+    python -m venv .venv && source .venv/bin/activate
+    python -m pip install -e .
+    ```
 
-Install development tooling when you want to run tests and lint checks:
+=== "With dev tools"
 
-```bash
-python -m pip install -e ".[dev]"
-```
+    ```bash
+    python -m pip install -e ".[dev]"
+    ```
 
-Install HPO support when you use `tune` or benchmark HPO:
+=== "With HPO"
 
-```bash
-python -m pip install -e ".[hpo]"
-```
+    ```bash
+    python -m pip install -e ".[hpo]"
+    ```
 
 ## Prepare Data
 
-For local runs, create JSONL split files:
-
-```text
-data/my_dataset/
-  train.jsonl
-  val.jsonl
-  test.jsonl
-```
-
-Each line is one sequence with `times` and `locations`:
+Each JSONL file has one sequence per line:
 
 ```json
 {"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
 ```
 
-See [Data Format](data-format.md) for local and Hugging Face data sources.
+Splits go in one directory:
+
+```text
+data/my_dataset/  train.jsonl  val.jsonl  test.jsonl
+```
+
+See [Data Format](data-format.md) for full details and Hugging Face sources.
 
 ## Run One Model With Python
-
-Use the Python API when you want one model in a script or notebook:
 
 ```python
 from unified_stpp import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
-val = load_jsonl("data/my_dataset/val.jsonl")
-test = load_jsonl("data/my_dataset/test.jsonl")
+val   = load_jsonl("data/my_dataset/val.jsonl")
+test  = load_jsonl("data/my_dataset/test.jsonl")
 
 model = AutoSTPP(device="cpu", seed=42)
 model.fit(train, val, test, epochs=10, batch_size=64)
-scores = model.evaluate(test)
+scores  = model.evaluate(test)           # likelihood metrics
 samples = model.predict_next(test, n_samples=32)
 ```
 
-The Python `evaluate()` method currently reports the implemented likelihood
-metrics exposed by the estimator. The predictive method is `predict_next()`.
-There is no generic `predict()` method in this API.
+!!! note
+    `evaluate()` returns likelihood metrics. Use `predict_next()` for predictive
+    samples. There is no generic `predict()` method.
 
-Continue with [Python API](python-api.md) or
-[Train One Model](examples/train-one-model.md).
+Continue with [Python API](python-api.md) or [Train One Model](examples/train-one-model.md).
 
 ## Use The CLI For Reproducible Runs
 

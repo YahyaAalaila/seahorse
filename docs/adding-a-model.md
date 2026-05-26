@@ -1,15 +1,11 @@
 # Adding A Model
 
-Seahorse models are connected through registries and preset configs. Follow the
-nearest existing model family first; it is the best source of truth for required
-interfaces and artifact behavior.
+!!! abstract "Key principle"
+    Every model enters through the registry and preset config path — this is what lets it
+    work with `fit`, `bench`, `evaluate`, and the Python API automatically.
+    Follow the nearest existing family as your starting point.
 
-New model families should continue to integrate with the registry/config path
-because the CLI uses it for reproducibility. The Python-first wrapper sits on
-top of the same model and data contracts.
-
-Use the Python API for quick local testing of an already registered model. Use
-the config/registry path when the model should enter benchmark comparisons.
+Once registered, your preset is usable immediately:
 
 ```python
 from unified_stpp import STPPEstimator

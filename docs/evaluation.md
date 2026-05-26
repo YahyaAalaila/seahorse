@@ -1,11 +1,8 @@
 # Evaluation And Visualization
 
-Use `evaluate` after `fit` or `bench` has produced a saved run directory. This
-is the supported path for benchmark-aligned metrics and diagnostic artifacts.
-
-For one fitted model in Python, use `model.evaluate(test)`. Use this CLI page
-when you need artifact-backed evaluation profiles, benchmark-aligned outputs,
-or visual diagnostics.
+!!! tip "Quick Python evaluation"
+    For a single fitted model, use `model.evaluate(test)` — no run directory needed.
+    This page covers the CLI path for artifact-backed metric profiles and visual diagnostics.
 
 ## Metric Profiles
 

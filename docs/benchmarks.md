@@ -1,7 +1,8 @@
 # Benchmark Campaigns
 
-Benchmarks are a CLI/config workflow. Use this path when you need reproducible
-campaigns, HPO, benchmark reports, and paper-style artifacts.
+!!! tip "When to use this"
+    Use the benchmark path for reproducible multi-preset, multi-dataset, multi-seed runs
+    with saved artifacts. For a single model in a notebook, the [Python API](python-api.md) is simpler.
 
 Run a benchmark grid with one or more presets, one or more datasets, and one or
 more seeds:

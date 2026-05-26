@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Crown spines -->
+  <line x1="15" y1="2" x2="15.5" y2="4.5" stroke="#26C6DA" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="18" y1="1.5" x2="18" y2="4" stroke="#26C6DA" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="21" y1="2" x2="20.5" y2="4.5" stroke="#26C6DA" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- Head -->
+  <ellipse cx="18" cy="8" rx="5" ry="5.5" fill="#26C6DA"/>
+  <!-- Snout -->
+  <path d="M13 7.5 L6 7.5" stroke="#26C6DA" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M6 7.5 L8.5 9" stroke="#26C6DA" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Body -->
+  <path d="M15 13.5 C12 15 11 18 12 21 C13 24 12 26.5 11 29"
+        stroke="#26C6DA" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Tail curl -->
+  <path d="M11 29 Q17 32 19.5 28.5 Q22 25 18.5 23 Q16 22 14.5 24"
+        stroke="#26C6DA" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Dorsal fin -->
+  <path d="M22.5 10.5 Q26 12.5 24.5 17 Q23 18.5 20.5 17.5"
+        stroke="#0097A7" stroke-width="2" stroke-linecap="round"/>
+  <!-- Eye -->
+  <circle cx="17" cy="7" r="1.6" fill="#004D55"/>
+  <circle cx="17.5" cy="6.5" r="0.5" fill="rgba(255,255,255,0.4)"/>
+</svg>
