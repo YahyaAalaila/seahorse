@@ -33,6 +33,7 @@ nav:
       - Train One Model: examples/train-one-model.md
       - Train And Evaluate One Model: examples/train-and-evaluate-one-model.md
       - Benchmark Models: examples/benchmark-models.md
+      - Run A Small Benchmark: examples/run-a-small-benchmark.md
       - Evaluate And Visualize: examples/evaluate-and-visualize.md
   - Paper Reproduction: paper-reproduction.md
 
