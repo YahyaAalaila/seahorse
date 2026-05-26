@@ -5,9 +5,8 @@ inside a script or notebook.
 
 ## Notebook
 
-Use <a href="../../notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
-for an executable walkthrough. Open in Colab badges will be added after public
-release.
+Use <a href="https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
+for an executable walkthrough in Google Colab.
 
 ## Python API Example
 

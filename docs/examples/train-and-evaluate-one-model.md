@@ -1,9 +1,8 @@
 # Train And Evaluate One Model
 
 For the complete executable walkthrough, use
-<a href="../../notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>.
-
-Open in Colab badges will be added after public release.
+<a href="https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
+in Google Colab.
 
 ## Goal
 
