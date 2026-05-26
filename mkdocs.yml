@@ -35,6 +35,7 @@ nav:
       - Benchmark Models: examples/benchmark-models.md
       - Run A Small Benchmark: examples/run-a-small-benchmark.md
       - Evaluate And Visualize: examples/evaluate-and-visualize.md
+      - Evaluate And Visualize Results: examples/evaluate-and-visualize-results.md
   - Paper Reproduction: paper-reproduction.md
 
 markdown_extensions:
