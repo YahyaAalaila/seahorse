@@ -61,7 +61,7 @@ Seahorse presets cover several public families:
 | Flow spatial baselines | `poisson_cnf`, `hawkes_cnf`, `selfcorrecting_cnf` | Continuous normalizing-flow spatial components. |
 | Time-varying CNF baselines | `poisson_tvcnf`, `hawkes_tvcnf`, `selfcorrecting_tvcnf` | Time-conditioned flow spatial components. |
 | Neural temporal baselines | `rmtpp_gmm`, `thp_gmm` | Neural temporal model with GMM spatial output. |
-| Neural STPP variants | `neural_stpp_attn_sc`, `neural_jumpcnf`, `neural_attncnf`, `neural_cond_gmm` | Neural conditioning with sampler or exact-density variants depending on preset. |
+| Neural STPP variants | `njsde`, `neural_jumpcnf`, `neural_attncnf`, `neural_stpp_attn_sc` | Neural conditioning with sampler or exact-density variants depending on preset. |
 | Paper-style families | `auto_stpp`, `deep_stpp`, `smash`, `diffusion_stpp`, `nsmpp` | Wrapped behind registered presets and Python aliases. |
 
 Use `python -m unified_stpp fit --help` and the registered preset list in the

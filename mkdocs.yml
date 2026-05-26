@@ -25,6 +25,7 @@ nav:
       - Evaluation And Visualization: evaluation.md
   - Benchmarking:
       - Benchmark Campaigns: benchmarks.md
+      - Model Capability Matrix: model-capability-matrix.md
   - Model Developers:
       - Adding A Model: adding-a-model.md
   - Examples:

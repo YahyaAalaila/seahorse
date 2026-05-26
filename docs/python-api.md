@@ -36,8 +36,10 @@ The Python API exposes friendly classes for registered presets, including:
 - `SelfCorrectingGMM`, `SelfCorrectingCNF`, `SelfCorrectingTVCNF`
 - `RMTPPGMM`, `THPGMM`
 - `NeuralSTPP`, `NeuralJumpSC`, `NeuralAttnSC`
-- `NeuralJumpCNF`, `NeuralAttnCNF`, `NeuralCondGMM`
+- `NeuralJumpCNF`, `NeuralAttnCNF`
 - `DeepSTPP`, `AutoSTPP`, `SMASH`, `DiffusionSTPP`, `NSMPP`
+
+The canonical NJSDE preset is available through `STPPEstimator("njsde")`.
 
 Programmatic discovery is available:
 
