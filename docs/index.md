@@ -6,10 +6,35 @@ complete.
 
 ## What Do You Want To Do?
 
-### Run One Model
+<div class="grid cards" markdown>
 
-Use the Python API when you want a script or notebook that trains one model,
-evaluates it, and samples next events.
+- **Run One Model**
+
+    Use the Python API for one-model scripts and notebooks.
+
+    [Start Here](examples/train-one-model.md)
+
+- **Benchmark Many Models**
+
+    Use the CLI for reproducible preset, dataset, and seed grids.
+
+    [Run A Benchmark](examples/run-a-small-benchmark.md)
+
+- **Add A Model**
+
+    Register a preset so it works with `fit`, `bench`, and `evaluate`.
+
+    [Developer Guide](adding-a-model.md)
+
+- **Reproduce Paper Results**
+
+    Use pinned data, explicit presets, fixed seeds, and saved artifacts.
+
+    [Reproduction Guide](paper-reproduction.md)
+
+</div>
+
+## Quick Taste
 
 ```python
 from unified_stpp import AutoSTPP, load_jsonl
@@ -19,58 +44,11 @@ val = load_jsonl("data/my_dataset/val.jsonl")
 test = load_jsonl("data/my_dataset/test.jsonl")
 
 model = AutoSTPP(device="cpu", seed=42)
-model.fit(train, val, test, epochs=10, batch_size=64)
-scores = model.evaluate(test)
-samples = model.predict_next(test, n_samples=32)
+model.fit(train, val, test, epochs=1, batch_size=64)
+print(model.evaluate(test))
 ```
 
-Start with [Train One Model](examples/train-one-model.md) or the
-[Python API](python-api.md).
-
-### Benchmark Many Models
-
-Use the CLI when you need reproducible grids across presets, datasets, and
-seeds.
-
-```bash
-python -m unified_stpp bench \
-  --presets poisson_gmm hawkes_gmm neural_attncnf \
-  --splits_dir splits \
-  --seeds 1 2 3 \
-  --out runs/bench
-```
-
-Start with [Benchmark Models](examples/benchmark-models.md) or
-[Benchmark Campaigns](benchmarks.md).
-
-### Add A Model
-
-Use the registry/config path when a model should become a preset that works
-with `fit`, `bench`, and `evaluate`.
-
-```python
-from unified_stpp import STPPEstimator
-
-model = STPPEstimator("my_preset", device="cpu")
-```
-
-Start with [Adding A Model](adding-a-model.md).
-
-### Reproduce Paper Results
-
-Use pinned datasets, explicit presets/configs, fixed seeds, and CLI evaluation
-profiles. The reproduction page is the public checklist for paper-grade runs.
-
-```bash
-python -m unified_stpp bench \
-  --presets poisson_gmm hawkes_gmm \
-  --dataset owner/repo[/subdir] \
-  --dataset-revision <revision> \
-  --seeds 1 2 3 \
-  --out runs/paper_bench
-```
-
-Start with [Paper Reproduction](paper-reproduction.md).
+For the full walkthrough, open the [tutorial notebooks](examples/colabs.md).
 
 ## Core Concepts
 
@@ -81,7 +59,7 @@ Start with [Paper Reproduction](paper-reproduction.md).
 - Model developers integrate through registries and preset configs so new
   models can use the same CLI and benchmark machinery.
 
-## Local Documentation
+## Serve The Docs
 
 Serve these docs locally from the repository root:
 

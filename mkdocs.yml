@@ -22,24 +22,23 @@ nav:
       - Run One Model: python-api.md
   - CLI Workflows:
       - CLI Reference: cli.md
-      - Evaluation And Visualization: evaluation.md
+      - Evaluation: evaluation.md
   - Benchmarking:
       - Benchmark Campaigns: benchmarks.md
       - Model Capability Matrix: model-capability-matrix.md
   - Model Developers:
-      - Adding A Model: adding-a-model.md
+      - Add A Model: adding-a-model.md
   - Examples:
       - Tutorial Notebooks: examples/colabs.md
       - Inspect Data: examples/inspect-data.md
       - Train One Model: examples/train-one-model.md
-      - Train And Evaluate One Model: examples/train-and-evaluate-one-model.md
-      - Benchmark Models: examples/benchmark-models.md
       - Run A Small Benchmark: examples/run-a-small-benchmark.md
-      - Evaluate And Visualize: examples/evaluate-and-visualize.md
-      - Evaluate And Visualize Results: examples/evaluate-and-visualize-results.md
+      - Evaluate Results: examples/evaluate-and-visualize-results.md
   - Paper Reproduction: paper-reproduction.md
 
 markdown_extensions:
+  - attr_list
+  - md_in_html
   - admonition
   - toc:
       permalink: true

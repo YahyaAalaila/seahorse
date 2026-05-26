@@ -139,6 +139,6 @@ checkpoint, and `run_result.json` artifacts.
 
 ## Next Steps
 
-- Use [Benchmark Models](examples/benchmark-models.md) for a concrete example.
+- Use [Run A Small Benchmark](examples/run-a-small-benchmark.md) for a concrete example.
 - Use [Evaluation And Visualization](evaluation.md) for post-fit metrics and
   plots.

@@ -1,4 +1,4 @@
-# Evaluate And Visualize Results
+# Evaluate Results
 
 ## Goal
 
