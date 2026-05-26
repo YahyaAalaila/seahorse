@@ -31,6 +31,7 @@ nav:
   - Examples:
       - Inspect Data: examples/inspect-data.md
       - Train One Model: examples/train-one-model.md
+      - Train And Evaluate One Model: examples/train-and-evaluate-one-model.md
       - Benchmark Models: examples/benchmark-models.md
       - Evaluate And Visualize: examples/evaluate-and-visualize.md
   - Paper Reproduction: paper-reproduction.md
