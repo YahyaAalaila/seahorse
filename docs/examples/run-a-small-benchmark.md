@@ -1,7 +1,7 @@
 # Run A Small Benchmark
 
 For the complete executable walkthrough, use
-<a href="../notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>.
+<a href="../../notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>.
 
 Open in Colab badges will be added after public release.
 

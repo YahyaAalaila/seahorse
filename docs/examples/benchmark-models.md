@@ -5,7 +5,7 @@ seeds, overrides, and output artifacts explicit.
 
 ## Notebook
 
-Use <a href="../notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
+Use <a href="../../notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
 for an executable walkthrough. Open in Colab badges will be added after public
 release.
 
