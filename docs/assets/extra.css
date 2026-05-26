@@ -107,9 +107,61 @@
 }
 
 /* ── Admonitions ──────────────────────────────────────────────────────────── */
-[data-md-color-scheme="slate"] .md-typeset .admonition,
-[data-md-color-scheme="slate"] .md-typeset details {
+[data-md-color-scheme="slate"] .md-typeset .admonition {
   border-left-width: 3px;
+}
+
+/* ── Collapsible blocks (??? / details) — subtle, non-intrusive ──────────── */
+
+/* Override the loud accent border with a quiet neutral one */
+.md-typeset details {
+  border-radius: 4px !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+}
+
+[data-md-color-scheme="slate"] .md-typeset details {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  border-left-color: rgba(255, 255, 255, 0.15) !important;
+  border-left-width: 2px !important;
+}
+
+[data-md-color-scheme="default"] .md-typeset details {
+  background-color: rgba(0, 0, 0, 0.025) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-left-color: rgba(0, 96, 100, 0.35) !important;
+  border-left-width: 2px !important;
+}
+
+/* Summary row — smaller, quieter */
+.md-typeset details > summary {
+  padding-top: 0.4em !important;
+  padding-bottom: 0.4em !important;
+  font-size: 0.82em !important;
+  font-weight: 500 !important;
+  color: var(--md-default-fg-color--light) !important;
+  background-color: transparent !important;
+  min-height: unset !important;
+}
+
+/* Remove the type-colored icon background from collapsible summaries */
+.md-typeset details > summary::before {
+  filter: grayscale(1) opacity(0.45) !important;
+}
+
+/* Code blocks inside collapsibles — same size as surrounding code */
+.md-typeset details pre,
+.md-typeset details pre > code {
+  font-size: 0.85em !important;
+}
+
+/* Tighter inner padding */
+.md-typeset details > .md-typeset:first-of-type,
+.md-typeset details > p,
+.md-typeset details > pre {
+  margin-top: 0.5em !important;
 }
 
 /* ── Hero section (homepage) ──────────────────────────────────────────────── */

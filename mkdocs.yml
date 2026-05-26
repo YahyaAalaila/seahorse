@@ -47,6 +47,8 @@ nav:
   - Benchmarking:
       - Benchmark Campaigns: benchmarks.md
       - Model Capability Matrix: model-capability-matrix.md
+  - Concepts:
+      - Architecture: architecture.md
   - Model Developers:
       - Add A Model: adding-a-model.md
   - Examples:
