@@ -3,11 +3,11 @@
 Use the Python API when you want to train, evaluate, and sample from one model
 inside a script or notebook.
 
-## Placeholder Notebook
+## Notebook
 
-[Colab badge placeholder]
-
-A Colab notebook can be linked here when a maintained notebook exists.
+Use <a href="../../notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
+for an executable walkthrough. Open in Colab badges will be added after public
+release.
 
 ## Python API Example
 

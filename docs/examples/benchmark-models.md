@@ -3,11 +3,11 @@
 Use the CLI for benchmark campaigns. This keeps model presets, data sources,
 seeds, overrides, and output artifacts explicit.
 
-## Placeholder Notebook
+## Notebook
 
-[Colab badge placeholder]
-
-A Colab notebook can be linked here when a maintained notebook exists.
+Use <a href="../../notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
+for an executable walkthrough. Open in Colab badges will be added after public
+release.
 
 ## Benchmark A Split Collection
 

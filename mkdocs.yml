@@ -29,6 +29,7 @@ nav:
   - Model Developers:
       - Adding A Model: adding-a-model.md
   - Examples:
+      - Tutorial Notebooks: examples/colabs.md
       - Inspect Data: examples/inspect-data.md
       - Train One Model: examples/train-one-model.md
       - Train And Evaluate One Model: examples/train-and-evaluate-one-model.md
