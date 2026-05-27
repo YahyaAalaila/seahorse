@@ -10,6 +10,10 @@ Unified benchmarking for heterogeneous spatio-temporal point processes.<br>
 One API. One CLI. Many models. Consistent metrics.
 </p>
 
+<div class="hero-figure">
+  <img src="assets/cool_figure.png" alt="Seahorse: Event data, model, and YAML config feed into the framework, which outputs reproducible performance metrics and best hyperparameters.">
+</div>
+
 <div class="grid cards" markdown>
 
 -   :material-play-circle:{ .lg .middle } **Run One Model**

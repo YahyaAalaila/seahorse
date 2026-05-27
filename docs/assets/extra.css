@@ -1,19 +1,19 @@
 /* ── Custom colour tokens ─────────────────────────────────────────────────── */
 :root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color:        #006064;
-  --md-primary-fg-color--light: #00838F;
-  --md-primary-fg-color--dark:  #004D40;
-  --md-accent-fg-color:         #00B8D4;
-  --md-accent-fg-color--transparent: rgba(0,184,212,.1);
+  --md-primary-fg-color:        #0E7490;
+  --md-primary-fg-color--light: #0891B2;
+  --md-primary-fg-color--dark:  #155E75;
+  --md-accent-fg-color:         #0369A1;
+  --md-accent-fg-color--transparent: rgba(3,105,161,.1);
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color:        #00ACC1;
-  --md-primary-fg-color--light: #26C6DA;
-  --md-primary-fg-color--dark:  #00838F;
-  --md-accent-fg-color:         #26C6DA;
-  --md-accent-fg-color--transparent: rgba(38,198,218,.12);
+  --md-primary-fg-color:        #0891B2;
+  --md-primary-fg-color--light: #38BDF8;
+  --md-primary-fg-color--dark:  #0E7490;
+  --md-accent-fg-color:         #0EA5E9;
+  --md-accent-fg-color--transparent: rgba(14,165,233,.12);
   --md-default-bg-color:        #111418;
   --md-default-bg-color--light: #181d23;
   --md-default-bg-color--lighter: #1e242c;
@@ -52,8 +52,8 @@
 }
 
 [data-md-color-scheme="slate"] .md-typeset code:not(pre code) {
-  background-color: rgba(38,198,218,.12);
-  color: #80DEEA;
+  background-color: rgba(14,165,233,.12);
+  color: #7DD3FC;
   border-radius: 3px;
   padding: .05em .3em;
 }
@@ -131,7 +131,7 @@
 [data-md-color-scheme="default"] .md-typeset details {
   background-color: rgba(0, 0, 0, 0.025) !important;
   border-color: rgba(0, 0, 0, 0.1) !important;
-  border-left-color: rgba(0, 96, 100, 0.35) !important;
+  border-left-color: rgba(14, 116, 144, 0.35) !important;
   border-left-width: 2px !important;
 }
 
@@ -176,4 +176,16 @@
 /* ── Tighten first h1 on homepage ─────────────────────────────────────────── */
 .md-content__inner > h1:first-child {
   margin-top: .2em;
+}
+
+/* ── Hero figure (homepage overview illustration) ─────────────────────────── */
+.hero-figure {
+  text-align: center;
+  margin: 2rem 0 2.5rem;
+}
+
+.hero-figure img {
+  max-width: 720px;
+  width: 100%;
+  border-radius: 10px;
 }
