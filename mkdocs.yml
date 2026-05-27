@@ -4,7 +4,7 @@ docs_dir: docs
 
 # Placeholder — update to the final public repo URL before publication
 repo_url: https://github.com/YahyaAalaila/uni-stpp
-repo_name: YahyaAalaila/uni-stpp
+repo_name: GitHub
 edit_uri: edit/release/v1-integration/docs/
 
 theme:

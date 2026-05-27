@@ -193,17 +193,17 @@
   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 3px 10px rgba(0,0,0,.15) !important;
 }
 
-/* Reduce tab bar height and add the blue → dark transition shadow */
+/* Tab bar: shadow for visual separation; NO fixed height — let content drive it
+   so the row is never clipped when Material recalculates its layout. */
 .md-tabs {
-  height: 2rem;
-  box-shadow: 0 4px 14px rgba(0,0,0,.4) !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35) !important;
 }
 
-/* Tab link: slightly larger text, compact vertical padding */
+/* Tab link: compact but not clipped (0.55rem padding × 2 + ~0.9rem line ≈ 2rem natural height) */
 .md-tabs__link {
   font-size: 0.75rem !important;
-  padding-top: .45rem !important;
-  padding-bottom: .45rem !important;
+  padding-top: .55rem !important;
+  padding-bottom: .55rem !important;
   opacity: 1;
 }
 
@@ -214,7 +214,7 @@
   opacity: 1 !important;
 }
 
-/* Reduce search form height so it sits proportionally in the header */
+/* Search form: compact height proportional to the header */
 .md-search__form {
   height: 1.75rem !important;
   border-radius: 4px !important;
