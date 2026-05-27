@@ -38,52 +38,46 @@ theme:
     - search.suggest
     - content.code.copy
     - content.tabs.link
-    - content.action.edit
 
 extra_css:
   - assets/extra.css
 
 nav:
-  - Home:
-      - Overview: index.md
-      - Quickstart: getting-started.md
+  - Home: index.md
+  - Getting Started:
+      - Overview: getting-started.md
       - Why Seahorse: why-seahorse.md
-  - Run Models:
-      - Start Here: python-api.md
-      - "Data → Model → Fit": examples/train-one-model.md
-      - Evaluate a Model: run-models/evaluate.md
-      - Predict / Sample Events: run-models/predict.md
-      - Visualize Results: run-models/visualize.md
-      - Tutorial Notebook: examples/colabs.md
-  - Benchmark:
-      - Benchmark Overview: benchmarks.md
-      - Run a Small Benchmark: examples/run-a-small-benchmark.md
-      - Presets and Configs: benchmark/presets.md
-      - Tune Hyperparameters: benchmark/tune.md
-      - Evaluation Profiles: evaluation.md
-      - Artifacts and Run Directories: benchmark/artifacts.md
-      - Compare Results: benchmark/compare.md
-  - Datasets:
-      - Dataset Overview: datasets/overview.md
       - Data Format: data-format.md
-      - Ready-to-use HF Datasets: datasets/hf-datasets.md
-      - Dataset Catalog: datasets/catalog.md
-      - Add Your Dataset: datasets/add-dataset.md
-      - Conversion Standard: datasets/conversion.md
-  - Extend Seahorse:
+      - Dataset Overview: datasets/overview.md
+  - Python API:
+      - Run One Model: python-api.md
+      - Predict Events: run-models/predict.md
+      - Visualize Results: run-models/visualize.md
+  - CLI Workflows:
+      - CLI Reference: cli.md
+      - Evaluation: evaluation.md
+      - Artifacts: benchmark/artifacts.md
+      - Compare Results: benchmark/compare.md
+  - Benchmarking:
+      - Benchmark Campaigns: benchmarks.md
+      - Run A Small Benchmark: examples/run-a-small-benchmark.md
+      - Presets And Configs: benchmark/presets.md
+      - Tune Hyperparameters: benchmark/tune.md
+      - Model Capability Matrix: model-capability-matrix.md
+  - Model Developers:
+      - Add A Model: adding-a-model.md
       - Extension Overview: extend/overview.md
-      - Add a Model: adding-a-model.md
-      - Wrap an Existing Model: extend/wrap.md
-      - Register a Preset: extend/preset.md
+      - Wrap Existing Models: extend/wrap.md
+      - Register Presets: extend/preset.md
       - Declare Capabilities: extend/capabilities.md
       - Testing Checklist: extend/testing.md
-  - Learn:
-      - Architecture: architecture.md
-      - Execution Contract: learn/execution-contract.md
-      - Model Capability Matrix: model-capability-matrix.md
-      - Evaluation Semantics: learn/evaluation-semantics.md
-      - Reproduce Paper Results: paper-reproduction.md
-      - "FAQ / Common Errors": learn/faq.md
+  - Examples:
+      - Tutorial Notebooks: examples/colabs.md
+      - Inspect Data: examples/inspect-data.md
+      - Train One Model: examples/train-one-model.md
+      - Run A Small Benchmark: examples/run-a-small-benchmark.md
+      - Evaluate Results: examples/evaluate-and-visualize-results.md
+  - Paper Reproduction: paper-reproduction.md
 
 markdown_extensions:
   - attr_list
@@ -116,8 +110,5 @@ exclude_docs: |
   original_models_manifesto.md
   wrapper_audit.md
   appendix_evaluation.md
-  examples/inspect-data.md
-  examples/evaluate-and-visualize-results.md
-  cli.md
   internal/**
   release/**

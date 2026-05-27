@@ -1,305 +1,383 @@
-/* ── Custom colour tokens ─────────────────────────────────────────────────── */
+/* Seahorse documentation theme: dark product-docs shell, subtle blue accents. */
+
 :root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color:        #075985;
-  --md-primary-fg-color--light: #0369A1;
-  --md-primary-fg-color--dark:  #0C4A6E;
-  --md-accent-fg-color:         #0369A1;
-  --md-accent-fg-color--transparent: rgba(3,105,161,.1);
+  --seahorse-accent: #075985;
+  --seahorse-accent-hover: #0284c7;
+  --seahorse-accent-soft: rgba(7, 89, 133, 0.14);
+  --seahorse-shell: #0b1018;
+  --seahorse-panel: #ffffff;
+  --seahorse-panel-soft: #f8fafc;
+  --seahorse-border: rgba(15, 23, 42, 0.14);
+  --md-primary-fg-color: #0f172a;
+  --md-primary-fg-color--light: #1e293b;
+  --md-primary-fg-color--dark: #020617;
+  --md-accent-fg-color: var(--seahorse-accent);
+  --md-accent-fg-color--transparent: var(--seahorse-accent-soft);
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color:        #0369A1;
-  --md-primary-fg-color--light: #38BDF8;
-  --md-primary-fg-color--dark:  #075985;
-  --md-accent-fg-color:         #38BDF8;
-  --md-accent-fg-color--transparent: rgba(56,189,248,.12);
-  --md-default-bg-color:        #111418;
-  --md-default-bg-color--light: #181d23;
-  --md-default-bg-color--lighter: #1e242c;
-  --md-default-bg-color--lightest: #252d38;
-  --md-code-bg-color:           #181d23;
-  --md-code-fg-color:           #e0e8f0;
+  --seahorse-accent: #075985;
+  --seahorse-accent-hover: #0284c7;
+  --seahorse-accent-soft: rgba(7, 89, 133, 0.28);
+  --seahorse-shell: #0b1018;
+  --seahorse-panel: #111827;
+  --seahorse-panel-soft: #151e2b;
+  --seahorse-border: rgba(148, 163, 184, 0.16);
+  --md-primary-fg-color: var(--seahorse-shell);
+  --md-primary-fg-color--light: #111827;
+  --md-primary-fg-color--dark: #020617;
+  --md-accent-fg-color: var(--seahorse-accent-hover);
+  --md-accent-fg-color--transparent: var(--seahorse-accent-soft);
+  --md-default-bg-color: #0f141d;
+  --md-default-bg-color--light: #141b26;
+  --md-default-bg-color--lighter: #182231;
+  --md-default-bg-color--lightest: #1d2938;
+  --md-default-fg-color: rgba(226, 232, 240, 0.92);
+  --md-default-fg-color--light: rgba(203, 213, 225, 0.78);
+  --md-default-fg-color--lighter: rgba(148, 163, 184, 0.58);
+  --md-code-bg-color: #111827;
+  --md-code-fg-color: #dbeafe;
+  --md-typeset-a-color: #38a6d9;
 }
 
-/* ── Content width — fill wider desktops ─────────────────────────────────── */
+/* Layout: use desktop width without forcing awkward gutters. */
 .md-grid {
-  max-width: 1500px;
+  max-width: 92rem;
 }
 
-/* ── Body typography ─────────────────────────────────────────────────────── */
-/* Bump base from Material's 0.8rem to 0.85rem for better readability */
-.md-typeset {
-  font-size: .85rem;
-  line-height: 1.65;
-}
-
-/* ── Heading hierarchy ────────────────────────────────────────────────────── */
-.md-typeset h1 {
-  font-size: 2em;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin-bottom: .4em;
-}
-
-.md-typeset h2 {
-  font-size: 1.4em;
-  font-weight: 600;
-  border-bottom: 1px solid var(--md-default-fg-color--lightest);
-  padding-bottom: .25em;
-  margin-top: 1.6em;
-}
-
-.md-typeset h3 {
-  font-size: 1.15em;
-  font-weight: 600;
-}
-
-/* ── Logo — slight size bump (~10%) ───────────────────────────────────────── */
-.md-header__button.md-logo img {
-  height: 1.65rem;
-  width: auto;
-}
-
-/* ── Code blocks ──────────────────────────────────────────────────────────── */
-[data-md-color-scheme="slate"] .highlight pre,
-[data-md-color-scheme="slate"] .md-typeset pre {
-  background-color: #181d23;
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 6px;
-}
-
-[data-md-color-scheme="slate"] .md-typeset code:not(pre code) {
-  background-color: rgba(56,189,248,.12);
-  color: #7DD3FC;
-  border-radius: 3px;
-  padding: .05em .3em;
-}
-
-/* ── Tables ───────────────────────────────────────────────────────────────── */
-.md-typeset__table {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.md-typeset table:not([class]) {
-  border-collapse: collapse;
-  font-size: .85em;
-  line-height: 1.5;
-}
-
-.md-typeset table:not([class]) th {
-  background-color: var(--md-primary-fg-color);
-  color: #fff;
-  font-weight: 600;
-  padding: .5em .8em;
-  white-space: nowrap;
-}
-
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
-  border-bottom: 1px solid rgba(255,255,255,.06);
-  padding: .45em .8em;
-}
-
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:nth-child(even) td {
-  background-color: rgba(255,255,255,.025);
-}
-
-/* ── Navigation sidebar ───────────────────────────────────────────────────── */
-.md-nav__title {
-  font-weight: 700;
-  letter-spacing: .02em;
-}
-
-/* ── Cards / grid ─────────────────────────────────────────────────────────── */
-.md-typeset .grid.cards > ul > li,
-.md-typeset .grid.cards > .card {
-  border-radius: 8px;
-  transition: box-shadow .15s ease, transform .1s ease;
-}
-
-.md-typeset .grid.cards > ul > li:hover,
-.md-typeset .grid.cards > .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
-}
-
-/* ── Admonitions ──────────────────────────────────────────────────────────── */
-[data-md-color-scheme="slate"] .md-typeset .admonition {
-  border-left-width: 3px;
-}
-
-/* ── Collapsible blocks (??? / details) ──────────────────────────────────── */
-
-/* Container: reset font-size so child code blocks don't compound-shrink */
-.md-typeset details {
-  font-size: 1em !important;
-  border-radius: 4px !important;
-  border-width: 1px !important;
-  border-style: solid !important;
-  box-shadow: none !important;
-}
-
-[data-md-color-scheme="slate"] .md-typeset details {
-  background-color: rgba(255,255,255,.03) !important;
-  border-color: rgba(255,255,255,.09) !important;
-  border-left-color: rgba(255,255,255,.15) !important;
-  border-left-width: 2px !important;
-}
-
-[data-md-color-scheme="default"] .md-typeset details {
-  background-color: rgba(0,0,0,.025) !important;
-  border-color: rgba(0,0,0,.1) !important;
-  border-left-color: rgba(7,89,133,.35) !important;
-  border-left-width: 2px !important;
-}
-
-/* Summary: normal body font size, slightly muted */
-.md-typeset details > summary {
-  padding: 0.55em 0.75em !important;
-  font-size: 1em !important;
-  font-weight: 500 !important;
-  color: var(--md-default-fg-color--light) !important;
-  background-color: transparent !important;
-  min-height: unset !important;
-  cursor: pointer;
-}
-
-/* Disclosure marker — greyed out, unobtrusive */
-.md-typeset details > summary::before {
-  filter: grayscale(1) opacity(0.45) !important;
-}
-
-/* Code blocks inside collapsibles: inherit from the reset 1em container
-   so they render at the same size as page-level code blocks */
-.md-typeset details pre,
-.md-typeset details .highlight pre,
-.md-typeset details pre > code,
-.md-typeset details .highlight pre > code {
-  font-size: inherit !important;
-}
-
-/* Comfortable spacing before first block inside an open collapsible */
-.md-typeset details > p,
-.md-typeset details > pre,
-.md-typeset details > .highlight {
-  margin-top: 0.75em !important;
-}
-
-/* ── Header proportions and header → page transition ─────────────────────── */
-
-/* Subtle under-shadow on the header bar */
-.md-header {
-  box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 3px 10px rgba(0,0,0,.15) !important;
-}
-
-/* Tab bar: shadow for visual separation; NO fixed height — let content drive it
-   so the row is never clipped when Material recalculates its layout. */
-.md-tabs {
-  box-shadow: 0 3px 10px rgba(0,0,0,.35) !important;
-}
-
-/* Tab link: compact but not clipped (0.55rem padding × 2 + ~0.9rem line ≈ 2rem natural height) */
-.md-tabs__link {
-  font-size: 0.75rem !important;
-  padding-top: .55rem !important;
-  padding-bottom: .55rem !important;
-  opacity: 1;
-}
-
-/* Active tab: bolder so the current section reads clearly */
-.md-tabs__link--active,
-.md-tabs__item--active .md-tabs__link {
-  font-weight: 600 !important;
-  opacity: 1 !important;
-}
-
-/* Search form: compact height proportional to the header */
-.md-search__form {
-  height: 1.75rem !important;
-  border-radius: 4px !important;
-}
-
-/* Constrain search box width at wider viewports */
-@media screen and (min-width: 60em) {
-  .md-search {
-    width: 9.5rem;
+@media screen and (min-width: 122rem) {
+  .md-grid {
+    max-width: 104rem;
   }
 }
 
-/* ── Homepage hero section ────────────────────────────────────────────────── */
+.md-main__inner {
+  margin-top: 1.2rem;
+}
+
+.md-content__inner {
+  padding-top: 0.2rem;
+}
+
+/* Header and top tabs: compact dark shell, blue only as accent. */
+.md-header {
+  background: #0b1018;
+  border-bottom: 1px solid var(--seahorse-border);
+  box-shadow: none;
+}
+
+.md-header__title {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.md-header__button.md-logo {
+  margin: 0.2rem 0.45rem 0.2rem 0.2rem;
+  padding: 0.18rem;
+}
+
+.md-header__button.md-logo img {
+  height: 1.45rem;
+  width: auto;
+}
+
+.md-tabs {
+  background: #0b1018;
+  border-bottom: 1px solid var(--seahorse-border);
+  box-shadow: none;
+}
+
+.md-tabs__list {
+  gap: 0.15rem;
+}
+
+.md-tabs__link {
+  margin-top: 0;
+  padding: 0.65rem 0.42rem 0.55rem;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.72rem;
+  opacity: 1;
+}
+
+.md-tabs__link:hover,
+.md-tabs__link--active,
+.md-tabs__item--active .md-tabs__link {
+  color: #f8fafc;
+}
+
+.md-tabs__link--active,
+.md-tabs__item--active .md-tabs__link {
+  box-shadow: inset 0 -2px 0 var(--seahorse-accent);
+  font-weight: 650;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-header__source {
+    width: auto;
+    max-width: 7rem;
+  }
+}
+
+.md-source {
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.md-source:hover {
+  color: #f8fafc;
+}
+
+/* Search: proportional, not a second header. */
+.md-search__form {
+  height: 1.85rem;
+  border-radius: 0.35rem;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.md-search__input {
+  font-size: 0.78rem;
+}
+
+@media screen and (min-width: 60em) {
+  .md-search {
+    width: 12rem;
+  }
+}
+
+@media screen and (min-width: 100em) {
+  .md-search {
+    width: 15rem;
+  }
+}
+
+/* Sidebar and TOC: readable, aligned, and subtle active states. */
+[data-md-color-scheme="slate"] .md-sidebar {
+  color: rgba(203, 213, 225, 0.86);
+}
+
+.md-nav {
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.md-nav__title {
+  color: rgba(226, 232, 240, 0.92);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.md-nav__link {
+  border-radius: 0.35rem;
+  margin-top: 0.08rem;
+  padding: 0.22rem 0.45rem;
+}
+
+.md-nav__link:hover {
+  color: #7dd3fc;
+  background: rgba(7, 89, 133, 0.14);
+}
+
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: #e0f2fe;
+  background: rgba(7, 89, 133, 0.24);
+  box-shadow: inset 2px 0 0 var(--seahorse-accent);
+}
+
+.md-nav--secondary .md-nav__title {
+  color: rgba(203, 213, 225, 0.78);
+  box-shadow: none;
+}
+
+.md-nav--secondary .md-nav__link {
+  padding-left: 0.55rem;
+}
+
+/* Typography: serious docs scale, not oversized marketing headings. */
+.md-typeset {
+  color: var(--md-default-fg-color);
+  font-size: 0.84rem;
+  line-height: 1.68;
+}
+
+.md-typeset h1 {
+  font-size: 1.9rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  margin-bottom: 0.65rem;
+}
+
+.md-typeset h2 {
+  font-size: 1.25rem;
+  font-weight: 680;
+  margin-top: 1.9rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--seahorse-border);
+}
+
+.md-typeset h3 {
+  font-size: 1.02rem;
+  font-weight: 650;
+}
+
+[data-md-color-scheme="default"] .md-typeset h1 {
+  color: #0f172a;
+}
+
+[data-md-color-scheme="default"] .md-typeset h2,
+[data-md-color-scheme="default"] .md-typeset h3 {
+  color: #1e293b;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  color: #f8fafc;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h2 {
+  color: #edf5ff;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #e2e8f0;
+}
+
+.md-typeset a {
+  text-underline-offset: 0.16em;
+}
+
+/* Homepage: compact landing section that fits naturally into docs layout. */
 .hero-tagline {
-  font-size: 1.15em;
-  color: var(--md-default-fg-color--light);
-  max-width: 640px;
-  line-height: 1.6;
+  max-width: 48rem;
   margin: 0 0 1.2rem;
+  color: rgba(203, 213, 225, 0.82);
+  font-size: 1.02rem;
+  line-height: 1.65;
 }
 
-/* Tighten first h1 (site name) on homepage */
-.md-content__inner > h1:first-child {
-  margin-top: .2em;
+.md-typeset .grid.cards > ul {
+  grid-gap: 0.75rem;
 }
 
-/* Hero figure — secondary illustration, shown below the cards */
+.md-typeset .grid.cards > ul > li {
+  border-color: var(--seahorse-border);
+  border-radius: 0.55rem;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.88), rgba(15, 23, 42, 0.72));
+  box-shadow: none;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: rgba(56, 166, 217, 0.55);
+  background: linear-gradient(180deg, rgba(17, 30, 45, 0.94), rgba(15, 23, 42, 0.78));
+  transform: translateY(-1px);
+}
+
+.md-typeset .grid.cards .lg {
+  color: #38a6d9;
+}
+
 .hero-figure {
-  text-align: center;
-  margin: 1.5rem 0 1.25rem;
+  margin: 1rem 0 1.4rem;
 }
 
 .hero-figure img {
-  max-width: 680px;
-  width: 70%;
-  border-radius: 10px;
+  display: block;
+  width: min(100%, 54rem);
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.65rem;
+  background: #0b1018;
 }
 
-/* ── Page footer: feedback rating + action links ──────────────────────────── */
+/* Code and tables: readable but restrained. */
+[data-md-color-scheme="slate"] .highlight pre,
+[data-md-color-scheme="slate"] .md-typeset pre {
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 0.45rem;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code:not(pre code) {
+  color: #bae6fd;
+  background: rgba(7, 89, 133, 0.22);
+  border-radius: 0.25rem;
+  padding: 0.08em 0.28em;
+}
+
+.md-typeset__table {
+  width: 100%;
+}
+
+.md-typeset table:not([class]) {
+  display: table;
+  width: 100%;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.45rem;
+  overflow: hidden;
+  font-size: 0.78rem;
+}
+
+.md-typeset table:not([class]) th {
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid var(--seahorse-border);
+  font-weight: 650;
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:nth-child(even) td {
+  background: rgba(148, 163, 184, 0.035);
+}
+
+/* Admonitions and details: quiet callouts. */
+[data-md-color-scheme="slate"] .md-typeset .admonition,
+[data-md-color-scheme="slate"] .md-typeset details {
+  background: rgba(17, 24, 39, 0.72);
+  border-color: var(--seahorse-border);
+  box-shadow: none;
+}
+
+/* Custom page footer from overrides/partials/feedback.html. */
 .sh-page-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: .75rem;
+  gap: 0.75rem;
   margin-top: 2.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--md-default-fg-color--lightest);
-  font-size: .78em;
+  border-top: 1px solid var(--seahorse-border);
   color: var(--md-default-fg-color--light);
+  font-size: 0.72rem;
 }
 
-.sh-feedback {
+.sh-feedback,
+.sh-page-actions {
   display: flex;
   align-items: center;
-  gap: .45rem;
+  gap: 0.55rem;
 }
 
 .sh-feedback__btn {
-  background: none;
-  border: 1px solid var(--md-default-fg-color--lighter);
-  border-radius: 3px;
   color: var(--md-default-fg-color--light);
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.3rem;
   cursor: pointer;
   font: inherit;
-  font-size: .78em;
-  padding: .18em .55em;
-  transition: border-color .15s, color .15s;
-  line-height: 1.4;
+  padding: 0.16rem 0.48rem;
 }
 
 .sh-feedback__btn:hover:not(:disabled) {
-  border-color: var(--md-primary-fg-color);
-  color: var(--md-primary-fg-color);
+  color: #e0f2fe;
+  border-color: var(--seahorse-accent);
 }
 
-.sh-feedback__btn:disabled {
-  cursor: default;
-  opacity: .45;
-}
-
-/* CSS-driven answered state */
 .sh-feedback__thanks {
   display: none;
-  color: var(--md-default-fg-color--light);
 }
 
 [data-sh-feedback="answered"] .sh-feedback__thanks {
@@ -311,19 +389,12 @@
   display: none;
 }
 
-.sh-page-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-}
-
 .sh-action-link {
   color: var(--md-default-fg-color--light);
   text-decoration: none;
-  transition: color .15s;
 }
 
 .sh-action-link:hover {
-  color: var(--md-primary-fg-color);
+  color: #7dd3fc;
   text-decoration: underline;
 }
