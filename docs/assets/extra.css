@@ -161,7 +161,9 @@
   line-height: 1.42;
 }
 
+/* Section title (e.g. "Home") — explicit size so it reads above subitems */
 .md-nav__title {
+  font-size: 0.76rem;
   color: rgba(226, 232, 240, 0.92);
   font-weight: 700;
   letter-spacing: 0;
@@ -169,6 +171,12 @@
 
 .md-nav__item {
   padding: 0.02rem 0;
+}
+
+/* Small top pad on the list so the first item's border-radius isn't
+   clipped by the sidebar scrollwrap's overflow:hidden */
+.md-sidebar .md-nav__list {
+  padding-top: 0.12rem;
 }
 
 .md-nav__link {
@@ -183,12 +191,14 @@
   overflow: visible;
 }
 
+/* Top-level section links */
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
   color: rgba(226, 232, 240, 0.9);
   font-size: 0.76rem;
   font-weight: 650;
 }
 
+/* Second-level subitems — slightly smaller and lighter than section titles */
 .md-nav--primary .md-nav__item .md-nav__list .md-nav__link {
   color: rgba(203, 213, 225, 0.76);
   min-height: 1.46rem;
@@ -202,12 +212,12 @@
   background: rgba(7, 89, 133, 0.14);
 }
 
+/* Active state: drop background-clip so the inset left bar renders cleanly */
 .md-nav__link--active,
 .md-nav__item .md-nav__link--active {
   color: #e0f2fe;
   background: rgba(7, 89, 133, 0.24);
   box-shadow: inset 2px 0 0 var(--seahorse-accent);
-  background-clip: padding-box;
 }
 
 .md-nav--secondary .md-nav__title {
