@@ -22,6 +22,18 @@
   --md-code-fg-color:           #e0e8f0;
 }
 
+/* ── Content width — fill wider desktops ─────────────────────────────────── */
+.md-grid {
+  max-width: 1500px;
+}
+
+/* ── Body typography ─────────────────────────────────────────────────────── */
+/* Bump base from Material's 0.8rem to 0.85rem for better readability */
+.md-typeset {
+  font-size: .85rem;
+  line-height: 1.65;
+}
+
 /* ── Heading hierarchy ────────────────────────────────────────────────────── */
 .md-typeset h1 {
   font-size: 2em;
@@ -176,67 +188,68 @@
 
 /* ── Header proportions and header → page transition ─────────────────────── */
 
-/* Subtle under-shadow on the header bar itself */
+/* Subtle under-shadow on the header bar */
 .md-header {
   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 3px 10px rgba(0,0,0,.15) !important;
 }
 
-/* Soften the hard blue → dark jump at the bottom of the tabs bar.
-   This is the main fix: the tabs bar sits at the bottom of the blue zone,
-   so its shadow falls onto the page content and creates a gradual transition. */
+/* Reduce tab bar height and add the blue → dark transition shadow */
 .md-tabs {
+  height: 2rem;
   box-shadow: 0 4px 14px rgba(0,0,0,.4) !important;
 }
 
-/* Slightly larger tab link text to balance visually with the search form */
+/* Tab link: slightly larger text, compact vertical padding */
 .md-tabs__link {
   font-size: 0.75rem !important;
+  padding-top: .45rem !important;
+  padding-bottom: .45rem !important;
   opacity: 1;
 }
 
-/* Active tab: slightly bolder so the current section is clear */
+/* Active tab: bolder so the current section reads clearly */
 .md-tabs__link--active,
 .md-tabs__item--active .md-tabs__link {
   font-weight: 600 !important;
   opacity: 1 !important;
 }
 
-/* Reduce search form height so it sits proportionally inside the header */
+/* Reduce search form height so it sits proportionally in the header */
 .md-search__form {
   height: 1.75rem !important;
   border-radius: 4px !important;
 }
 
-/* Constrain the search box width at wider viewports */
+/* Constrain search box width at wider viewports */
 @media screen and (min-width: 60em) {
   .md-search {
     width: 9.5rem;
   }
 }
 
-/* ── Hero section (homepage) ──────────────────────────────────────────────── */
+/* ── Homepage hero section ────────────────────────────────────────────────── */
 .hero-tagline {
   font-size: 1.15em;
   color: var(--md-default-fg-color--light);
   max-width: 640px;
   line-height: 1.6;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.2rem;
 }
 
-/* ── Tighten first h1 on homepage ─────────────────────────────────────────── */
+/* Tighten first h1 (site name) on homepage */
 .md-content__inner > h1:first-child {
   margin-top: .2em;
 }
 
-/* ── Hero figure (homepage overview illustration) ─────────────────────────── */
+/* Hero figure — secondary illustration, shown below the cards */
 .hero-figure {
   text-align: center;
-  margin: 2rem 0 2.5rem;
+  margin: 1.5rem 0 1.25rem;
 }
 
 .hero-figure img {
-  max-width: 720px;
-  width: 100%;
+  max-width: 680px;
+  width: 70%;
   border-radius: 10px;
 }
 
