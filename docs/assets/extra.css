@@ -93,7 +93,7 @@
   background-color: rgba(255,255,255,.025);
 }
 
-/* ── Navigation ───────────────────────────────────────────────────────────── */
+/* ── Navigation sidebar ───────────────────────────────────────────────────── */
 .md-nav__title {
   font-weight: 700;
   letter-spacing: .02em;
@@ -117,8 +117,11 @@
   border-left-width: 3px;
 }
 
-/* ── Collapsible blocks (??? / details) — subtle, non-intrusive ──────────── */
+/* ── Collapsible blocks (??? / details) ──────────────────────────────────── */
+
+/* Container: reset font-size so child code blocks don't compound-shrink */
 .md-typeset details {
+  font-size: 1em !important;
   border-radius: 4px !important;
   border-width: 1px !important;
   border-style: solid !important;
@@ -126,46 +129,89 @@
 }
 
 [data-md-color-scheme="slate"] .md-typeset details {
-  background-color: rgba(255, 255, 255, 0.03) !important;
-  border-color: rgba(255, 255, 255, 0.09) !important;
-  border-left-color: rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255,255,255,.03) !important;
+  border-color: rgba(255,255,255,.09) !important;
+  border-left-color: rgba(255,255,255,.15) !important;
   border-left-width: 2px !important;
 }
 
 [data-md-color-scheme="default"] .md-typeset details {
-  background-color: rgba(0, 0, 0, 0.025) !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
-  border-left-color: rgba(7, 89, 133, 0.35) !important;
+  background-color: rgba(0,0,0,.025) !important;
+  border-color: rgba(0,0,0,.1) !important;
+  border-left-color: rgba(7,89,133,.35) !important;
   border-left-width: 2px !important;
 }
 
-/* Summary row — smaller, quieter */
+/* Summary: normal body font size, slightly muted */
 .md-typeset details > summary {
-  padding-top: 0.4em !important;
-  padding-bottom: 0.4em !important;
-  font-size: 0.82em !important;
+  padding: 0.55em 0.75em !important;
+  font-size: 1em !important;
   font-weight: 500 !important;
   color: var(--md-default-fg-color--light) !important;
   background-color: transparent !important;
   min-height: unset !important;
+  cursor: pointer;
 }
 
-/* Remove the type-colored icon background from collapsible summaries */
+/* Disclosure marker — greyed out, unobtrusive */
 .md-typeset details > summary::before {
   filter: grayscale(1) opacity(0.45) !important;
 }
 
-/* Code blocks inside collapsibles — same size as surrounding code */
+/* Code blocks inside collapsibles: inherit from the reset 1em container
+   so they render at the same size as page-level code blocks */
 .md-typeset details pre,
-.md-typeset details pre > code {
-  font-size: 0.85em !important;
+.md-typeset details .highlight pre,
+.md-typeset details pre > code,
+.md-typeset details .highlight pre > code {
+  font-size: inherit !important;
 }
 
-/* Tighter inner padding */
-.md-typeset details > .md-typeset:first-of-type,
+/* Comfortable spacing before first block inside an open collapsible */
 .md-typeset details > p,
-.md-typeset details > pre {
-  margin-top: 0.5em !important;
+.md-typeset details > pre,
+.md-typeset details > .highlight {
+  margin-top: 0.75em !important;
+}
+
+/* ── Header proportions and header → page transition ─────────────────────── */
+
+/* Subtle under-shadow on the header bar itself */
+.md-header {
+  box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 3px 10px rgba(0,0,0,.15) !important;
+}
+
+/* Soften the hard blue → dark jump at the bottom of the tabs bar.
+   This is the main fix: the tabs bar sits at the bottom of the blue zone,
+   so its shadow falls onto the page content and creates a gradual transition. */
+.md-tabs {
+  box-shadow: 0 4px 14px rgba(0,0,0,.4) !important;
+}
+
+/* Slightly larger tab link text to balance visually with the search form */
+.md-tabs__link {
+  font-size: 0.75rem !important;
+  opacity: 1;
+}
+
+/* Active tab: slightly bolder so the current section is clear */
+.md-tabs__link--active,
+.md-tabs__item--active .md-tabs__link {
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+
+/* Reduce search form height so it sits proportionally inside the header */
+.md-search__form {
+  height: 1.75rem !important;
+  border-radius: 4px !important;
+}
+
+/* Constrain the search box width at wider viewports */
+@media screen and (min-width: 60em) {
+  .md-search {
+    width: 9.5rem;
+  }
 }
 
 /* ── Hero section (homepage) ──────────────────────────────────────────────── */
@@ -237,7 +283,7 @@
   opacity: .45;
 }
 
-/* CSS-driven answered state — no JS framework needed */
+/* CSS-driven answered state */
 .sh-feedback__thanks {
   display: none;
   color: var(--md-default-fg-color--light);
