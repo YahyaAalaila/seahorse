@@ -53,9 +53,9 @@ One API. One CLI. Many models. Consistent metrics.
     ```python
     from unified_stpp import AutoSTPP, load_jsonl
 
-    train = load_jsonl("data/my_dataset/train.jsonl")
-    val   = load_jsonl("data/my_dataset/val.jsonl")
-    test  = load_jsonl("data/my_dataset/test.jsonl")
+    train = load_jsonl("data/citibike-stpp/train.jsonl")
+    val   = load_jsonl("data/citibike-stpp/val.jsonl")
+    test  = load_jsonl("data/citibike-stpp/test.jsonl")
 
     model = AutoSTPP(device="cpu", seed=42)
     model.fit(train, val, test, epochs=10, batch_size=64)
@@ -77,8 +77,8 @@ One API. One CLI. Many models. Consistent metrics.
 
 On the CLI, start with a hosted real-world dataset such as
 `yahya021/citibike-stpp`, or use one of Seahorse's curated HF datasets from the
-catalog. For the Python API, keep using local JSONL splits and swap the same
-layout over to your own files when you are ready to iterate locally.
+catalog. For the Python API, load the same Citibike splits from local JSONL
+files once you have them downloaded or cached under `data/citibike-stpp/`.
 
 <div class="hero-figure">
   <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
