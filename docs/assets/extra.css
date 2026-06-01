@@ -176,34 +176,34 @@
 /* Small top pad on the list so the first item's border-radius isn't
    clipped by the sidebar scrollwrap's overflow:hidden */
 .md-sidebar .md-nav__list {
-  padding-top: 0.12rem;
+  padding-top: 0.18rem;
 }
 
 .md-nav__link {
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  min-height: 1.58rem;
-  border-radius: 0.35rem;
-  margin: 0.04rem 0;
-  padding: 0.26rem 0.52rem;
-  line-height: 1.32;
+  min-height: 1.64rem;
+  border-radius: 0.42rem;
+  margin: 0.06rem 0;
+  padding: 0.3rem 0.54rem;
+  line-height: 1.28;
   overflow: visible;
 }
 
 /* Top-level section links */
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
   color: rgba(226, 232, 240, 0.9);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 650;
 }
 
 /* Second-level subitems — slightly smaller and lighter than section titles */
 .md-nav--primary .md-nav__item .md-nav__list .md-nav__link {
   color: rgba(203, 213, 225, 0.76);
-  min-height: 1.46rem;
-  padding: 0.22rem 0.5rem;
-  font-size: 0.7rem;
+  min-height: 1.5rem;
+  padding: 0.24rem 0.52rem;
+  font-size: 0.69rem;
   font-weight: 500;
 }
 
@@ -218,6 +218,7 @@
   color: #e0f2fe;
   background: rgba(7, 89, 133, 0.24);
   box-shadow: inset 2px 0 0 var(--seahorse-accent);
+  background-clip: padding-box;
 }
 
 .md-nav--secondary .md-nav__title {
@@ -226,9 +227,9 @@
 }
 
 .md-nav--secondary .md-nav__link {
-  min-height: 1.42rem;
-  padding-left: 0.55rem;
-  font-size: 0.68rem;
+  min-height: 1.46rem;
+  padding-left: 0.58rem;
+  font-size: 0.69rem;
 }
 
 /* Typography: serious docs scale, not oversized marketing headings. */
@@ -315,12 +316,13 @@
 }
 
 .hero-figure {
-  margin: 1rem 0 1.4rem;
+  margin: 0.9rem auto 1.1rem;
+  max-width: 36rem;
 }
 
 .hero-figure img {
   display: block;
-  width: min(100%, 54rem);
+  width: 100%;
   border: 1px solid var(--seahorse-border);
   border-radius: 0.65rem;
   background: #0b1018;

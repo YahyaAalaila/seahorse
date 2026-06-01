@@ -46,10 +46,6 @@ One API. One CLI. Many models. Consistent metrics.
 
 </div>
 
-<div class="hero-figure">
-  <img src="assets/cool_figure.png" alt="Seahorse: Event data, model, and YAML config feed into the framework, which outputs reproducible performance metrics and best hyperparameters.">
-</div>
-
 ## Quick Start
 
 === "Python API"
@@ -57,9 +53,9 @@ One API. One CLI. Many models. Consistent metrics.
     ```python
     from unified_stpp import AutoSTPP, load_jsonl
 
-    train = load_jsonl("data/my_dataset/train.jsonl")
-    val   = load_jsonl("data/my_dataset/val.jsonl")
-    test  = load_jsonl("data/my_dataset/test.jsonl")
+    train = load_jsonl("data/hawkesnest_hard_v2/topology_T5/train.jsonl")
+    val   = load_jsonl("data/hawkesnest_hard_v2/topology_T5/val.jsonl")
+    test  = load_jsonl("data/hawkesnest_hard_v2/topology_T5/test.jsonl")
 
     model = AutoSTPP(device="cpu", seed=42)
     model.fit(train, val, test, epochs=10, batch_size=64)
@@ -71,10 +67,21 @@ One API. One CLI. Many models. Consistent metrics.
     ```bash
     python -m unified_stpp bench \
       --presets poisson_gmm auto_stpp deep_stpp \
-      --dataset data/my_dataset \
+      --dataset hawkesnest_hard_v2/topology_T5 \
+      --dataset-revision main \
       --seeds 1 2 3 \
       --out runs/bench
     ```
+
+## What Seahorse Does
+
+Start with a hosted Seahorse dataset such as `hawkesnest_hard_v2/topology_T5`,
+then swap the same split layout over to your own JSONL files when you are ready
+to iterate locally.
+
+<div class="hero-figure">
+  <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
+</div>
 
 ## Core Concepts
 
