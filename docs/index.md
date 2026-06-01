@@ -10,7 +10,7 @@ Unified benchmarking for heterogeneous spatio-temporal point processes.<br>
 One API. One CLI. Many models. Consistent metrics.
 </p>
 
-<div class="grid cards" markdown>
+<div class="grid cards hero-cards" markdown>
 
 -   :material-play-circle:{ .lg .middle } **Run One Model**
 
@@ -20,7 +20,7 @@ One API. One CLI. Many models. Consistent metrics.
 
     [:octicons-arrow-right-24: Python API](python-api.md)
 
--   :material-chart-bar-stacked:{ .lg .middle } **Benchmark Many Models**
+-   :material-chart-bar-stacked:{ .lg .middle } **Run a Benchmark**
 
     ---
 
@@ -53,9 +53,9 @@ One API. One CLI. Many models. Consistent metrics.
     ```python
     from unified_stpp import AutoSTPP, load_jsonl
 
-    train = load_jsonl("data/hawkesnest_hard_v2/topology_T5/train.jsonl")
-    val   = load_jsonl("data/hawkesnest_hard_v2/topology_T5/val.jsonl")
-    test  = load_jsonl("data/hawkesnest_hard_v2/topology_T5/test.jsonl")
+    train = load_jsonl("data/my_dataset/train.jsonl")
+    val   = load_jsonl("data/my_dataset/val.jsonl")
+    test  = load_jsonl("data/my_dataset/test.jsonl")
 
     model = AutoSTPP(device="cpu", seed=42)
     model.fit(train, val, test, epochs=10, batch_size=64)
@@ -67,7 +67,7 @@ One API. One CLI. Many models. Consistent metrics.
     ```bash
     python -m unified_stpp bench \
       --presets poisson_gmm auto_stpp deep_stpp \
-      --dataset hawkesnest_hard_v2/topology_T5 \
+      --dataset yahya021/citibike-stpp \
       --dataset-revision main \
       --seeds 1 2 3 \
       --out runs/bench
@@ -75,9 +75,9 @@ One API. One CLI. Many models. Consistent metrics.
 
 ## What Seahorse Does
 
-Start with a hosted Seahorse dataset such as `hawkesnest_hard_v2/topology_T5`,
-then swap the same split layout over to your own JSONL files when you are ready
-to iterate locally.
+Start with a hosted real-world dataset such as `yahya021/citibike-stpp`, or use
+one of Seahorse's curated HF datasets from the catalog. Then swap the same split
+layout over to your own JSONL files when you are ready to iterate locally.
 
 <div class="hero-figure">
   <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
