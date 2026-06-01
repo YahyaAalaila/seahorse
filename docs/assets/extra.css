@@ -297,25 +297,27 @@
   grid-gap: 0.75rem;
 }
 
-.hero-cards > ul {
+.md-typeset .grid.cards.hero-cards > ul {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 @media screen and (max-width: 59.99em) {
-  .hero-cards > ul {
+  .md-typeset .grid.cards.hero-cards > ul {
     grid-template-columns: 1fr;
   }
 }
 
-.md-typeset .grid.cards > ul > li {
+.md-typeset .grid.cards.hero-cards > ul > li {
   border-color: var(--seahorse-border);
   border-radius: 0.55rem;
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.88), rgba(15, 23, 42, 0.72));
   box-shadow: none;
   transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+  height: 100%;
 }
 
-.md-typeset .grid.cards > ul > li:hover {
+.md-typeset .grid.cards.hero-cards > ul > li:hover {
   border-color: rgba(56, 166, 217, 0.55);
   background: linear-gradient(180deg, rgba(17, 30, 45, 0.94), rgba(15, 23, 42, 0.78));
   transform: translateY(-1px);
