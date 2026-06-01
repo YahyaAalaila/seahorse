@@ -75,9 +75,10 @@ One API. One CLI. Many models. Consistent metrics.
 
 ## What Seahorse Does
 
-Start with a hosted real-world dataset such as `yahya021/citibike-stpp`, or use
-one of Seahorse's curated HF datasets from the catalog. Then swap the same split
-layout over to your own JSONL files when you are ready to iterate locally.
+On the CLI, start with a hosted real-world dataset such as
+`yahya021/citibike-stpp`, or use one of Seahorse's curated HF datasets from the
+catalog. For the Python API, keep using local JSONL splits and swap the same
+layout over to your own files when you are ready to iterate locally.
 
 <div class="hero-figure">
   <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
