@@ -1,3 +1,5 @@
+<a name="top"></a>
+
 <div align="center">
 
 <img src="docs/assets/logofv.png" alt="Seahorse logo" width="120"/>
@@ -29,15 +31,17 @@ rapid prototyping and rigorous, reproducible benchmarking on streaming event dat
 
 ---
 
-## News <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![NEW](https://img.shields.io/badge/-NEW-red) Documentation site is live — install the docs extras and run `mkdocs serve`.
-- ![NEW](https://img.shields.io/badge/-NEW-red) Google Colab notebooks available: [01 — Run One Model](https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/01_run_one_model_python_api.ipynb) · [02 — Benchmark via CLI](https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/02_benchmark_models_cli.ipynb)
-- ![NEW](https://img.shields.io/badge/-NEW-red) Unified benchmark data-contract enforced across all presets — comparable NLL out of the box.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning & Global Health Network (MLGH)](https://mlgh.net/), London, UK.
+
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
+
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [13-02-2025] Our review paper about [Neural Spatiotemporal Point Processes: Trends and Challenges](https://arxiv.org/abs/2502.09341) is up on [arxiv](https://arxiv.org/abs/2502.09341).
 
 ---
 
-## Features <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## ✨ Features&nbsp;<a name="features"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 | | |
 |---|---|
@@ -51,7 +55,7 @@ rapid prototyping and rigorous, reproducible benchmarking on streaming event dat
 
 ---
 
-## Model List <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 🤖 Model List&nbsp;<a name="model-list"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 Our package includes the following state-of-the-art STPP models:
 
@@ -72,7 +76,7 @@ Our package includes the following state-of-the-art STPP models:
 
 ---
 
-## Datasets <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 📊 Datasets&nbsp;<a name="datasets"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse reads any collection of JSONL event sequences. The canonical split layout is:
 
@@ -100,7 +104,7 @@ Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/data
 
 ---
 
-## Quick Start <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 🚀 Quick Start&nbsp;<a name="quick-start"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 **Install**
 
@@ -141,7 +145,7 @@ grid    = runner2.intensity_grid(test[0])
 
 ---
 
-## CLI <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 💻 CLI&nbsp;<a name="cli"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 **Fit one model**
 
@@ -178,7 +182,7 @@ python -m unified_stpp tune \
 
 ---
 
-## Documentation <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 📚 Documentation&nbsp;<a name="documentation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 ```bash
 pip install -e ".[docs]"
@@ -190,18 +194,18 @@ The docs cover the [Python API](docs/python-api.md), [CLI reference](docs/cli.md
 
 ---
 
-## Citation <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 📝 Citation&nbsp;<a name="citation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 Citation details will be added before publication.
 
 ---
 
-## License <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## ⚖️ License&nbsp;<a name="license"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
 ---
 
-## Acknowledgment <sup>[[Back to Top](#seahorse--unified-stpp)]</sup>
+## 🙏 Acknowledgment&nbsp;<a name="acknowledgment"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.
