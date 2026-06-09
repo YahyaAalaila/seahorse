@@ -1,0 +1,58 @@
+{#- Seahorse custom page footer: feedback rating + action links -#}
+
+{#- ── Original analytics-based feedback (preserved for future use) ───────── -#}
+{% if config.extra.analytics %}
+  {% set feedback = config.extra.analytics.feedback %}
+{% endif %}
+{% if page.meta and page.meta.hide %}
+  {% if "feedback" in page.meta.hide %}
+    {% set feedback = None %}
+  {% endif %}
+{% endif %}
+{% if feedback %}
+  <form class="md-feedback" name="feedback" hidden>
+    <fieldset>
+      <legend class="md-feedback__title">{{ feedback.title }}</legend>
+      <div class="md-feedback__inner">
+        <div class="md-feedback__list">
+          {% for rating in feedback.ratings %}
+            <button class="md-feedback__icon md-icon" type="submit" title="{{ rating.name }}" data-md-value="{{ rating.data }}">
+              {% include ".icons/" ~ rating.icon ~ ".svg" %}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    </fieldset>
+  </form>
+{% endif %}
+
+{#- ── Seahorse page footer ──────────────────────────────────────────────── -#}
+<div class="sh-page-footer" data-sh-feedback="pending">
+
+  <div class="sh-feedback">
+    <span class="sh-feedback__prompt">Was this page helpful?</span>
+    <button class="sh-feedback__btn" type="button"
+      onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+      Yes
+    </button>
+    <button class="sh-feedback__btn" type="button"
+      onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+      No
+    </button>
+    <span class="sh-feedback__thanks">Thanks for the feedback.</span>
+  </div>
+
+  <div class="sh-page-actions">
+    {% if page.edit_url %}
+    <a class="sh-action-link" href="{{ page.edit_url }}" target="_blank" rel="noopener noreferrer">
+      Suggest edits
+    </a>
+    {% endif %}
+    {% if config.repo_url %}
+    <a class="sh-action-link" href="{{ config.repo_url }}/issues/new?labels=documentation&template=doc-feedback.md&title=Docs+feedback%3A+{{ page.title | urlencode }}" target="_blank" rel="noopener noreferrer">
+      Raise issue
+    </a>
+    {% endif %}
+  </div>
+
+</div>

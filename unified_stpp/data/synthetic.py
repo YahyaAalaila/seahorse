@@ -1,464 +1,24 @@
-"""
-Synthetic spatiotemporal point process generators for testing.
+"""Synthetic data generation and reference helpers.
 
-1. Spatiotemporal Hawkes process — self-exciting with spatial Gaussian kernel.
-2. Inhomogeneous Poisson with covariate-dependent intensity — for testing
-   covariate integration.
+The maintained live CLI in ``unified_stpp.__main__`` consumes prebuilt JSONL
+splits for ``fit``, ``evaluate``, ``bench``, and ``tune``. Those splits can be
+produced offline with this module's STHP generator and plotting/reference
+helpers.
+
+Older or non-STHP experimental paths are reference-only and may remain archived
+elsewhere in the repo; this module is the maintained live implementation.
 """
 
 import abc
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 
-
-def _smoothstep(u):
-    u = np.clip(u, 0.0, 1.0)
-    return u * u * (3.0 - 2.0 * u)
+import plotly
 
 
-def _moving_hotspot_t1_t2(T: float, t1_frac: float, t2_frac: float) -> Tuple[float, float]:
-    t1 = float(np.clip(t1_frac, 0.0, 1.0) * T)
-    t2 = float(np.clip(t2_frac, 0.0, 1.0) * T)
-    if t2 < t1:
-        t2 = t1
-    return t1, t2
 
 
-def _moving_hotspot_latent(seed: int, T: float, n_noise_knots: int = 16):
-    rng = np.random.RandomState(seed)
-    phi1 = rng.uniform(0, 2 * np.pi)
-    phi2 = rng.uniform(0, 2 * np.pi)
-    phiA = rng.uniform(0, 2 * np.pi)
-    noise_knots_t = np.linspace(0.0, T, int(max(4, n_noise_knots)))
-    noise_knots_v = rng.normal(0.0, 1.0, size=noise_knots_t.shape[0])
-    return phi1, phi2, phiA, noise_knots_t, noise_knots_v
 
-
-def moving_hotspot_center_and_amplitude(
-    t: float,
-    T: float,
-    spatial_bounds: Tuple[float, float],
-    *,
-    t1_frac: float = 0.32,
-    t2_frac: float = 0.46,
-    jitter_radius: float = 0.55,
-    jitter_f1: float = 0.8,
-    jitter_f2: float = 1.25,
-    amp0: float = 0.0,
-    amp1: float = 0.55,
-    amp_noise: float = 0.10,
-    seed: int = 42,
-    n_noise_knots: int = 16,
-) -> Tuple[np.ndarray, float]:
-    sb_min, sb_max = spatial_bounds
-    a = 0.5 * (sb_max - sb_min)
-    b = 0.5 * (sb_max - sb_min)
-    center_shift = np.array([0.5 * (sb_min + sb_max), 0.5 * (sb_min + sb_max)], dtype=np.float64)
-    corner_a = center_shift + np.array([-a, -b], dtype=np.float64)
-    corner_b = center_shift + np.array([a, b], dtype=np.float64)
-
-    t1, t2 = _moving_hotspot_t1_t2(T, t1_frac=t1_frac, t2_frac=t2_frac)
-    phi1, phi2, phiA, noise_t, noise_v = _moving_hotspot_latent(seed=seed, T=T, n_noise_knots=n_noise_knots)
-
-    if t <= t1:
-        base = corner_a
-    elif t <= t2:
-        u = (t - t1) / max(t2 - t1, 1e-9)
-        s = _smoothstep(u)
-        base = (1.0 - s) * corner_a + s * corner_b
-    else:
-        base = corner_b
-
-    jx = np.sin(2 * np.pi * jitter_f1 * t + phi1)
-    jy = np.cos(2 * np.pi * jitter_f2 * t + phi2)
-    jitter = float(jitter_radius) * np.array([jx, jy], dtype=np.float64)
-    c = base + jitter
-    c[0] = np.clip(c[0], sb_min, sb_max)
-    c[1] = np.clip(c[1], sb_min, sb_max)
-
-    noise_val = np.interp(t, noise_t, noise_v)
-    amp_val = amp0 + amp1 * np.sin(2 * np.pi * 0.35 * t + phiA) + amp_noise * noise_val
-    amp = float(np.exp(amp_val))
-    return c.astype(np.float64), amp
-
-
-def moving_hotspot_intensity(
-    t: float,
-    s: np.ndarray,
-    T: float,
-    spatial_bounds: Tuple[float, float],
-    *,
-    base_rate: float,
-    hotspot_weight: float,
-    sigma: float,
-    t1_frac: float = 0.32,
-    t2_frac: float = 0.46,
-    jitter_radius: float = 0.55,
-    jitter_f1: float = 0.8,
-    jitter_f2: float = 1.25,
-    amp0: float = 0.0,
-    amp1: float = 0.55,
-    amp_noise: float = 0.10,
-    seed: int = 42,
-    n_noise_knots: int = 16,
-) -> np.ndarray:
-    c, amp = moving_hotspot_center_and_amplitude(
-        t=t,
-        T=T,
-        spatial_bounds=spatial_bounds,
-        t1_frac=t1_frac,
-        t2_frac=t2_frac,
-        jitter_radius=jitter_radius,
-        jitter_f1=jitter_f1,
-        jitter_f2=jitter_f2,
-        amp0=amp0,
-        amp1=amp1,
-        amp_noise=amp_noise,
-        seed=seed,
-        n_noise_knots=n_noise_knots,
-    )
-    s_arr = np.asarray(s)
-    d2 = np.sum((s_arr - c) ** 2, axis=-1)
-    hotspot = np.exp(-d2 / (2.0 * sigma * sigma))
-    return base_rate + hotspot_weight * amp * hotspot
-
-
-def generate_hawkes_stpp(
-    n_sequences: int = 100,
-    T: float = 10.0,
-    spatial_bounds: Tuple[float, float] = (-5.0, 5.0),
-    spatial_dim: int = 2,
-    mu: float = 1.0,
-    alpha: float = 0.5,
-    beta: float = 1.0,
-    sigma_s: float = 1.0,
-    seed: int = 42,
-) -> List[Dict]:
-    """
-    Generate sequences from a spatiotemporal Hawkes process.
-    
-    λ*(t, s) = μ + α Σ_{t_i < t} β exp(-β(t - t_i)) · N(s; s_i, σ_s² I)
-    
-    Args:
-        n_sequences: Number of sequences to generate.
-        T: Time horizon.
-        spatial_bounds: (min, max) for each spatial dimension.
-        spatial_dim: Number of spatial dimensions.
-        mu: Background rate.
-        alpha: Excitation magnitude (must be < 1 for stability).
-        beta: Temporal decay rate.
-        sigma_s: Spatial influence kernel bandwidth.
-        seed: Random seed.
-    Returns:
-        List of dicts, each with 'times', 'locations', and optionally 'covariates'.
-    """
-    rng = np.random.RandomState(seed)
-    sequences = []
-
-    for _ in range(n_sequences):
-        times = []
-        locs = []
-        t = 0.0
-
-        # Upper bound for thinning
-        lambda_bar = mu + 10.0  # conservative; increase if rejection rate high
-
-        while t < T:
-            # Thinning algorithm
-            dt = rng.exponential(1.0 / lambda_bar)
-            t = t + dt
-            if t >= T:
-                break
-
-            # Compute actual intensity at (t, s_candidate)
-            s_candidate = rng.uniform(spatial_bounds[0], spatial_bounds[1], size=spatial_dim)
-
-            lam = mu
-            for ti, si in zip(times, locs):
-                temporal = alpha * beta * np.exp(-beta * (t - ti))
-                spatial = np.exp(-np.sum((s_candidate - si) ** 2) / (2 * sigma_s ** 2))
-                spatial /= (2 * np.pi * sigma_s ** 2) ** (spatial_dim / 2)
-                lam += temporal * spatial
-
-            # Accept/reject
-            if rng.uniform() < lam / lambda_bar:
-                times.append(t)
-                locs.append(s_candidate)
-
-            # Update upper bound (adaptive)
-            lambda_bar = max(lambda_bar, lam * 1.5)
-
-        sequences.append({
-            "times": np.array(times, dtype=np.float32),
-            "locations": np.array(locs, dtype=np.float32).reshape(-1, spatial_dim),
-        })
-
-    return sequences
-
-
-def generate_inhomogeneous_stpp(
-    n_sequences: int = 100,
-    T: float = 5.0,
-    spatial_bounds: Tuple[float, float] = (-5.0, 5.0),
-    spatial_dim: int = 2,
-    base_rate: float = 2.0,
-    covariate_dim: int = 1,
-    seed: int = 42,
-    covariate_fn=None,
-) -> List[Dict]:
-    """
-    Generate sequences from an inhomogeneous Poisson process whose
-    intensity depends on a spatial covariate.
-    
-    λ*(t, s) = base_rate · exp(w^T X(t, s))
-    
-    where X(t, s) is a field covariate. If covariate_fn is None,
-    uses a default: X(t, s) = sin(s_1) + cos(t).
-    
-    This is useful for testing covariate augmentation.
-    """
-    print(f"Generating inhomogeneous Poisson sequences with covariate-dependent intensity, with seed = {seed} and covariate_fn = {covariate_fn}")
-    rng = np.random.RandomState(seed)
-
-    if covariate_fn is None:
-        def covariate_fn(t, s):
-            # Deterministic feature map with configurable output width.
-            base = [
-                np.sin(s[0]) + np.cos(t),
-                np.cos(s[1] if len(s) > 1 else s[0]) + np.sin(0.5 * t),
-                np.sin(s[0] + t),
-                np.cos((s[1] if len(s) > 1 else s[0]) - t),
-            ]
-            if covariate_dim <= len(base):
-                vals = base[:covariate_dim]
-            else:
-                vals = base + [np.sin((k + 1) * t) for k in range(covariate_dim - len(base))]
-            return np.asarray(vals, dtype=np.float32)
-
-    sequences = []
-    sb = spatial_bounds
-    vol = (sb[1] - sb[0]) ** spatial_dim
-
-    for _ in range(n_sequences):
-        times = []
-        locs = []
-        covs = []
-        t = 0.0
-
-        lambda_bar = base_rate * np.exp(0.5)  # upper bound
-
-        while t < T:
-            dt = rng.exponential(1.0 / (lambda_bar * vol))
-            t = t + dt
-            if t >= T:
-                break
-
-            s = rng.uniform(sb[0], sb[1], size=spatial_dim)
-            x = covariate_fn(t, s)
-            lam = base_rate * np.exp(np.clip(x.sum(), -5, 5))
-
-            if rng.uniform() < lam / lambda_bar:
-                times.append(t)
-                locs.append(s.astype(np.float32))
-                covs.append(x)
-        #print(f"times: {len(times)}, locs: {len(locs)}, covs: {len(covs)}")
-        seq = {
-            "times": np.array(times, dtype=np.float32),
-            "locations": np.array(locs, dtype=np.float32).reshape(-1, spatial_dim),
-            "field_covariates": np.array(covs, dtype=np.float32).reshape(-1, len(covs[0])) if covs else np.zeros((0, 1), dtype=np.float32),
-        }
-        sequences.append(seq)
-
-    return sequences
-
-
-def moving_hotspot_covariates(
-    t: float,
-    s: np.ndarray,          # kept for API compatibility; NOT used in computation
-    T: float,
-    spatial_bounds: Tuple[float, float],
-    sigma: float,           # kept for API compatibility; NOT used in computation
-    covariate_dim: int,
-    t1_frac: float = 0.32,
-    t2_frac: float = 0.46,
-    jitter_radius: float = 0.55,
-    jitter_f1: float = 0.8,
-    jitter_f2: float = 1.25,
-    amp0: float = 0.0,
-    amp1: float = 0.55,
-    amp_noise: float = 0.10,
-    seed: int = 42,
-    n_noise_knots: int = 16,
-) -> np.ndarray:
-    """
-    Pure time-dependent contextual covariates for the moving-hotspot process.
-
-    All features are functions of t only — no dependency on the event's own
-    spatial location s.  This guarantees:
-      (a) No leakage of the target location into the conditioning signal.
-      (b) The spatial density f*(s | z, X(t)) remains a valid normalised
-          density because X does not vary with s.
-      (c) Training and inference covariate distributions are aligned.
-
-    Feature layout (first covariate_dim entries):
-      0: c_x(t)      — hotspot centre x at time t
-      1: c_y(t)      — hotspot centre y at time t
-      2: amp(t)      — amplitude modulation at time t
-      3: sin(2πt/T)  — periodic motion-phase encoding (sin)
-      4: cos(2πt/T)  — periodic motion-phase encoding (cos)
-      5+: higher-order sin harmonics for extra capacity
-    """
-    c, amp = moving_hotspot_center_and_amplitude(
-        t=t,
-        T=T,
-        spatial_bounds=spatial_bounds,
-        t1_frac=t1_frac,
-        t2_frac=t2_frac,
-        jitter_radius=jitter_radius,
-        jitter_f1=jitter_f1,
-        jitter_f2=jitter_f2,
-        amp0=amp0,
-        amp1=amp1,
-        amp_noise=amp_noise,
-        seed=seed,
-        n_noise_knots=n_noise_knots,
-    )
-    tod = 2.0 * np.pi * t / max(T, 1e-6)
-
-    # All time-only features — s is intentionally not used here.
-    base = [
-        c[0],             # hotspot centre x  (time-only)
-        c[1],             # hotspot centre y  (time-only)
-        amp,              # amplitude modulation  (time-only)
-        np.sin(tod),      # periodic phase — sin  (time-only)
-        np.cos(tod),      # periodic phase — cos  (time-only)
-    ]
-    if covariate_dim <= len(base):
-        vals = base[:covariate_dim]
-    else:
-        vals = base + [np.sin((k + 1) * tod) for k in range(covariate_dim - len(base))]
-    return np.asarray(vals, dtype=np.float32)
-
-
-def generate_moving_hotspot_stpp(
-    n_sequences: int = 100,
-    T: float = 5.0,
-    spatial_bounds: Tuple[float, float] = (-5.0, 5.0),
-    spatial_dim: int = 2,
-    base_rate: float = 0.2,
-    hotspot_weight: float = 3.0,
-    sigma: float = 0.9,
-    switch_frac: float = 0.5,
-    switch_time: Optional[float] = None,
-    move_duration: Optional[float] = None,
-    t1_frac: float = 0.32,
-    t2_frac: float = 0.46,
-    jitter_radius: float = 0.55,
-    jitter_f1: float = 0.8,
-    jitter_f2: float = 1.25,
-    amp0: float = 0.0,
-    amp1: float = 0.55,
-    amp_noise: float = 0.10,
-    n_noise_knots: int = 16,
-    interaction_weight: float = 1.2,
-    tod_weight: float = 0.6,
-    covariate_dim: int = 1,
-    seed: int = 42,
-) -> List[Dict]:
-    """
-    Inhomogeneous Poisson with a hotspot that moves from one corner to the opposite.
-    Field covariates expose regime/time interaction explicitly.
-    """
-    if spatial_dim != 2:
-        raise ValueError("moving_hotspot currently supports spatial_dim=2")
-
-    rng = np.random.RandomState(seed)
-    sb_min, sb_max = spatial_bounds
-    vol = (sb_max - sb_min) ** spatial_dim
-
-    # Conservative bound for thinning proposals.
-    amp_max = np.exp(amp0 + abs(amp1) + 4.0 * abs(amp_noise))
-    lambda_bar = base_rate + hotspot_weight * amp_max
-
-    print(
-        "Generating moving-hotspot sequences, "
-        f"seed={seed}, covariate_dim={covariate_dim}"
-    )
-
-    sequences = []
-    for _ in range(n_sequences):
-        times = []
-        locs = []
-        covs = []
-        t = 0.0
-
-        while t < T:
-            dt = rng.exponential(1.0 / (lambda_bar * vol))
-            t = t + dt
-            if t >= T:
-                break
-
-            s = rng.uniform(sb_min, sb_max, size=2)
-            lam = float(
-                moving_hotspot_intensity(
-                    t=t,
-                    s=s,
-                    T=T,
-                    spatial_bounds=spatial_bounds,
-                    base_rate=base_rate,
-                    hotspot_weight=hotspot_weight,
-                    sigma=sigma,
-                    t1_frac=t1_frac,
-                    t2_frac=t2_frac,
-                    jitter_radius=jitter_radius,
-                    jitter_f1=jitter_f1,
-                    jitter_f2=jitter_f2,
-                    amp0=amp0,
-                    amp1=amp1,
-                    amp_noise=amp_noise,
-                    seed=seed,
-                    n_noise_knots=n_noise_knots,
-                )
-            )
-
-            cov = moving_hotspot_covariates(
-                t=t,
-                s=s,
-                T=T,
-                spatial_bounds=spatial_bounds,
-                sigma=sigma,
-                covariate_dim=max(1, covariate_dim),
-                t1_frac=t1_frac,
-                t2_frac=t2_frac,
-                jitter_radius=jitter_radius,
-                jitter_f1=jitter_f1,
-                jitter_f2=jitter_f2,
-                amp0=amp0,
-                amp1=amp1,
-                amp_noise=amp_noise,
-                seed=seed,
-                n_noise_knots=n_noise_knots,
-            )
-
-            if rng.uniform() < lam / lambda_bar:
-                times.append(t)
-                locs.append(s.astype(np.float32))
-                covs.append(cov.astype(np.float32))
-        print(f"Generated sequence with {len(times)} events.")
-        sequences.append(
-            {
-                "times": np.array(times, dtype=np.float32),
-                "locations": np.array(locs, dtype=np.float32).reshape(-1, 2),
-                "field_covariates": (
-                    np.array(covs, dtype=np.float32).reshape(-1, max(1, covariate_dim))
-                    if covs
-                    else np.zeros((0, max(1, covariate_dim)), dtype=np.float32)
-                ),
-            }
-        )
-        
-
-    return sequences
 
 
 eps = 1e-10
@@ -854,6 +414,91 @@ class STHPDataset(SyntheticDataset):
         )
         return minimize(obj_fun, x0=xinit, bounds=bnds, constraints=cons)
 
+    def lamb_st_grid(self, xs: np.ndarray, ys: np.ndarray, t: float) -> np.ndarray:
+        """Evaluate λ*(t, s | H) on a 2-D spatial grid in one vectorised pass.
+
+        Parameters
+        ----------
+        xs : (Nx,)  x-axis sample points
+        ys : (Ny,)  y-axis sample points
+        t  : scalar query time
+
+        Returns
+        -------
+        grid : (Nx, Ny)  conditional intensity at each grid cell
+        """
+        # Build flat grid: (Nx*Ny, 2)
+        xx, yy = np.meshgrid(xs, ys, indexing="ij")          # (Nx, Ny) each
+        s_flat = np.column_stack([xx.ravel(), yy.ravel()])    # (N, 2)
+
+        # Background term: vectorised over N — g0 calls g2 with s_mu (1,2)
+        bg = self.mu * self.g0(s_flat, self.s_mu, self.g0_sidc, self.g0_ic)  # (N,)
+
+        # History up to t
+        his_t = self.trunc(self.his_t[self.his_t < t])
+        his_s = self.trunc(self.his_s[self.his_t < t])
+
+        if len(his_t) == 0:
+            return bg.reshape(len(xs), len(ys))
+
+        # Temporal kernel: (H,)
+        g1_vec = self.g1(t, his_t, self.alpha, self.beta)
+
+        # Spatial kernel: (N, H) via broadcast
+        delta_s = s_flat[:, np.newaxis, :] - his_s[np.newaxis, :, :]  # (N, H, 2)
+        quad = np.einsum("nhi,ij,nhj->nh", delta_s, self.g2_ic, delta_s)  # (N, H)
+        g2_mat = 1.0 / (2.0 * np.pi) * self.g2_sidc * np.exp(-quad / 2.0)  # (N, H)
+
+        excitation = (g2_mat * g1_vec[np.newaxis, :]).sum(axis=1)             # (N,)
+        return (bg + excitation).reshape(len(xs), len(ys))
+
+    def get_lamb_st(
+        self,
+        t_start: float,
+        t_end: float,
+        n_x: int = 50,
+        n_y: int = 50,
+        n_t: int = 20,
+    ) -> tuple[list[np.ndarray], np.ndarray, np.ndarray, np.ndarray]:
+        """Compute the conditional intensity surface over a space-time grid.
+
+        Spatial bounds are derived from events in [t_start, t_end]; an extra
+        20 % margin is added so the boundary region is visible.
+
+        Parameters
+        ----------
+        t_start, t_end : time range to visualise
+        n_x, n_y       : spatial grid resolution (points per axis)
+        n_t            : number of time slices
+
+        Returns
+        -------
+        lambs   : list of n_t arrays each shaped (n_x, n_y)
+        x_range : (n_x,)
+        y_range : (n_y,)
+        t_range : (n_t,)
+        """
+        from tqdm import tqdm
+
+        idx = np.logical_and(self.his_t >= t_start, self.his_t < t_end)
+        his_s_win = self.his_s[idx]
+        if len(his_s_win) > 0:
+            x_min, y_min = his_s_win.min(axis=0)
+            x_max, y_max = his_s_win.max(axis=0)
+        else:
+            x_min, y_min = self.s_mu - 2.0
+            x_max, y_max = self.s_mu + 2.0
+
+        x_range = np.linspace(x_min, x_max, n_x)
+        y_range = np.linspace(y_min, y_max, n_y)
+        t_range = np.linspace(t_start, t_end, n_t)
+
+        lambs = [
+            self.lamb_st_grid(x_range, y_range, float(t))
+            for t in tqdm(t_range, desc="intensity grid", leave=False)
+        ]
+        return lambs, x_range, y_range, t_range
+
     def plot_intensity(self, s=None, t_start=None, t_end=None, color="blue"):
         import matplotlib.pyplot as plt
 
@@ -878,7 +523,6 @@ class STHPDataset(SyntheticDataset):
         ax2.stem(
             self.his_t[idx],
             np.sqrt(np.sum(np.square(self.his_s[idx] - s), axis=1)),
-            use_line_collection=True,
             label=f"Events(height = dist to ({s[0,0]}, {s[0,1]}))",
         )
         ax2.set_xlim([t_start, t_end])
@@ -913,139 +557,97 @@ class STHPDataset(SyntheticDataset):
 
 
 # ============================================================================
-# Marked Hawkes process generator
+# Interactive intensity surface visualisation
 # ============================================================================
 
-def generate_marked_hawkes_stpp(
-    n_sequences: int = 100,
-    T: float = 10.0,
-    spatial_bounds: Tuple[float, float] = (-5.0, 5.0),
-    spatial_dim: int = 2,
-    n_marks: int = 3,
-    mu: float = 1.0,
-    alpha: float = 0.5,
-    beta: float = 1.0,
-    sigma_s: float = 1.0,
-    excitation_matrix: Optional[np.ndarray] = None,
-    background_probs: Optional[np.ndarray] = None,
-    seed: int = 42,
-) -> List[Dict]:
+def plot_intensity_surface(
+    lambs: list[np.ndarray],
+    x_range: np.ndarray,
+    y_range: np.ndarray,
+    t_range: np.ndarray,
+    *,
+    mode: str = "heatmap",
+    title: str = "Spatio-temporal Conditional Intensity λ*(t,s|H)",
+    colorscale: str = "Viridis",
+    save_path: Optional[str] = None,
+    show: bool = False,
+) -> "plotly.graph_objects.Figure":
+    """Build an animated plotly figure of the spatiotemporal intensity surface.
+
+    Parameters
+    ----------
+    lambs     : sequence of (n_x, n_y) arrays, one per time step
+    x_range   : (n_x,) x-axis coordinates
+    y_range   : (n_y,) y-axis coordinates
+    t_range   : (n_t,) time values
+    mode      : ``"heatmap"`` (2-D colour) or ``"surface"`` (3-D mesh)
+    title     : figure title
+    colorscale: plotly colorscale name (default ``"Viridis"``)
+    save_path : if given, write an interactive HTML file to this path
+    show      : call ``fig.show()`` (opens browser)
+
+    Returns
+    -------
+    plotly Figure with a time-slider and play/pause controls
     """
-    Generate sequences from a marked spatiotemporal Hawkes process.
+    import plotly.graph_objects as go
 
-    The ground process (t, s) is a standard Hawkes process. The mark k
-    for each event is drawn from a conditional categorical distribution:
+    lambs_arr = np.asarray(lambs)            # (n_t, n_x, n_y)
+    cmin = float(lambs_arr.min())
+    cmax = float(lambs_arr.max())
+    trace_kw = dict(x=x_range, y=y_range, colorscale=colorscale,
+                    cmin=cmin, cmax=cmax, cauto=False)
 
-      Background event:  k ~ Categorical(background_probs)
-      Triggered by event j with mark k_j:
-                         k ~ Categorical(excitation_matrix[k_j])
+    def _trace(z):
+        z_T = z.T    # plotly heatmap/surface: rows = y, cols = x
+        if mode == "surface":
+            return go.Surface(z=z_T, **trace_kw)
+        return go.Heatmap(z=z_T, **trace_kw)
 
-    This produces cross-excitation patterns where marks cluster in
-    predictable ways — useful for testing mark decoder generalisation.
+    frames = [
+        go.Frame(data=_trace(lambs_arr[i]),
+                 name=f"{t_range[i]:.2f}")
+        for i in range(len(t_range))
+    ]
+    fig = go.Figure(data=_trace(lambs_arr[0]), frames=frames)
 
-    Args:
-        n_sequences: Number of sequences to generate.
-        T: Time horizon.
-        spatial_bounds: (min, max) for each spatial dimension.
-        spatial_dim: Number of spatial dimensions.
-        n_marks: Number of discrete mark types (K).
-        mu: Background rate.
-        alpha: Excitation magnitude (must be < 1 for stability).
-        beta: Temporal decay rate.
-        sigma_s: Spatial influence kernel bandwidth.
-        excitation_matrix: (K, K) row-stochastic matrix. excitation_matrix[k, j]
-            is the probability that a child triggered by a type-k parent gets
-            type j. Defaults to a slightly-biased-toward-self matrix.
-        background_probs: (K,) probability vector for background events.
-            Defaults to uniform.
-        seed: Random seed.
+    sliders = [{
+        "pad": {"b": 10, "t": 60},
+        "len": 0.9, "x": 0.1, "y": 0,
+        "steps": [
+            {"args": [[f.name], {"frame": {"duration": 0}, "mode": "immediate",
+                                 "transition": {"duration": 0}}],
+             "label": f.name, "method": "animate"}
+            for f in frames
+        ],
+    }]
+    fig.update_layout(
+        title=title,
+        width=700, height=600,
+        updatemenus=[{
+            "buttons": [
+                {"args": [None, {"frame": {"duration": 200}, "fromcurrent": True}],
+                 "label": "▶", "method": "animate"},
+                {"args": [[None], {"frame": {"duration": 0}, "mode": "immediate"}],
+                 "label": "⏸", "method": "animate"},
+            ],
+            "direction": "left", "type": "buttons",
+            "pad": {"r": 10, "t": 70}, "x": 0.1, "y": 0,
+        }],
+        sliders=sliders,
+        xaxis_title="x", yaxis_title="y",
+    )
+    if mode == "surface":
+        fig.update_scenes(
+            aspectmode="cube",
+            zaxis=dict(title="λ", range=[cmin, cmax], autorange=False),
+        )
 
-    Returns:
-        List of dicts, each with keys:
-            'times':     (N,) float32
-            'locations': (N, d) float32
-            'marks':     (N,) int64 — mark indices in [0, K)
-    """
-    rng = np.random.RandomState(seed)
-
-    # Default excitation matrix: self-exciting with small cross-excitation
-    if excitation_matrix is None:
-        diag_weight = 0.6
-        off_diag_weight = (1.0 - diag_weight) / max(n_marks - 1, 1)
-        excitation_matrix = np.full((n_marks, n_marks), off_diag_weight)
-        np.fill_diagonal(excitation_matrix, diag_weight)
-
-    excitation_matrix = np.asarray(excitation_matrix, dtype=np.float64)
-    # Row-normalise to ensure valid distribution
-    row_sums = excitation_matrix.sum(axis=1, keepdims=True)
-    excitation_matrix = excitation_matrix / np.maximum(row_sums, 1e-12)
-
-    if background_probs is None:
-        background_probs = np.ones(n_marks, dtype=np.float64) / n_marks
-    background_probs = np.asarray(background_probs, dtype=np.float64)
-    background_probs = background_probs / background_probs.sum()
-
-    sequences = []
-    for _ in range(n_sequences):
-        times = []
-        locs = []
-        marks = []
-        parent_marks = []  # mark of the triggering event (None = background)
-
-        t = 0.0
-        lambda_bar = mu + 10.0
-
-        while t < T:
-            dt = rng.exponential(1.0 / lambda_bar)
-            t = t + dt
-            if t >= T:
-                break
-
-            s_candidate = rng.uniform(spatial_bounds[0], spatial_bounds[1], size=spatial_dim)
-
-            lam = mu
-            for ti, si in zip(times, locs):
-                temporal = alpha * beta * np.exp(-beta * (t - ti))
-                spatial = np.exp(-np.sum((s_candidate - si) ** 2) / (2 * sigma_s ** 2))
-                spatial /= (2 * np.pi * sigma_s ** 2) ** (spatial_dim / 2)
-                lam += temporal * spatial
-
-            if rng.uniform() < lam / lambda_bar:
-                # Determine which event triggered this one (background vs parent)
-                # Compute contribution of each past event to lam
-                contribs = []
-                for ti, si in zip(times, locs):
-                    temporal = alpha * beta * np.exp(-beta * (t - ti))
-                    spatial = np.exp(-np.sum((s_candidate - si) ** 2) / (2 * sigma_s ** 2))
-                    spatial /= (2 * np.pi * sigma_s ** 2) ** (spatial_dim / 2)
-                    contribs.append(temporal * spatial)
-                total_excitation = sum(contribs)
-                bg_prob = mu / (mu + total_excitation + 1e-12)
-
-                if len(contribs) == 0 or rng.uniform() < bg_prob:
-                    # Background event
-                    k = rng.choice(n_marks, p=background_probs)
-                else:
-                    # Triggered: sample parent proportional to contributions
-                    contribs_arr = np.array(contribs)
-                    parent_probs = contribs_arr / (contribs_arr.sum() + 1e-12)
-                    parent_idx = rng.choice(len(contribs), p=parent_probs)
-                    parent_mark = marks[parent_idx]
-                    k = rng.choice(n_marks, p=excitation_matrix[parent_mark])
-
-                times.append(t)
-                locs.append(s_candidate)
-                marks.append(k)
-
-            lambda_bar = max(lambda_bar, lam * 1.5)
-
-        sequences.append({
-            "times": np.array(times, dtype=np.float32),
-            "locations": np.array(locs, dtype=np.float32).reshape(-1, spatial_dim),
-            "marks": np.array(marks, dtype=np.int64),
-        })
-
-    return sequences
+    if save_path is not None:
+        fig.write_html(save_path, include_plotlyjs="cdn")
+    if show:
+        fig.show()
+    return fig
 
 
 # ============================================================================

@@ -1,0 +1,119 @@
+site_name: Seahorse
+site_description: "Unified benchmarking for heterogeneous spatio-temporal point processes"
+docs_dir: docs
+
+# Placeholder — update to the final public repo URL before publication
+repo_url: https://github.com/YahyaAalaila/uni-stpp
+repo_name: GitHub
+edit_uri: edit/release/v1-integration/docs/
+
+theme:
+  name: material
+  custom_dir: overrides
+  logo: assets/logo.png
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+
+extra_css:
+  - assets/extra.css
+
+nav:
+  - Home:
+      - Overview: index.md
+      - Quickstart: getting-started.md
+      - Why Seahorse: why-seahorse.md
+  - Run Models:
+      - Start Here: python-api.md
+      - Data → Model → Fit: examples/train-one-model.md
+      - Evaluate a Model: run-models/evaluate.md
+      - Predict / Sample Events: run-models/predict.md
+      - Visualize Results: run-models/visualize.md
+      - Tutorial Notebook: examples/colabs.md
+  - Benchmark:
+      - Benchmark Overview: benchmarks.md
+      - Run a Small Benchmark: examples/run-a-small-benchmark.md
+      - Presets and Configs: benchmark/presets.md
+      - Tune Hyperparameters: benchmark/tune.md
+      - Evaluation Profiles: evaluation.md
+      - Artifacts and Run Directories: benchmark/artifacts.md
+      - Compare Results: benchmark/compare.md
+  - Datasets:
+      - Dataset Overview: datasets/overview.md
+      - Data Format: data-format.md
+      - Ready-to-use HF Datasets: datasets/hf-datasets.md
+      - Dataset Catalog: datasets/catalog.md
+      - Add Your Dataset: datasets/add-dataset.md
+      - Conversion Standard: datasets/conversion.md
+  - Extend Seahorse:
+      - Extension Overview: extend/overview.md
+      - Add a Model: adding-a-model.md
+      - Wrap an Existing Model: extend/wrap.md
+      - Register a Preset: extend/preset.md
+      - Declare Capabilities: extend/capabilities.md
+      - Testing Checklist: extend/testing.md
+  - Learn:
+      - Architecture: architecture.md
+      - Execution Contract: learn/execution-contract.md
+      - Model Capability Matrix: model-capability-matrix.md
+      - Evaluation Semantics: learn/evaluation-semantics.md
+      - Reproduce Paper Results: paper-reproduction.md
+      - FAQ / Common Errors: learn/faq.md
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+exclude_docs: |
+  DEVELOPMENT.md
+  EXPERIMENT_READINESS.md
+  BENCHMARK.md
+  evaluation_layout.md
+  metrics_catalog.md
+  metrics_paper_ready.md
+  original_models_manifesto.md
+  wrapper_audit.md
+  appendix_evaluation.md
+  internal/**
+  release/**

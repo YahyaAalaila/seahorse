@@ -9,13 +9,22 @@ description = "Unified neural spatiotemporal point process framework"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Local Developer" }]
+authors = [{ name = "Anonymous Authors" }]
 dependencies = [
   "torch>=2.0.0",
+  "pytorch-lightning>=2.0.0",
   "numpy>=1.24.0",
   "PyYAML>=6.0",
   "matplotlib>=3.7.0",
   "tqdm>=4.65.0",
+  "pydantic>=2.0",
+  "pandas>=2.0",
+  "jinja2>=3.0",
+  "joblib>=1.3",
+  "scipy>=1.10.0",
+  "POT>=0.9.0",
+  "scikit-learn>=1.3.0",
+  "huggingface_hub>=0.24.0",
   "torchdiffeq>=0.2.3",
 ]
 
@@ -25,29 +34,26 @@ dev = [
   "ruff>=0.6.0",
   "pre-commit>=3.7.0",
 ]
-runner = [
-  "pydantic>=2.0",
-  "pandas>=2.0",
-  "jinja2>=3.0",
-  "joblib>=1.3",
-]
+runner = []
 hpo = [
   "ray[tune]>=2.0",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+]
 all = [
-  "unified-stpp[runner,hpo]",
+  "unified-stpp[runner,hpo,docs]",
 ]
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["unified_stpp", "unified_stpp.*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
@@ -57,4 +63,3 @@ extend-exclude = ["runs", "artifacts", ".venv", "unified_stpp/data_cache"]
 [tool.ruff.lint]
 select = ["E", "F"]
 ignore = ["E501"]
-

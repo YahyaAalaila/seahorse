@@ -1,0 +1,117 @@
+# Adding A Model
+
+!!! abstract "Key principle"
+    Every model enters through the registry and preset config path — this is what lets it
+    work with `fit`, `bench`, `evaluate`, and the Python API automatically.
+    Follow the nearest existing family as your starting point.
+
+Once registered, your preset is usable immediately:
+
+```python
+from unified_stpp import STPPEstimator
+
+model = STPPEstimator("my_preset", device="cpu")
+```
+
+## Extension Checklist
+
+1. Add or reuse model components under `unified_stpp/models/`.
+2. Register component classes with the model registries when they are selected
+   by key.
+3. Add a construction config under `unified_stpp/models/configs/`.
+4. Register the preset with `ConfigRegistry`.
+5. Import the config module from `unified_stpp/models/configs/__init__.py`.
+6. Add a bundled YAML config under `unified_stpp/configs/` when the preset needs
+   public defaults.
+7. Add focused tests for config loading, model construction, and a tiny fit path.
+8. Document supported evaluation and sampling capabilities before adding the
+   preset to benchmark examples.
+
+## Existing Model Families
+
+Use these files as starting points:
+
+- `factorized.py` for compact temporal plus spatial families.
+- `auto_stpp.py` and `deep_stpp.py` for paper-style model families.
+- `neural_stpp.py` for neural exact-family presets.
+- `smash.py` and `diffusion_stpp.py` for specialized neural architectures.
+- `nsmpp_deepbasis.py` for the public `nsmpp` preset.
+
+## Component Registries
+
+Component registry decorators live in `unified_stpp/models/model_registry.py`:
+
+```python
+from unified_stpp.models.model_registry import register_event, register_spatial, register_state
+```
+
+Use the registry only for components that need keyed construction. Many preset
+configs reuse existing registered components.
+
+## Preset Config Registry
+
+Preset configs live under `unified_stpp/models/configs/` and register with
+`ConfigRegistry`:
+
+```python
+from unified_stpp.models.configs.base import BaseModelConfig, ConfigRegistry
+
+
+@ConfigRegistry.register("my_preset")
+class MyPresetConfig(BaseModelConfig):
+    ...
+```
+
+A preset config owns construction-time parameters and builds a `UnifiedSTPP`
+model.
+
+## Capability Contract
+
+Before documenting a new preset, decide and test which capabilities it supports:
+
+- exact or approximate likelihood evaluation.
+- native next-event sampling.
+- generative rollouts.
+- intensity surface queries.
+- save/load through the runner.
+- benchmark execution across multiple seeds.
+
+Evaluation profiles use these capabilities to decide which metrics and
+artifacts are valid. Unsupported paths should raise clear errors.
+
+## Bundled YAML
+
+If users should run the preset directly, add:
+
+```text
+unified_stpp/configs/my_preset.yaml
+```
+
+The CLI can then load it with:
+
+```bash
+python -m unified_stpp fit \
+  --preset my_preset \
+  --train data/my_dataset/train.jsonl \
+  --val data/my_dataset/val.jsonl \
+  --test data/my_dataset/test.jsonl \
+  --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
+```
+
+Use `--config path/to/config.yaml` when the model is experimental and should not
+be exposed as a bundled preset yet.
+
+## Tests To Add
+
+Keep the first tests narrow:
+
+- The preset name is registered and resolves through `ConfigRegistry`.
+- `STPPConfig.from_preset("my_preset")` or `STPPConfig.from_yaml(...)` loads.
+- The model builds for a tiny config.
+- A one-epoch fit on a small local JSONL split completes or fails with a clear,
+  intentional unsupported-capability error.
+- `evaluate metrics --metric-profile core` works when the model claims NLL
+  support.
+
+Do not add a preset to benchmark examples until the fit, save/load, and
+evaluation path you document has been exercised.

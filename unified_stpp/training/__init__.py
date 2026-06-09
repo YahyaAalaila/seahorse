@@ -1,5 +1,3 @@
-from .trainer import Trainer  # legacy
-
 try:
     from .lightning_module import STPPLightningModule
     from .data_module import STPPDataModule

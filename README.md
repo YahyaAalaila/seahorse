@@ -1,234 +1,217 @@
-# Unified Neural Spatiotemporal Point Process Framework
+<a name="top"></a>
 
-A modular, research-oriented framework that unifies neural STPP methods under a common
-$\mathcal{M} = (\mathcal{E}, \mathcal{D}, \mathcal{U}, \mathcal{G})$ architecture with
-systematic covariate augmentation.
+<div align="center">
 
-## Dev Quickstart
+<img src="docs/assets/logofv.png" alt="Seahorse logo" width="120"/>
+
+# Seahorse — `unified-stpp`
+
+**A modular, research-grade framework for end-to-end development, training, and evaluation of**  
+**Spatio-Temporal Point-Process (STPP) models.**  
+Seahorse couples declarative YAML configuration with PyTorch Lightning execution,  
+Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver  
+rapid prototyping and rigorous, reproducible benchmarking on streaming event data.
+
+[![PyPI](https://img.shields.io/pypi/v/unified-stpp?label=pypi&color=blue)](https://pypi.org/project/unified-stpp/)
+[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/uni-stpp)](https://github.com/YahyaAalaila/uni-stpp/commits)
+[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/uni-stpp)
+[![Issues](https://img.shields.io/github/issues/YahyaAalaila/uni-stpp)](https://github.com/YahyaAalaila/uni-stpp/issues)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/pytorch-2.2%2B-orange?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Lightning](https://img.shields.io/badge/lightning-2.2%2B-792ee5)](https://lightning.ai/)
+[![Ray Tune](https://img.shields.io/badge/ray__tune-2.9%2B-028CF0)](https://docs.ray.io/en/latest/tune/)
+
+</div>
+
+---
+
+| [News](#news) | [Features](#features) | [Model List](#model-list) | [Datasets](#datasets) | [Quick Start](#quick-start) | [CLI](#cli) | [License](#license) | [Acknowledgment](#acknowledgment) |
+
+---
+
+## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Documentation site will be live when the repository goes public.
+
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our benchmark paper **Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling** will be up on arxiv soon.
+
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our synthetic benchmark paper **HawkesNest: A Multi-Axis Synthetic Benchmark for Spatiotemporal Pattern Complexity** will be up on arxiv soon.
+
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning & Global Health Network (MLGH)](https://mlgh.net/), London, UK.
+
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
+
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [13-02-2025] Our review paper about [Neural Spatiotemporal Point Processes: Trends and Challenges](https://arxiv.org/abs/2502.09341) is up on [arxiv](https://arxiv.org/abs/2502.09341).
+
+---
+
+## ✨ Features&nbsp;<a name="features"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+| | |
+|---|---|
+| **Unified Python API** | Train, evaluate, and sample any model through one consistent interface (`STPPRunner`). |
+| **YAML-driven config** | Every hyperparameter is declarative; experiments are fully reproducible. |
+| **Plug-and-play presets** | Switch models with `--preset auto_stpp` — no code changes required. |
+| **Ray Tune HPO** | YAML search-space files feed directly into distributed hyperparameter sweeps. |
+| **Benchmark campaigns** | Multi-preset × multi-dataset × multi-seed runs with a single CLI command. |
+| **Data contract** | `Benchmark` enforces identical train/val/test splits across all presets so NLL scores are directly comparable. |
+| **HuggingFace datasets** | Stream or cache any JSONL dataset directly from the Hub with `--dataset owner/repo`. |
+
+---
+
+## 🤖 Model List&nbsp;<a name="model-list"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+Our package includes the following state-of-the-art STPP models:
+
+| No | Venue | Preset | Paper | Implementation |
+|:--:|-------|--------|-------|:--------------:|
+| 1 | NeurIPS'23 | `auto_stpp` | [Automatic Integration for Spatiotemporal Neural Point Processes](https://arxiv.org/abs/2310.01179) | PyTorch |
+| 2 | L4DC'22 | `deep_stpp` | [Deep Spatiotemporal Point Process](https://proceedings.mlr.press/v168/lin22a.html) | PyTorch |
+| 3 | ICLR'21 | `neural_jumpcnf` / `neural_attncnf` | [Neural Spatio-Temporal Point Processes](https://openreview.net/forum?id=XQQA6-So14) | PyTorch |
+| 4 | NeurIPS'19 | `njsde` | [Neural Jump Stochastic Differential Equations](https://arxiv.org/abs/1905.10403) | PyTorch |
+| 5 | ACM KDD'23 | `diffusion_stpp` | [Spatio-temporal Diffusion Point Processes](https://dl.acm.org/doi/10.1145/3580305.3599511) | PyTorch |
+| 6 | ICLR'22 | `nsmpp` | [Neural Spectral Marked Point Processes](https://openreview.net/forum?id=0rcbOaoBXbg) | PyTorch |
+| 7 | Arxiv | `smash` | [Embedding Event History to Vector](https://arxiv.org/abs/2310.19324) | PyTorch |
+| 8 | ICML'20 | `thp_gmm` | [Transformer Hawkes Process](https://arxiv.org/abs/2002.09291) | PyTorch |
+| 9 | KDD'16 | `rmtpp_gmm` | [Recurrent Marked Temporal Point Processes](https://dl.acm.org/doi/10.1145/2939672.2939875) | PyTorch |
+
+**Parametric baselines** (fast, exact likelihood):  
+`poisson_gmm` · `hawkes_gmm` · `selfcorrecting_gmm` · `poisson_cnf` · `hawkes_cnf` · `selfcorrecting_cnf` · `poisson_tvcnf` · `hawkes_tvcnf` · `selfcorrecting_tvcnf`
+
+---
+
+## 📊 Datasets&nbsp;<a name="datasets"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+Seahorse reads any collection of JSONL event sequences. The canonical split layout is:
+
+```text
+dataset_root/
+  train.jsonl
+  val.jsonl
+  test.jsonl
+```
+
+Each line is one sequence:
+
+```json
+{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
+```
+
+Datasets from the original NeuralSTPP paper are directly supported:
+
+- **Pinwheel** — Synthetic multimodal non-Gaussian process. 10 clusters in a pinwheel structure; events propagate clock-wise via a multivariate Hawkes mechanism. Tests the ability to capture drastic history-driven spatial shifts.
+- **Earthquake** — Real-world seismic event catalog ([U.S. Geological Survey, 2020](https://earthquake.usgs.gov/)).
+- **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
+- **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
+
+Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`.
+
+---
+
+## 🚀 Quick Start&nbsp;<a name="quick-start"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+**Install**
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-pre-commit install
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
-Run a tiny end-to-end training smoke:
+**Python API**
+
+```python
+from unified_stpp import AutoSTPP, PoissonGMM, load_jsonl
+
+train = load_jsonl("dataset_root/train.jsonl")
+val   = load_jsonl("dataset_root/val.jsonl")
+test  = load_jsonl("dataset_root/test.jsonl")
+
+model    = AutoSTPP(device="cpu")
+baseline = PoissonGMM()
+
+model.fit(train, val, test, epochs=50, batch_size=64)
+scores  = model.evaluate(test)          # {"test_nll": ..., "mean_seq_nll": ...}
+samples = model.predict_next(test, n_samples=32)
+```
+
+**STPPRunner (lower-level)**
+
+```python
+from unified_stpp import STPPRunner
+
+runner = STPPRunner.from_preset("auto_stpp")
+result = runner.fit(train, val, test)   # returns RunResult
+runner.save("/tmp/my_run/")
+
+runner2 = STPPRunner.load("/tmp/my_run/")
+grid    = runner2.intensity_grid(test[0])
+```
+
+---
+
+## 💻 CLI&nbsp;<a name="cli"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+
+**Fit one model**
 
 ```bash
-bash scripts/tiny_train.sh
+python -m unified_stpp fit \
+  --preset auto_stpp \
+  --train dataset_root/train.jsonl \
+  --val   dataset_root/val.jsonl \
+  --test  dataset_root/test.jsonl \
+  --out   runs/quickstart
 ```
 
-Or directly:
+**Benchmark campaign** (multi-preset × multi-seed)
 
 ```bash
-python train.py --preset deep_stpp --data hawkes --n_train 8 --n_val 2 --n_epochs 1 --batch_size 4 --no_save_metrics
+python -m unified_stpp bench \
+  --presets auto_stpp deep_stpp njsde poisson_gmm \
+  --splits_dir splits/ \
+  --seeds 1 2 3 \
+  --out runs/bench \
+  --n_workers 4
 ```
 
-## Framework Overview
-
-Every neural STPP is decomposed into four components:
-
-| Component | Role | Interface |
-|-----------|------|-----------|
-| **Encoder** $\mathcal{E}$ | History → latent state | `(events, lengths, x_event) → (z, states)` |
-| **Dynamics** $\mathcal{D}$ | Inter-event state evolution | `(z_n, Δt, x_field) → z(t)` |
-| **Updater** $\mathcal{U}$ | State update at events | `(z⁻, t, s, x_event, x_field) → z⁺` |
-| **Decoder** $\mathcal{G}$ | State → intensity/density | `(z, t, s, x_field) → log f*(t,s)` |
-
-Covariates inject at four points:
-- **(I) Encoder**: event-level covariates enrich history representation
-- **(II) Dynamics**: field covariates modulate state evolution (non-trivial only for ODE dynamics)
-- **(III) Updater**: covariates at event location inform state transitions
-- **(IV) Decoder**: field covariates directly modulate intensity/density
-
-## Implemented Methods
-
-| Method | Encoder | Dynamics | Updater | Decoder |
-|--------|---------|----------|---------|---------|
-| **NeuralSTPP** | GRU | Neural ODE | GRU Jump | Cumulative hazard + CNF |
-| **DeepSTPP** | Attention | Identity | Attention | Log-normal mixture + Gaussian mixture |
-| **DSTPP** | Transformer | Identity | Attention | Score-based diffusion (joint) |
-
-## Project Structure
-
-```
-unified_stpp/
-├── train.py                          # Entry point
-├── configs/
-│   ├── neural_stpp.yaml
-│   ├── deep_stpp.yaml
-│   ├── dstpp.yaml
-│   └── deep_stpp_covariates.yaml     # Covariate-augmented example
-├── unified_stpp/
-│   ├── registry.py                   # Model factory + presets
-│   ├── models/
-│   │   ├── base.py                   # Abstract base classes (Encoder, Dynamics, Updater, Decoder)
-│   │   ├── unified_model.py          # UnifiedSTPP: composes E, D, U, G
-│   │   ├── encoders/
-│   │   │   ├── gru.py                # GRU (NeuralSTPP)
-│   │   │   ├── attention.py          # Self-attention (DeepSTPP)
-│   │   │   └── transformer.py        # Transformer + continuous time encoding (DSTPP)
-│   │   ├── dynamics/
-│   │   │   ├── identity.py           # z(t) = z_n (most methods)
-│   │   │   └── neural_ode.py         # dz/dt = f(z,t,X) (NeuralSTPP)
-│   │   ├── updaters/
-│   │   │   ├── gru_jump.py           # GRU cell update (NeuralSTPP)
-│   │   │   └── attention_update.py   # Cross-attention update (DeepSTPP, DSTPP)
-│   │   ├── decoders/
-│   │   │   ├── factorized.py         # f*(t)·f*(s|t) wrapper
-│   │   │   ├── temporal.py           # Cumulative hazard, log-normal mixture
-│   │   │   ├── spatial.py            # CNF, Gaussian mixture
-│   │   │   └── diffusion.py          # Score-based joint decoder (DSTPP)
-│   │   └── covariates/
-│   │       └── __init__.py           # LiftingMap, FieldCovariateEncoder
-│   ├── data/
-│   │   ├── dataset.py                # STPPDataset + collation
-│   │   └── synthetic.py              # Hawkes + inhomogeneous Poisson generators
-│   └── training/
-│       └── trainer.py                # Training loop
-└── requirements.txt
-```
-
-## Quick Start
+**HPO sweep**
 
 ```bash
-pip install -r requirements.txt
-
-# Train DeepSTPP on synthetic Hawkes data
-python train.py --preset deep_stpp --n_epochs 50
-
-# Train NeuralSTPP (requires torchdiffeq)
-python train.py --preset neural_stpp --n_epochs 50
-
-# Train DSTPP (diffusion decoder)
-python train.py --preset dstpp --n_epochs 50
-
-# Use a YAML config
-python train.py --config configs/deep_stpp.yaml
-
-# Covariate-augmented model on inhomogeneous data
-python train.py --preset deep_stpp --field_cov_dim 1 --data inhomogeneous
-
-# Moving hotspot benchmark (with explicit switch at t1)
-python train.py --config unified_stpp/configs/moving_hotspot_with_covariates.yaml
-python train.py --config unified_stpp/configs/moving_hotspot_without_covariates.yaml
-
-# Regime-gated Hawkes benchmark (with/without covariates)
-python train.py --config unified_stpp/configs/regime_gated_hawkes_with_covariates.yaml
-python train.py --config unified_stpp/configs/regime_gated_hawkes_without_covariates.yaml
+python -m unified_stpp tune \
+  --preset auto_stpp \
+  --search_space configs/hpo/auto_stpp_search.yaml \
+  --train dataset_root/train.jsonl \
+  --val   dataset_root/val.jsonl \
+  --n_trials 30
 ```
 
-## Mix-and-Match
+---
 
-The modular design allows combining components across methods:
+## 📚 Documentation&nbsp;<a name="documentation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-```python
-from unified_stpp.registry import build_model
-
-# DeepSTPP encoder + NeuralSTPP decoder (CNF spatial)
-model = build_model(
-    config={
-        "encoder": {"type": "attention", "num_heads": 4, "num_layers": 2},
-        "dynamics": {"type": "identity"},
-        "updater": {"type": "attention", "num_heads": 4},
-        "decoder": {
-            "type": "factorized",
-            "temporal": {"type": "cumulative_hazard"},
-            "spatial": {"type": "cnf"},
-        },
-    },
-    spatial_dim=2,
-    hidden_dim=64,
-)
+```bash
+pip install -e ".[docs]"
+mkdocs serve          # live-reload at http://127.0.0.1:8000
+mkdocs build --strict # static site → site/
 ```
 
-**Compatibility note**: Not all combinations are valid. See Remark 2 in the paper.
-The main constraint is dimensional: all components must agree on `hidden_dim`.
+The docs cover the [Python API](docs/python-api.md), [CLI reference](docs/cli.md), [data format](docs/data-format.md), [benchmark campaigns](docs/benchmarks.md), and [how to add a new model](docs/extend/preset.md).
 
-## Adding Covariates
+---
 
-```python
-# With field covariates (e.g., temperature field)
-model = build_model(
-    config={},
-    preset="deep_stpp",
-    spatial_dim=2,
-    hidden_dim=64,
-    field_cov_dim=3,  # 3-dimensional covariate field
-)
+## 📝 Citation&nbsp;<a name="citation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-# Covariates automatically injected at points (I), (III), (IV).
-# Point (II) is vacuous for identity dynamics.
-```
+Citation details will be added before publication.
 
-## Sampling from Any Model
+---
 
-All decoders implement `sample()`, enabling autoregressive event generation from any model configuration:
+## ⚖️ License&nbsp;<a name="license"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-```python
-# After training:
-sampled_times, sampled_locs, mask = model.sample(
-    history_times, history_locations, history_lengths,
-    n_samples=50, t_max=20.0,
-)
-```
+Seahorse is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
-Sampling strategies per decoder:
+---
 
-| Decoder | Temporal sampling | Spatial sampling |
-|---------|------------------|-----------------|
-| **Log-normal mixture** (DeepSTPP) | Ancestral: sample component k ~ π, then τ ~ LogNormal(μ_k, σ_k²) | Ancestral: sample component, then s ~ N(μ_k, σ_k² I) |
-| **Cumulative hazard + CNF** (NeuralSTPP) | Inverse CDF via bisection: find τ s.t. Λ*(τ) = -log(U) | CNF forward pass: z₀ ~ N(0,I), solve ODE τ: 0→1 |
-| **Diffusion** (DSTPP) | Joint annealed Langevin dynamics | (joint with temporal) |
+## 🙏 Acknowledgment&nbsp;<a name="acknowledgment"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-For intensity-based decoders or validation, use the **thinning sampler**:
-
-```python
-from unified_stpp.models.sampling import thinning_sample, IntensityEvaluator
-
-# Wrap model for intensity queries
-evaluator = IntensityEvaluator(model, z=z_state, t_prev=t_last)
-
-# Thinning-based sampling (works with any model)
-times, locs, counts = thinning_sample(
-    intensity_fn=evaluator.intensity,
-    t_start=t_last,
-    t_max=20.0,
-    spatial_bounds=(s_min, s_max),
-)
-
-# Intensity heatmap for visualization
-grid_x, grid_y, lam_grid = evaluator.intensity_grid(
-    t=5.0, s_min=s_min, s_max=s_max, n_grid=50,
-)
-```
-
-## Adding a New Component
-
-1. Subclass the appropriate base in `models/base.py`
-2. Implement the required interface
-3. Register in `registry.py`
-
-Example: adding a new encoder:
-
-```python
-# In models/encoders/my_encoder.py
-from ..base import Encoder
-
-class MyEncoder(Encoder):
-    def __init__(self, input_dim, hidden_dim, **kwargs):
-        super().__init__(input_dim, hidden_dim)
-        # ... your architecture ...
-    
-    def forward(self, events, lengths, x_event=None):
-        # ... your forward pass ...
-        return z_final, all_states
-
-# In registry.py, add:
-ENCODER_REGISTRY["my_encoder"] = MyEncoder
-```
-
-## Citation
-
-If you use this framework, please cite the methodology paper (in preparation).
+Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.

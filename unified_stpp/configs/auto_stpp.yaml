@@ -1,37 +1,53 @@
+# Canonical AutoSTPP preset.
+#
+# This is the AutoSTPP configuration used by current benchmark runs.
+
 model:
   preset: auto_stpp
   hidden_dim: 128
   spatial_dim: 2
   n_marks: 0
-  # Keep AutoInt decoder but use a DeepSTPP-like backbone:
-  # transformer encoder + attention updater.
-  encoder:
-    type: transformer
-    num_heads: 2
-    num_layers: 3
-    dropout: 0.1
-  updater:
-    type: attention
-    num_heads: 2
-  # Decoder overrides — deep-merged with preset auto_stpp decoder.
-  # Spatial bounding box is auto-computed from training data at runtime;
-  # no need to set x_lo/hi/y_lo/hi here.
+  event_cov_dim: 0
+  field_cov_dim: 0
   decoder:
-    n_components: [2, 5, 10]    # paper: N=2 (synthetic) / N=10 (real)  |  HPO choices
-    n_layers: 2
-    internal_dim: [64, 128]     # paper: 64 (synthetic) / 128 (real)  |  HPO choices
+    type: autoint
+    lookback: 20
+    lookahead: 1
+    activation: tanh
+    bias: true
+    trunc: false
+    max_history: 20
+    temporal_diag_mode: exact
+    temporal_mc_samples: 10
+    report_orig_space_metrics: true
+    n_prodnet: 10
+    hidden_size: 128
+    num_layers: 2
 
 training:
-  lr: {min: 1.0e-4, max: 1.0e-2, default: 4.0e-3}
-  weight_decay: 1.0e-5
-  grad_clip: 5.0
+  lr: 4.0e-3
+  optimizer: adam
+  weight_decay: 0.0
+  grad_clip: 1.0
   n_epochs: 50
   batch_size: 128
-  lr_step_size: [20, 10, 50]   # paper: step_size=20  |  HPO choices
-  lr_step_gamma: [0.5, 0.2]    # paper: gamma=0.5  |  HPO choices
+  patience: null
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  device: auto
+  lr_schedule: step
+  lr_warmup_epochs: 0
+  lr_final: null
+  lr_step_size: 20
+  lr_step_gamma: 0.5
+  checkpoint_select: best
+  test_nll_space: raw
+  vae_beta: 0.0
 
 data:
-  type: hawkes
-  n_train: 200
-  n_val: 50
-  T: 10.0
+  protocol: raw
+  normalize: false
+  adapter_kwargs:
+    training_view: sliding_window
+    lookback: 20
+    lookahead: 1
