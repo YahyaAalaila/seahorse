@@ -33,6 +33,12 @@ rapid prototyping and rigorous, reproducible benchmarking on streaming event dat
 
 ## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Documentation site will be live when the repository goes public.
+
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our benchmark paper **Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling** will be up on arxiv soon.
+
+- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our synthetic benchmark paper **HawkesNest: A Multi-Axis Synthetic Benchmark for Spatiotemporal Pattern Complexity** will be up on arxiv soon.
+
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning & Global Health Network (MLGH)](https://mlgh.net/), London, UK.
 
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
