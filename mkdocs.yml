@@ -2,10 +2,9 @@ site_name: Seahorse
 site_description: "Unified benchmarking for heterogeneous spatio-temporal point processes"
 docs_dir: docs
 
-# Placeholder — update to the final public repo URL before publication
-repo_url: https://github.com/YahyaAalaila/uni-stpp
-repo_name: GitHub
-edit_uri: edit/release/v1-integration/docs/
+repo_url: https://github.com/YahyaAalaila/seahorse
+repo_name: YahyaAalaila/seahorse
+edit_uri: edit/main/docs/
 
 theme:
   name: material

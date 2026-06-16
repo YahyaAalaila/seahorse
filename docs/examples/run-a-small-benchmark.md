@@ -1,7 +1,7 @@
 # Run A Small Benchmark
 
 For the complete executable walkthrough, use
-<a href="https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
+<a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
 in Google Colab.
 
 ## Goal

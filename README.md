@@ -4,7 +4,7 @@
 
 <img src="docs/assets/logofv.png" alt="Seahorse logo" width="120"/>
 
-# Seahorse — `unified-stpp`
+# Seahorse
 
 **A modular, research-grade framework for end-to-end development, training, and evaluation of**  
 **Spatio-Temporal Point-Process (STPP) models.**  
@@ -12,10 +12,12 @@ Seahorse couples declarative YAML configuration with PyTorch Lightning execution
 Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver  
 rapid prototyping and rigorous, reproducible benchmarking on streaming event data.
 
+Documentation: https://yahyaaalaila.github.io/seahorse/
+
 [![PyPI](https://img.shields.io/pypi/v/unified-stpp?label=pypi&color=blue)](https://pypi.org/project/unified-stpp/)
-[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/uni-stpp)](https://github.com/YahyaAalaila/uni-stpp/commits)
-[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/uni-stpp)
-[![Issues](https://img.shields.io/github/issues/YahyaAalaila/uni-stpp)](https://github.com/YahyaAalaila/uni-stpp/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/commits)
+[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/seahorse)
+[![Issues](https://img.shields.io/github/issues/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/issues)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
@@ -33,7 +35,7 @@ rapid prototyping and rigorous, reproducible benchmarking on streaming event dat
 
 ## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Documentation site will be live when the repository goes public.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/seahorse/
 
 - ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our benchmark paper **Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling** will be up on arxiv soon.
 
