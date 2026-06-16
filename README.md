@@ -12,12 +12,12 @@ Seahorse couples declarative YAML configuration with PyTorch Lightning execution
 Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver  
 rapid prototyping and rigorous, reproducible benchmarking on streaming event data.
 
-Documentation: https://yahyaaalaila.github.io/seahorse/
+Documentation: https://yahyaaalaila.github.io/STPPGC/
 
 [![PyPI](https://img.shields.io/pypi/v/unified-stpp?label=pypi&color=blue)](https://pypi.org/project/unified-stpp/)
-[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/commits)
-[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/seahorse)
-[![Issues](https://img.shields.io/github/issues/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/STPPGC)](https://github.com/YahyaAalaila/STPPGC/commits)
+[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/STPPGC)
+[![Issues](https://img.shields.io/github/issues/YahyaAalaila/STPPGC)](https://github.com/YahyaAalaila/STPPGC/issues)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
@@ -35,7 +35,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/seahorse/
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/STPPGC/
 
 - ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our benchmark paper **Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling** will be up on arxiv soon.
 

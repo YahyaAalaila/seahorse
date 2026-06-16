@@ -2,8 +2,8 @@ site_name: Seahorse
 site_description: "Unified benchmarking for heterogeneous spatio-temporal point processes"
 docs_dir: docs
 
-repo_url: https://github.com/YahyaAalaila/seahorse
-repo_name: YahyaAalaila/seahorse
+repo_url: https://github.com/YahyaAalaila/STPPGC
+repo_name: YahyaAalaila/STPPGC
 edit_uri: edit/main/docs/
 
 theme:

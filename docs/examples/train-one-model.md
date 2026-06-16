@@ -5,7 +5,7 @@ inside a script or notebook.
 
 ## Notebook
 
-Use <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
+Use <a href="https://colab.research.google.com/github/YahyaAalaila/STPPGC/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
 for an executable walkthrough in Google Colab.
 
 ## Python API Example

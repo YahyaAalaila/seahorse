@@ -97,4 +97,4 @@ class MyDescriptor(PresetDescriptor):
 
 The runner calls `descriptor.data_init_overrides(dm)` before `build_model()` and merges the result into `build_overrides`.
 
-See [existing descriptors](https://github.com/YahyaAalaila/seahorse/tree/main/unified_stpp/presets) for reference implementations.
+See [existing descriptors](https://github.com/YahyaAalaila/STPPGC/tree/main/unified_stpp/presets) for reference implementations.
