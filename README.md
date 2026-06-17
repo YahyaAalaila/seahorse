@@ -37,9 +37,9 @@ Documentation: https://yahyaaalaila.github.io/STPPGC/
 
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/STPPGC/
 
-- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our benchmark paper **Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling** will be up on arxiv soon.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Seahorse includes executable Colab tutorials for single-model training and benchmark campaigns.
 
-- ![COMING SOON](https://img.shields.io/badge/COMING%20SOON-orange?style=flat)&nbsp; Our synthetic benchmark paper **HawkesNest: A Multi-Axis Synthetic Benchmark for Spatiotemporal Pattern Complexity** will be up on arxiv soon.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The documentation includes an end-to-end case study that walks from JSONL data to benchmark artifacts.
 
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning & Global Health Network (MLGH)](https://mlgh.net/), London, UK.
 
@@ -199,12 +199,22 @@ mkdocs build --strict # static site → site/
 ```
 
 The docs cover the [Python API](docs/python-api.md), [CLI reference](docs/cli.md), [data format](docs/data-format.md), [benchmark campaigns](docs/benchmarks.md), and [how to add a new model](docs/extend/preset.md).
+Start with the [end-to-end case study](docs/examples/case-study.md) for a complete data-to-artifacts walkthrough.
 
 ---
 
 ## 📝 Citation&nbsp;<a name="citation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-Citation details will be added before publication.
+If Seahorse supports your work, cite the repository:
+
+```bibtex
+@software{aalaila_seahorse,
+  title = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
+  author = {Aalaila, Yahya},
+  url = {https://github.com/YahyaAalaila/STPPGC},
+  license = {MIT}
+}
+```
 
 ---
 

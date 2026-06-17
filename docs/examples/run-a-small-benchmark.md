@@ -49,7 +49,7 @@ python -m unified_stpp bench \
       --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
     ```
 
-    The notebook uses additional tiny-model overrides so `auto_stpp` and
+    The notebook uses additional compact-model overrides so `auto_stpp` and
     `deep_stpp` finish quickly on CPU.
 
 ## Inspect Output Directory

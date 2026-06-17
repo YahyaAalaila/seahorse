@@ -1,7 +1,8 @@
-# Paper Reproduction
+# Reproducible Study Checklist
 
-This page is the public checklist for paper reproduction commands once the
-final artifact bundle, dataset revisions, and citation details are available.
+This page defines the command and artifact checklist for reproducible Seahorse
+studies. Use it for paper experiments, team benchmarks, or public case
+studies.
 
 Use CLI workflows for reproduction. They record the model preset or config,
 dataset source, seeds, overrides, and output artifacts more explicitly than a
@@ -94,7 +95,8 @@ Keep the following with a paper reproduction bundle:
 - predictive, generative, or surface artifacts used in tables and figures
 - exact command lines and git commit
 
-## Current Gaps
+## Public Tutorials
 
-Citation details, final public dataset revisions, and maintained Colab
-notebooks will be added before publication.
+For a runnable end-to-end walkthrough, use the Colab notebooks linked from
+[Tutorial Notebooks](examples/colabs.md). They generate demo JSONL data, execute
+the public API or CLI, and inspect the resulting artifacts on CPU.

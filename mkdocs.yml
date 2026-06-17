@@ -48,6 +48,7 @@ nav:
       - Why Seahorse: why-seahorse.md
   - Run Models:
       - Start Here: python-api.md
+      - End-to-End Case Study: examples/case-study.md
       - Data → Model → Fit: examples/train-one-model.md
       - Evaluate a Model: run-models/evaluate.md
       - Predict / Sample Events: run-models/predict.md

@@ -105,6 +105,6 @@ same metric definitions.
   <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
 </div>
 
-Start with the [quickstart](getting-started.md), run a
+Start with the [end-to-end case study](examples/case-study.md), run a
 [small benchmark](examples/run-a-small-benchmark.md), or open the
 [tutorial notebooks](examples/colabs.md).

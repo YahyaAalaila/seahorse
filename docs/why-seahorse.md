@@ -18,13 +18,13 @@ Existing STPP research code is scattered. Each paper ships its own training loop
 
 Seahorse imposes a **benchmark contract**: all presets are evaluated on the same dataset, the same normalization policy, and the same metric definition. This makes comparisons trustworthy by construction rather than by convention.
 
-## What Seahorse Is Not
+## Scope
 
-Seahorse is a benchmarking and research platform, not a production serving system. It does not:
+Seahorse is built for reproducible STPP research, benchmarking, and offline evaluation. It deliberately keeps online serving concerns outside the core framework:
 
-- Deploy models to an inference server.
-- Manage streaming or online inference.
-- Replace dataset-specific preprocessing pipelines.
+- Model serving and API deployment belong in an application layer.
+- Streaming ingestion and online inference belong in a production data plane.
+- Dataset-specific preprocessing remains explicit so benchmark inputs stay auditable.
 
 If you want to run one model in a script or notebook, the [Python API](python-api.md) is the starting point. If you want reproducible multi-model comparisons, the [Benchmark](benchmarks.md) path is the right tool.
 
