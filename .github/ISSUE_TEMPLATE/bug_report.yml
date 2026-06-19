@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible problem in Seahorse.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail for maintainers
+        to reproduce the issue.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Commands, code, config, or data schema needed to reproduce.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output
+      description: Paste the relevant traceback or logs. Remove secrets and private paths.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Seahorse version or commit
+      placeholder: "commit hash, tag, or branch"
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS, Python version, PyTorch version"
+    validations:
+      required: false

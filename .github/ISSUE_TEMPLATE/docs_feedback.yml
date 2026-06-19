@@ -1,0 +1,26 @@
+name: Documentation feedback
+description: Report unclear, outdated, or broken documentation.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or link
+      placeholder: "https://yahyaaalaila.github.io/STPPGC/..."
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What should be improved?
+      description: Describe the unclear text, broken link, missing step, or mismatch.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: Optional wording or structure suggestion.
+    validations:
+      required: false
