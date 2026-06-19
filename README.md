@@ -2,14 +2,12 @@
 
 <div align="center">
 
-<img src="docs/assets/logofv.png" alt="Seahorse logo" width="120"/>
+<img src="docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
 
-# Seahorse
-
-**A modular, research-grade framework for end-to-end development, training, and evaluation of**  
-**Spatio-Temporal Point-Process (STPP) models.**  
-Seahorse couples declarative YAML configuration with PyTorch Lightning execution,  
-Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver  
+**A modular, research-grade framework for end-to-end development, training, and evaluation of**
+**Spatio-Temporal Point-Process (STPP) models.**
+Seahorse couples declarative YAML configuration with PyTorch Lightning execution,
+Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver
 rapid prototyping and rigorous, reproducible benchmarking on streaming event data.
 
 Documentation: https://yahyaaalaila.github.io/seahorse/
@@ -28,95 +26,64 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ---
 
-| [News](#news) | [Features](#features) | [Model List](#model-list) | [Datasets](#datasets) | [Quick Start](#quick-start) | [CLI](#cli) | [License](#license) | [Acknowledgment](#acknowledgment) |
+| [News](#news) | [What you can build do with Seahorse stpp](#what-you-can-build-do-with-seahorse-stpp) | [Features](#features) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
 
 ---
 
-## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 🗞️ News [[Back&nbsp;to&nbsp;Top](#top)]
 
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/seahorse/
-
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Seahorse includes executable Colab tutorials for single-model training and benchmark campaigns.
-
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The documentation includes an end-to-end case study that walks from JSONL data to benchmark artifacts.
-
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning & Global Health Network (MLGH)](https://mlgh.net/), London, UK.
-
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning &amp; Global Health Network (MLGH)](https://mlgh.net/), London, UK.
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
-
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [13-02-2025] Our review paper about [Neural Spatiotemporal Point Processes: Trends and Challenges](https://arxiv.org/abs/2502.09341) is up on [arxiv](https://arxiv.org/abs/2502.09341).
 
 ---
 
-## ✨ Features&nbsp;<a name="features"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 💡 What you can build do with Seahorse stpp [[Back&nbsp;to&nbsp;Top](#top)]
 
-| | |
-|---|---|
-| **Unified Python API** | Train, evaluate, and sample any model through one consistent interface (`STPPRunner`). |
-| **YAML-driven config** | Every hyperparameter is declarative; experiments are fully reproducible. |
-| **Plug-and-play presets** | Switch models with `--preset auto_stpp` — no code changes required. |
-| **Ray Tune HPO** | YAML search-space files feed directly into distributed hyperparameter sweeps. |
-| **Benchmark campaigns** | Multi-preset × multi-dataset × multi-seed runs with a single CLI command. |
-| **Data contract** | `Benchmark` enforces identical train/val/test splits across all presets so NLL scores are directly comparable. |
-| **HuggingFace datasets** | Stream or cache any JSONL dataset directly from the Hub with `--dataset owner/repo`. |
+Seahorse provides a flexible framework to model complex event dynamics. You can build applications for:
+- **Epidemiology:** Modeling the spread of infectious diseases over time and regions.
+- **Seismology:** Forecasting earthquake occurrences and aftershock propagation.
+- **Urban Mobility:** Analyzing and predicting bike-sharing demand and traffic flows.
+- **Social Networks:** Tracking information diffusion and viral content over time.
+- **Finance:** Modeling high-frequency trading events and market shocks.
 
 ---
 
-## 🤖 Model List&nbsp;<a name="model-list"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## ✨ Features [[Back&nbsp;to&nbsp;Top](#top)]
 
-Our package includes the following state-of-the-art STPP models:
-
-| No | Venue | Preset | Paper | Implementation |
-|:--:|-------|--------|-------|:--------------:|
-| 1 | NeurIPS'23 | `auto_stpp` | [Automatic Integration for Spatiotemporal Neural Point Processes](https://arxiv.org/abs/2310.01179) | PyTorch |
-| 2 | L4DC'22 | `deep_stpp` | [Deep Spatiotemporal Point Process](https://proceedings.mlr.press/v168/lin22a.html) | PyTorch |
-| 3 | ICLR'21 | `neural_jumpcnf` / `neural_attncnf` | [Neural Spatio-Temporal Point Processes](https://openreview.net/forum?id=XQQA6-So14) | PyTorch |
-| 4 | NeurIPS'19 | `njsde` | [Neural Jump Stochastic Differential Equations](https://arxiv.org/abs/1905.10403) | PyTorch |
-| 5 | ACM KDD'23 | `diffusion_stpp` | [Spatio-temporal Diffusion Point Processes](https://dl.acm.org/doi/10.1145/3580305.3599511) | PyTorch |
-| 6 | ICLR'22 | `nsmpp` | [Neural Spectral Marked Point Processes](https://openreview.net/forum?id=0rcbOaoBXbg) | PyTorch |
-| 7 | Arxiv | `smash` | [Embedding Event History to Vector](https://arxiv.org/abs/2310.19324) | PyTorch |
-| 8 | ICML'20 | `thp_gmm` | [Transformer Hawkes Process](https://arxiv.org/abs/2002.09291) | PyTorch |
-| 9 | KDD'16 | `rmtpp_gmm` | [Recurrent Marked Temporal Point Processes](https://dl.acm.org/doi/10.1145/2939672.2939875) | PyTorch |
-
-**Parametric baselines** (fast, exact likelihood):  
-`poisson_gmm` · `hawkes_gmm` · `selfcorrecting_gmm` · `poisson_cnf` · `hawkes_cnf` · `selfcorrecting_cnf` · `poisson_tvcnf` · `hawkes_tvcnf` · `selfcorrecting_tvcnf`
+- **Unified Python API**: Train, evaluate, and sample any model through one consistent interface (`STPPRunner`).
+- **YAML-driven config**: Every hyperparameter is declarative; experiments are fully reproducible.
+- **Plug-and-play presets**: Switch models with `--preset auto_stpp` — no code changes required.
+- **Ray Tune HPO**: YAML search-space files feed directly into distributed hyperparameter sweeps.
+- **Benchmark campaigns**: Multi-preset × multi-dataset × multi-seed runs with a single CLI command.
+- **Data contract**: `Benchmark` enforces identical train/val/test splits across all presets so NLL scores are directly comparable.
+- **HuggingFace datasets**: Stream or cache any JSONL dataset directly from the Hub with `--dataset owner/repo`.
 
 ---
 
-## 📊 Datasets&nbsp;<a name="datasets"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 🚀 Quick Start [[Back&nbsp;to&nbsp;Top](#top)]
 
-Seahorse reads any collection of JSONL event sequences. The canonical split layout is:
-
-```text
-dataset_root/
-  train.jsonl
-  val.jsonl
-  test.jsonl
-```
-
-Each line is one sequence:
-
-```json
-{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
-```
-
-Datasets from the original NeuralSTPP paper are directly supported:
-
-- **Pinwheel** — Synthetic multimodal non-Gaussian process. 10 clusters in a pinwheel structure; events propagate clock-wise via a multivariate Hawkes mechanism. Tests the ability to capture drastic history-driven spatial shifts.
-- **Earthquake** — Real-world seismic event catalog ([U.S. Geological Survey, 2020](https://earthquake.usgs.gov/)).
-- **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
-- **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
-
-Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`.
-
----
-
-## 🚀 Quick Start&nbsp;<a name="quick-start"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+For more detailed guides, check out our documentation:
+- [Getting Started](https://yahyaaalaila.github.io/STPPGC/getting-started/)
+- [Why Seahorse?](https://yahyaaalaila.github.io/STPPGC/why-seahorse/)
+- [End-to-End Case Study](https://yahyaaalaila.github.io/STPPGC/examples/case-study/)
+- [Predicting with Models](https://yahyaaalaila.github.io/STPPGC/run-models/predict/)
 
 **Install**
 
+*macOS / Linux:*
 ```bash
 python -m venv .venv && source .venv/bin/activate
+pip install -e .
+```
+
+*Windows:*
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -e .
 ```
 
@@ -152,7 +119,66 @@ grid    = runner2.intensity_grid(test[0])
 
 ---
 
-## 💻 CLI&nbsp;<a name="cli"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 🤖 Supported models [[Back&nbsp;to&nbsp;Top](#top)]
+
+Our package includes the following state-of-the-art STPP models:
+
+| No | Venue      | Preset                                  | Paper                                                                                            | Implementation |
+| :-: | ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------ | :------------: |
+| 1 | NeurIPS'23 | `auto_stpp`                           | [Automatic Integration for Spatiotemporal Neural Point Processes](https://arxiv.org/abs/2310.01179) |    PyTorch    |
+| 2 | L4DC'22    | `deep_stpp`                           | [Deep Spatiotemporal Point Process](https://proceedings.mlr.press/v168/lin22a.html)                 |    PyTorch    |
+| 3 | ICLR'21    | `neural_jumpcnf` / `neural_attncnf` | [Neural Spatio-Temporal Point Processes](https://openreview.net/forum?id=XQQA6-So14)                |    PyTorch    |
+| 4 | NeurIPS'19 | `njsde`                               | [Neural Jump Stochastic Differential Equations](https://arxiv.org/abs/1905.10403)                   |    PyTorch    |
+| 5 | ACM KDD'23 | `diffusion_stpp`                      | [Spatio-temporal Diffusion Point Processes](https://dl.acm.org/doi/10.1145/3580305.3599511)         |    PyTorch    |
+| 6 | ICLR'22    | `nsmpp`                               | [Neural Spectral Marked Point Processes](https://openreview.net/forum?id=0rcbOaoBXbg)               |    PyTorch    |
+| 7 | Arxiv      | `smash`                               | [Embedding Event History to Vector](https://arxiv.org/abs/2310.19324)                               |    PyTorch    |
+| 8 | ICML'20    | `thp_gmm`                             | [Transformer Hawkes Process](https://arxiv.org/abs/2002.09291)                                      |    PyTorch    |
+| 9 | KDD'16     | `rmtpp_gmm`                           | [Recurrent Marked Temporal Point Processes](https://dl.acm.org/doi/10.1145/2939672.2939875)         |    PyTorch    |
+
+**Parametric baselines** (fast, exact likelihood):
+`poisson_gmm` · `hawkes_gmm` · `selfcorrecting_gmm` · `poisson_cnf` · `hawkes_cnf` · `selfcorrecting_cnf` · `poisson_tvcnf` · `hawkes_tvcnf` · `selfcorrecting_tvcnf`
+
+---
+
+## 📊 Datasets [[Back&nbsp;to&nbsp;Top](#top)]
+
+Seahorse reads any collection of JSONL event sequences. The canonical split layout is:
+
+```text
+dataset_root/
+  train.jsonl
+  val.jsonl
+  test.jsonl
+```
+
+Each line is one sequence:
+
+```json
+{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
+```
+
+Datasets from the original NeuralSTPP paper are directly supported:
+
+- **Pinwheel** — Synthetic multimodal non-Gaussian process. 10 clusters in a pinwheel structure; events propagate clock-wise via a multivariate Hawkes mechanism. Tests the ability to capture drastic history-driven spatial shifts.
+- **Earthquake** — Real-world seismic event catalog ([U.S. Geological Survey, 2020](https://earthquake.usgs.gov/)).
+- **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
+- **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
+
+Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. Some of our available Hugging Face datasets include:
+
+- [`I5m41L/austin_311_stpp`](https://huggingface.co/datasets/I5m41L/austin_311_stpp)
+- [`I5m41L/uber_pickups_nyc_stpp`](https://huggingface.co/datasets/I5m41L/uber_pickups_nyc_stpp)
+- [`I5m41L/us_wildfires_stpp`](https://huggingface.co/datasets/I5m41L/us_wildfires_stpp)
+- [`I5m41L/gtd_stpp`](https://huggingface.co/datasets/I5m41L/gtd_stpp)
+- [`I5m41L/us_accidents_stpp`](https://huggingface.co/datasets/I5m41L/us_accidents_stpp)
+- [`I5m41L/la_crime_stpp`](https://huggingface.co/datasets/I5m41L/la_crime_stpp)
+- [`I5m41L/brightkite_checkins_stpp`](https://huggingface.co/datasets/I5m41L/brightkite_checkins_stpp)
+- [`I5m41L/chicago_crime_stpp`](https://huggingface.co/datasets/I5m41L/chicago_crime_stpp)
+- [`I5m41L/gowalla_checkins_stpp`](https://huggingface.co/datasets/I5m41L/gowalla_checkins_stpp)
+
+---
+
+## 💻 CLI [[Back&nbsp;to&nbsp;Top](#top)]
 
 **Fit one model**
 
@@ -189,20 +215,7 @@ python -m seahorse tune \
 
 ---
 
-## 📚 Documentation&nbsp;<a name="documentation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
-
-```bash
-pip install -e ".[docs]"
-mkdocs serve          # live-reload at http://127.0.0.1:8000
-mkdocs build --strict # static site → site/
-```
-
-The docs cover the [Python API](docs/python-api.md), [CLI reference](docs/cli.md), [data format](docs/data-format.md), [benchmark campaigns](docs/benchmarks.md), and [how to add a new model](docs/extend/preset.md).
-Start with the [end-to-end case study](docs/examples/case-study.md) for a complete data-to-artifacts walkthrough.
-
----
-
-## 📝 Citation&nbsp;<a name="citation"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 📝 Citation [[Back&nbsp;to&nbsp;Top](#top)]
 
 If Seahorse supports your work, cite the repository:
 
@@ -217,12 +230,12 @@ If Seahorse supports your work, cite the repository:
 
 ---
 
-## ⚖️ License&nbsp;<a name="license"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## ⚖️ License [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
 ---
 
-## 🙏 Acknowledgment&nbsp;<a name="acknowledgment"></a> [[Back&nbsp;to&nbsp;Top](#top)]
+## 🙏 Acknowledgment [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.
