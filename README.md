@@ -168,17 +168,9 @@ Datasets from the original NeuralSTPP paper are directly supported:
 - **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
 - **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
 
-Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. Some of our available Hugging Face datasets include:
+Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. 
 
-- [`I5m41L/austin_311_stpp`](https://huggingface.co/datasets/I5m41L/austin_311_stpp)
-- [`I5m41L/uber_pickups_nyc_stpp`](https://huggingface.co/datasets/I5m41L/uber_pickups_nyc_stpp)
-- [`I5m41L/us_wildfires_stpp`](https://huggingface.co/datasets/I5m41L/us_wildfires_stpp)
-- [`I5m41L/gtd_stpp`](https://huggingface.co/datasets/I5m41L/gtd_stpp)
-- [`I5m41L/us_accidents_stpp`](https://huggingface.co/datasets/I5m41L/us_accidents_stpp)
-- [`I5m41L/la_crime_stpp`](https://huggingface.co/datasets/I5m41L/la_crime_stpp)
-- [`I5m41L/brightkite_checkins_stpp`](https://huggingface.co/datasets/I5m41L/brightkite_checkins_stpp)
-- [`I5m41L/chicago_crime_stpp`](https://huggingface.co/datasets/I5m41L/chicago_crime_stpp)
-- [`I5m41L/gowalla_checkins_stpp`](https://huggingface.co/datasets/I5m41L/gowalla_checkins_stpp)
+For a complete catalog of available datasets, please visit the [Datasets Documentation](https://yahyaaalaila.github.io/seahorse/datasets/catalog/).
 
 ---
 
