@@ -26,7 +26,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ---
 
-| [News](#news) | [What you can build with Seahorse STPP](#what-you-can-build-do-with-seahorse-stpp) | [Features](#features) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
+| [News](#news) | [What you can build with Seahorse STPP](#what-you-can-build-with-seahorse-stpp) | [Features](#features) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
 
 ---
 
@@ -69,10 +69,10 @@ Seahorse provides a flexible framework to model complex event dynamics. You can 
 
 For more detailed guides, check out our documentation:
 
-- [Getting Started](https://yahyaaalaila.github.io/STPPGC/getting-started/)
-- [Why Seahorse?](https://yahyaaalaila.github.io/STPPGC/why-seahorse/)
-- [End-to-End Case Study](https://yahyaaalaila.github.io/STPPGC/examples/case-study/)
-- [Predicting with Models](https://yahyaaalaila.github.io/STPPGC/run-models/predict/)
+- [Getting Started](https://yahyaaalaila.github.io/seahorse/getting-started/)
+- [Why Seahorse?](https://yahyaaalaila.github.io/seahorse/why-seahorse/)
+- [End-to-End Case Study](https://yahyaaalaila.github.io/seahorse/examples/case-study/)
+- [Predicting with Models](https://yahyaaalaila.github.io/seahorse/run-models/predict/)
 
 **Install**
 

@@ -69,7 +69,7 @@ streaming event data.
 === "Python API"
 
     ```python
-    from unified_stpp import AutoSTPP, PoissonGMM, load_jsonl
+    from seahorse import AutoSTPP, PoissonGMM, load_jsonl
 
     train = load_jsonl("dataset_root/train.jsonl")
     val   = load_jsonl("dataset_root/val.jsonl")
@@ -86,7 +86,7 @@ streaming event data.
 === "CLI"
 
     ```bash
-    python -m unified_stpp fit \
+    python -m seahorse fit \
       --preset auto_stpp \
       --train dataset_root/train.jsonl \
       --val   dataset_root/val.jsonl \
