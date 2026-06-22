@@ -1,5 +1,3 @@
-`<a name="top"></a>`
-
 <div align="center">
 
 <img src="docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
