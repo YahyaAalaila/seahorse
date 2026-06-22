@@ -1,4 +1,4 @@
-<a name="top"></a>
+`<a name="top"></a>`
 
 <div align="center">
 
@@ -44,6 +44,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 ## 💡 What you can build with Seahorse STPP [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse provides a flexible framework to model complex event dynamics. You can build applications for:
+
 - **Epidemiology:** Modeling the spread of infectious diseases over time and regions.
 - **Seismology:** Forecasting earthquake occurrences and aftershock propagation.
 - **Urban Mobility:** Analyzing and predicting bike-sharing demand and traffic flows.
@@ -67,6 +68,7 @@ Seahorse provides a flexible framework to model complex event dynamics. You can 
 ## 🚀 Quick Start [[Back&nbsp;to&nbsp;Top](#top)]
 
 For more detailed guides, check out our documentation:
+
 - [Getting Started](https://yahyaaalaila.github.io/STPPGC/getting-started/)
 - [Why Seahorse?](https://yahyaaalaila.github.io/STPPGC/why-seahorse/)
 - [End-to-End Case Study](https://yahyaaalaila.github.io/STPPGC/examples/case-study/)
@@ -75,12 +77,14 @@ For more detailed guides, check out our documentation:
 **Install**
 
 *macOS / Linux:*
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 ```
 
 *Windows:*
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
