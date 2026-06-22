@@ -26,7 +26,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ---
 
-| [News](#news) | [What you can build do with Seahorse stpp](#what-you-can-build-do-with-seahorse-stpp) | [Features](#features) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
+| [News](#news) | [What you can build with Seahorse STPP](#what-you-can-build-do-with-seahorse-stpp) | [Features](#features) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
 
 ---
 
@@ -41,7 +41,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ---
 
-## 💡 What you can build do with Seahorse stpp [[Back&nbsp;to&nbsp;Top](#top)]
+## 💡 What you can build with Seahorse STPP [[Back&nbsp;to&nbsp;Top](#top)]
 
 Seahorse provides a flexible framework to model complex event dynamics. You can build applications for:
 - **Epidemiology:** Modeling the spread of infectious diseases over time and regions.

@@ -9,7 +9,7 @@ hide:
 
 <div class="hero-content">
     <h1 class="hero-title">STPP Easier than before</h1>
-    <p class="hero-description">Discover the ultimate framework for modeling Spatial-Temporal Point Processes. Seahorse STPP simplifies complex data workflows, enabling you to build, train, and deploy models effortlessly.</p>
+    <p class="hero-description">Discover the ultimate framework for modeling Spatial-Temporal Point Processes. Seahorse STPP simplifies complex data workflows, enabling you to build, train, and evaluate models effortlessly.</p>
     <div class="hero-buttons">
       <a href="overview/" class="md-button md-button--primary">Getting Started</a>
       <a href="architecture/" class="md-button hero-btn-secondary">Learn More</a>
