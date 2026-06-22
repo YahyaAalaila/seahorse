@@ -13,7 +13,7 @@ UnifiedSTPP(state_model, event_model, *, hidden_dim)
 | `StateModel` | Encodes event history into a hidden state; evolves state to a query time |
 | `EventModel` | Computes `log_prob(event | state)` and optionally samples next events |
 
-Both are `nn.Module` subclasses. The full API is defined in `unified_stpp/models/unified_model.py`.
+Both are `nn.Module` subclasses. The full API is defined in `seahorse/models/unified_model.py`.
 
 ## Minimal StateModel Adapter
 
@@ -89,8 +89,8 @@ Once you have `MyStateModel` and `MyEventModel`, create a `ModelFamilyConfig`:
 
 ```python
 from dataclasses import dataclass
-from unified_stpp.models.configs.base import BaseModelConfig, ConfigRegistry
-from unified_stpp.models.unified_model import UnifiedSTPP
+from seahorse.models.configs.base import BaseModelConfig, ConfigRegistry
+from seahorse.models.unified_model import UnifiedSTPP
 
 @ConfigRegistry.register("my_preset")
 @dataclass

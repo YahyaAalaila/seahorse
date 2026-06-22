@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
-from unified_stpp.api import STPPEstimator, list_available_models, resolve_preset
+from seahorse.api import STPPEstimator, list_available_models, resolve_preset
 
 
 class ApiEstimatorTest(unittest.TestCase):
@@ -22,8 +22,8 @@ class ApiEstimatorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "val_seqs is required"):
             estimator.fit([{"times": [0.0], "locations": [[0.0, 0.0]]}])
 
-    @patch("unified_stpp.api.estimator.STPPRunner")
-    @patch("unified_stpp.api.estimator.STPPConfig")
+    @patch("seahorse.api.estimator.STPPRunner")
+    @patch("seahorse.api.estimator.STPPConfig")
     def test_fit_builds_config_and_delegates_to_runner(self, config_cls, runner_cls):
         config = Mock(name="config")
         config_cls.from_source.return_value = config

@@ -10,21 +10,21 @@ import numpy as np
 import torch
 
 from tests.eval_test_helpers import SAMPLE_SEQUENCES, make_saved_run
-from unified_stpp.evaluation import evaluate
-from unified_stpp.evaluation.artifacts import PredictiveSamples
-from unified_stpp.evaluation.predictive.benchmark import write_next_event_benchmark_summary
-from unified_stpp.evaluation.predictive.rollout import (
+from seahorse.evaluation import evaluate
+from seahorse.evaluation.artifacts import PredictiveSamples
+from seahorse.evaluation.predictive.benchmark import write_next_event_benchmark_summary
+from seahorse.evaluation.predictive.rollout import (
     ExactProposalConfig,
     _build_exact_proposal_cache,
     build_exact_intensity_fn,
     compute_generative_rollouts,
 )
-from unified_stpp.evaluation.predictive.sampling import compute_predictive_samples
-from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
-from unified_stpp.evaluation.registry import metric_by_name
-from unified_stpp.evaluation.result import MetricResult, Report
-from unified_stpp.models.abstractions import StateContext
-from unified_stpp.runner.runner import STPPRunner
+from seahorse.evaluation.predictive.sampling import compute_predictive_samples
+from seahorse.evaluation.profiles import PREDICTIVE_SAMPLES
+from seahorse.evaluation.registry import metric_by_name
+from seahorse.evaluation.result import MetricResult, Report
+from seahorse.models.abstractions import StateContext
+from seahorse.runner.runner import STPPRunner
 
 
 def _toy_sequences() -> list[dict[str, np.ndarray]]:

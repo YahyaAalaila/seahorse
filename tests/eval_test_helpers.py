@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from unified_stpp.config import STPPConfig
-from unified_stpp.runner.results import RunResult
+from seahorse.config import STPPConfig
+from seahorse.runner.results import RunResult
 
 
 SAMPLE_SEQUENCES = [

@@ -8,9 +8,9 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.data.dataset import STPPDataset
-from unified_stpp.models.configs.diffusion_stpp import DiffusionSTPPConfig
-from unified_stpp.registry import build_model
+from seahorse.data.dataset import STPPDataset
+from seahorse.models.configs.diffusion_stpp import DiffusionSTPPConfig
+from seahorse.registry import build_model
 
 
 def _tiny_batch():

@@ -1,6 +1,6 @@
 import unittest
 
-from unified_stpp.evaluation.surface.diagnostics import (
+from seahorse.evaluation.surface.diagnostics import (
     DEFAULT_T_NSTEP,
     DEFAULT_X_NSTEP,
     DEFAULT_Y_NSTEP,

@@ -1,7 +1,7 @@
 # Run A Small Benchmark
 
 For the complete executable walkthrough, use
-<a href="https://colab.research.google.com/github/YahyaAalaila/STPPGC/blob/main/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
+<a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a>
 in Google Colab.
 
 ## Goal
@@ -30,7 +30,7 @@ take separate `--train`, `--val`, or `--test` flags.
 ## Run The Benchmark
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
   --dataset data/my_dataset \
   --seeds 1 \
@@ -40,7 +40,7 @@ python -m unified_stpp bench \
 
 ??? example "Show CLI command — quick smoke test with training overrides"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
       --dataset data/my_dataset \
       --seeds 1 \
@@ -72,7 +72,7 @@ Common campaign artifacts under `runs/examples/small_benchmark/`:
 
 ??? example "Show CLI command"
     ```bash
-    python -m unified_stpp evaluate metrics \
+    python -m seahorse evaluate metrics \
       --run path/to/run_dir \
       --data data/my_dataset/test.jsonl \
       --split test \

@@ -8,20 +8,20 @@
 Once registered, your preset is usable immediately:
 
 ```python
-from unified_stpp import STPPEstimator
+from seahorse import STPPEstimator
 
 model = STPPEstimator("my_preset", device="cpu")
 ```
 
 ## Extension Checklist
 
-1. Add or reuse model components under `unified_stpp/models/`.
+1. Add or reuse model components under `seahorse/models/`.
 2. Register component classes with the model registries when they are selected
    by key.
-3. Add a construction config under `unified_stpp/models/configs/`.
+3. Add a construction config under `seahorse/models/configs/`.
 4. Register the preset with `ConfigRegistry`.
-5. Import the config module from `unified_stpp/models/configs/__init__.py`.
-6. Add a bundled YAML config under `unified_stpp/configs/` when the preset needs
+5. Import the config module from `seahorse/models/configs/__init__.py`.
+6. Add a bundled YAML config under `seahorse/configs/` when the preset needs
    public defaults.
 7. Add focused tests for config loading, model construction, and a tiny fit path.
 8. Document supported evaluation and sampling capabilities before adding the
@@ -39,10 +39,10 @@ Use these files as starting points:
 
 ## Component Registries
 
-Component registry decorators live in `unified_stpp/models/model_registry.py`:
+Component registry decorators live in `seahorse/models/model_registry.py`:
 
 ```python
-from unified_stpp.models.model_registry import register_event, register_spatial, register_state
+from seahorse.models.model_registry import register_event, register_spatial, register_state
 ```
 
 Use the registry only for components that need keyed construction. Many preset
@@ -50,11 +50,11 @@ configs reuse existing registered components.
 
 ## Preset Config Registry
 
-Preset configs live under `unified_stpp/models/configs/` and register with
+Preset configs live under `seahorse/models/configs/` and register with
 `ConfigRegistry`:
 
 ```python
-from unified_stpp.models.configs.base import BaseModelConfig, ConfigRegistry
+from seahorse.models.configs.base import BaseModelConfig, ConfigRegistry
 
 
 @ConfigRegistry.register("my_preset")
@@ -84,13 +84,13 @@ artifacts are valid. Unsupported paths should raise clear errors.
 If users should run the preset directly, add:
 
 ```text
-unified_stpp/configs/my_preset.yaml
+seahorse/configs/my_preset.yaml
 ```
 
 The CLI can then load it with:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset my_preset \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \

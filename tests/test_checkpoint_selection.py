@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from unified_stpp.runner.artifacts import checkpoint_file, load_state_dict
+from seahorse.runner.artifacts import checkpoint_file, load_state_dict
 
 
 class TestCheckpointSelection(unittest.TestCase):

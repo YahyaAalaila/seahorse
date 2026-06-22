@@ -7,10 +7,10 @@ import unittest
 
 import torch
 
-from unified_stpp.config.schema import STPPConfig
-from unified_stpp.models.configs.neural_stpp import NeuralSTPPSharedJumpCNFConfig
-from unified_stpp.models.spatial_models import neural_jumpcnf as neural_jumpcnf_module
-from unified_stpp.models.spatial_models.neural_jumpcnf import NeuralJumpCNFSpatial
+from seahorse.config.schema import STPPConfig
+from seahorse.models.configs.neural_stpp import NeuralSTPPSharedJumpCNFConfig
+from seahorse.models.spatial_models import neural_jumpcnf as neural_jumpcnf_module
+from seahorse.models.spatial_models.neural_jumpcnf import NeuralJumpCNFSpatial
 
 
 class TestNeuralJumpCNFSpatial(unittest.TestCase):

@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import numpy as np
 
-from unified_stpp.evaluation import evaluate
-from unified_stpp.evaluation.artifacts import PredictiveSamples, merge_predictive_samples
-from unified_stpp.evaluation.profiles import PREDICTIVE_SAMPLES
-from unified_stpp.evaluation.registry import metric_by_name
+from seahorse.evaluation import evaluate
+from seahorse.evaluation.artifacts import PredictiveSamples, merge_predictive_samples
+from seahorse.evaluation.profiles import PREDICTIVE_SAMPLES
+from seahorse.evaluation.registry import metric_by_name
 
 
 class _Caps:
@@ -78,7 +78,7 @@ class TestEvalArtifacts(unittest.TestCase):
             metric = metric_by_name("temporal_mae")
 
             with patch(
-                "unified_stpp.evaluation.predictive.sampling.compute_predictive_samples",
+                "seahorse.evaluation.predictive.sampling.compute_predictive_samples",
                 return_value=_sample_payload(),
             ) as compute:
                 report = evaluate(
@@ -100,7 +100,7 @@ class TestEvalArtifacts(unittest.TestCase):
             self.assertTrue(any(artifact_dir.glob("predictive_samples/*/manifest.json")))
 
             with patch(
-                "unified_stpp.evaluation.predictive.sampling.compute_predictive_samples",
+                "seahorse.evaluation.predictive.sampling.compute_predictive_samples",
                 side_effect=AssertionError("should load saved predictive samples"),
             ) as compute_again:
                 report = evaluate(

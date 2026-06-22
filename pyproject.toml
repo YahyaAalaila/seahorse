@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "unified-stpp"
+name = "seahorse-stpp"
 version = "0.1.0"
-description = "Unified neural spatiotemporal point process framework"
+description = "Seahorse: unified benchmarking for spatio-temporal point-process models"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -42,12 +42,12 @@ docs = [
   "mkdocs-material>=9.5",
 ]
 all = [
-  "unified-stpp[runner,hpo,docs]",
+  "seahorse-stpp[runner,hpo,docs]",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["unified_stpp", "unified_stpp.*"]
+include = ["seahorse", "seahorse.*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -58,7 +58,7 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["runs", "artifacts", ".venv", "unified_stpp/data_cache"]
+extend-exclude = ["runs", "artifacts", ".venv", "seahorse/data_cache"]
 
 [tool.ruff.lint]
 select = ["E", "F"]

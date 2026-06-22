@@ -7,8 +7,8 @@ import unittest
 
 import torch
 
-from unified_stpp.config.schema import STPPConfig
-from unified_stpp.models.spatial_models.njsde import ConditionalGMMSpatial
+from seahorse.config.schema import STPPConfig
+from seahorse.models.spatial_models.njsde import ConditionalGMMSpatial
 
 
 class TestConditionalGMMSpatial(unittest.TestCase):

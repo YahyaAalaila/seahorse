@@ -16,13 +16,13 @@
 | `surface` | Intensity-grid diagnostics | intensity grids or approximations |
 | `full` | All registered benchmark metrics | all heavy artifact families |
 
-Run `python -m unified_stpp evaluate metrics --help` for the exact metric names
+Run `python -m seahorse evaluate metrics --help` for the exact metric names
 in the installed version.
 
 ## Core Metric Report
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -32,7 +32,7 @@ python -m unified_stpp evaluate metrics \
 
 ??? example "Show CLI command — explicit metric names"
     ```bash
-    python -m unified_stpp evaluate metrics \
+    python -m seahorse evaluate metrics \
       --run path/to/run_dir \
       --data data/my_dataset/test.jsonl \
       --split test \
@@ -67,7 +67,7 @@ Heavy artifacts are profile-gated so expensive sampling or grid work is explicit
 Evaluate large test sets in sequence ranges:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -78,7 +78,7 @@ python -m unified_stpp evaluate metrics \
 
 ??? example "Show CLI command — merge shard artifacts"
     ```bash
-    python -m unified_stpp evaluate merge-artifacts \
+    python -m seahorse evaluate merge-artifacts \
       --artifact-dir runs/evaluate/shard_0/artifacts \
       --artifact-dir runs/evaluate/shard_1/artifacts \
       --out runs/evaluate/merged_artifacts
@@ -89,7 +89,7 @@ python -m unified_stpp evaluate metrics \
 ## Predictive Comparison
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run path/to/run_a \
   --run path/to/run_b \
   --label model_a \
@@ -107,7 +107,7 @@ python -m unified_stpp evaluate predictive-compare \
 
 ??? example "Show CLI command"
     ```bash
-    python -m unified_stpp evaluate surface \
+    python -m seahorse evaluate surface \
       --run path/to/run_dir \
       --history data/my_dataset/test.jsonl \
       --split test \
@@ -118,7 +118,7 @@ python -m unified_stpp evaluate predictive-compare \
 
     The `surface` command supports `history_frame` (`auto_stpp`, `deep_stpp`) and
     `future_exact` (neural exact families). Run
-    `python -m unified_stpp evaluate surface --help` for the full option list.
+    `python -m seahorse evaluate surface --help` for the full option list.
 
 ## Python Visualization Helpers
 

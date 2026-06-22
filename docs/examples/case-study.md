@@ -30,7 +30,7 @@ the workflow without downloading data.
 Use the Python API for a focused single-model experiment:
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val = load_jsonl("data/my_dataset/val.jsonl")
@@ -50,7 +50,7 @@ Open the executable walkthrough:
 Use the CLI when comparing presets or preserving benchmark artifacts:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
   --dataset data/my_dataset \
   --seeds 1 \
@@ -78,7 +78,7 @@ Use `cell_index.json` to find a saved run and evaluate additional metric
 profiles:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \

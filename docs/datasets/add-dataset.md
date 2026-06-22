@@ -42,7 +42,7 @@ For short datasets, ensure the validation set has enough sequences for stable ea
 Read the splits and print basic stats before fitting:
 
 ```python
-from unified_stpp import load_jsonl
+from seahorse import load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 seq = train[0]
@@ -59,7 +59,7 @@ print(f"First 3 locations: {seq['locations'][:3]}")
 Run a one-epoch fit with a lightweight preset to verify the data loads correctly:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \

@@ -7,8 +7,8 @@ Run these tests before adding a new preset to benchmark examples or documentatio
 ### 1. Preset registration
 
 ```python
-from unified_stpp import list_available_models
-from unified_stpp import STPPEstimator
+from seahorse import list_available_models
+from seahorse import STPPEstimator
 
 def test_preset_registered():
     assert "my_preset" in list_available_models()
@@ -21,7 +21,7 @@ def test_preset_constructs():
 ### 2. Config loading
 
 ```python
-from unified_stpp import STPPConfig
+from seahorse import STPPConfig
 
 def test_config_from_preset():
     cfg = STPPConfig.from_preset("my_preset")
@@ -38,7 +38,7 @@ def test_config_roundtrip(tmp_path):
 ### 3. One-epoch fit on tiny data
 
 ```python
-from unified_stpp import STPPEstimator, load_jsonl
+from seahorse import STPPEstimator, load_jsonl
 
 def test_fit_tiny(tiny_train, tiny_val, tiny_test):
     model = STPPEstimator("my_preset", device="cpu")
@@ -71,7 +71,7 @@ def test_save_load(tmp_path, tiny_train, tiny_val, tiny_test):
 ### 5. CLI core evaluation
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset my_preset \
   --train data/tiny/train.jsonl \
   --val data/tiny/val.jsonl \
@@ -79,7 +79,7 @@ python -m unified_stpp fit \
   --out runs/test_my_preset \
   --override training.n_epochs=1 training.batch_size=2 data.num_workers=0
 
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run runs/test_my_preset/fit/my_preset/<run_id> \
   --data data/tiny/test.jsonl \
   --split test \
@@ -106,7 +106,7 @@ def test_predict_next(tiny_train, tiny_val, tiny_test):
 ### Surface diagnostics
 
 ```bash
-python -m unified_stpp evaluate surface \
+python -m seahorse evaluate surface \
   --run runs/test_my_preset/fit/my_preset/<run_id> \
   --history data/tiny/test.jsonl \
   --split test \
@@ -139,7 +139,7 @@ def tiny_train(tmp_path):
                 "locations": [[0.1, 0.2], [0.4, 0.5], [0.6, 0.3], [0.8, 0.7]],
             }
             f.write(json.dumps(seq) + "\n")
-    from unified_stpp import load_jsonl
+    from seahorse import load_jsonl
     return load_jsonl(str(path))
 ```
 

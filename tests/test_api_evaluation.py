@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import torch
 
-from unified_stpp.api import STPPEstimator
+from seahorse.api import STPPEstimator
 
 
 def _fitted_estimator() -> STPPEstimator:
@@ -23,8 +23,8 @@ def _fitted_estimator() -> STPPEstimator:
 
 
 class ApiEvaluationTest(unittest.TestCase):
-    @patch("unified_stpp.api.estimator.compute_seq_nlls")
-    @patch("unified_stpp.api.estimator.compute_next_event_test_nll")
+    @patch("seahorse.api.estimator.compute_seq_nlls")
+    @patch("seahorse.api.estimator.compute_next_event_test_nll")
     def test_core_evaluate_delegates_to_existing_likelihood_helpers(self, next_nll, seq_nlls):
         next_nll.return_value = {"mean_nll": 1.25, "sampling_backend": "backend"}
         seq_nlls.return_value = np.asarray([1.0, 2.0], dtype=np.float32)

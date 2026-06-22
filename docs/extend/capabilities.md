@@ -48,7 +48,7 @@ When a method raises `NotImplementedError`, the corresponding metric is marked `
 Before adding your preset to benchmark examples, verify each claimed capability:
 
 ```python
-from unified_stpp import STPPEstimator, load_jsonl
+from seahorse import STPPEstimator, load_jsonl
 
 train = load_jsonl("data/tiny/train.jsonl")
 val   = load_jsonl("data/tiny/val.jsonl")

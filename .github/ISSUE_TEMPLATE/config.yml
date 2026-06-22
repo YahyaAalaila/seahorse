@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Documentation
-    url: https://yahyaaalaila.github.io/STPPGC/
+    url: https://yahyaaalaila.github.io/seahorse/
     about: Read the Seahorse documentation.
   - name: Security reports
-    url: https://github.com/YahyaAalaila/STPPGC/security/policy
+    url: https://github.com/YahyaAalaila/seahorse/security/policy
     about: Please follow the security policy before sharing sensitive details.

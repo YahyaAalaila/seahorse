@@ -8,9 +8,9 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.registry import build_model
-from unified_stpp.models.configs.smash import SMASHConfig
-from unified_stpp.models.history_encoders.smash_transformer import (
+from seahorse.registry import build_model
+from seahorse.models.configs.smash import SMASHConfig
+from seahorse.models.history_encoders.smash_transformer import (
     SMASHTransformerST,
 )
 

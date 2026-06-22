@@ -7,13 +7,13 @@ from unittest import mock
 
 import numpy as np
 
-from unified_stpp.evaluation.bundle_io import load_surface_bundle, write_surface_bundle
-from unified_stpp.evaluation.runtime import HistoryQuery, RunTarget
-from unified_stpp.evaluation.surface import (
+from seahorse.evaluation.bundle_io import load_surface_bundle, write_surface_bundle
+from seahorse.evaluation.runtime import HistoryQuery, RunTarget
+from seahorse.evaluation.surface import (
     SurfaceDiagnosticEvaluator,
     SurfaceDiagnosticSpec,
 )
-from unified_stpp.viz import SurfaceRenderConfig, render_surface_bundle
+from seahorse.viz import SurfaceRenderConfig, render_surface_bundle
 
 from tests.eval_test_helpers import assert_finite_array, make_saved_run, write_history_jsonl
 
@@ -94,7 +94,7 @@ class TestSurfaceDiagnostics(unittest.TestCase):
                 "provisional": False,
             }
             with mock.patch(
-                "unified_stpp.evaluation.surface.diagnostics.evaluate_neural_future_exact",
+                "seahorse.evaluation.surface.diagnostics.evaluate_neural_future_exact",
                 return_value=fake_payload,
             ):
                 result = SurfaceDiagnosticEvaluator().evaluate(

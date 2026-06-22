@@ -16,10 +16,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from unified_stpp.training.lightning_module import STPPLightningModule
-from unified_stpp.config.schema import STPPConfig, TrainingConfig
-from unified_stpp.evaluation.artifacts import PredictiveSamples
-from unified_stpp.models.unified_model import LossResult
+from seahorse.training.lightning_module import STPPLightningModule
+from seahorse.config.schema import STPPConfig, TrainingConfig
+from seahorse.evaluation.artifacts import PredictiveSamples
+from seahorse.models.unified_model import LossResult
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ class TestSchedulerSelection(unittest.TestCase):
 class TestTrainingConfigWarnings(unittest.TestCase):
 
     def test_max_epochs_emits_warning(self):
-        from unified_stpp.config.schema import TrainingConfig
+        from seahorse.config.schema import TrainingConfig
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             TrainingConfig(max_epochs=50)
@@ -187,7 +187,7 @@ class TestTrainingConfigWarnings(unittest.TestCase):
         )
 
     def test_early_stopping_patience_emits_warning(self):
-        from unified_stpp.config.schema import TrainingConfig
+        from seahorse.config.schema import TrainingConfig
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             TrainingConfig(early_stopping_patience=10)
@@ -198,7 +198,7 @@ class TestTrainingConfigWarnings(unittest.TestCase):
         )
 
     def test_valid_fields_emit_no_warning(self):
-        from unified_stpp.config.schema import TrainingConfig
+        from seahorse.config.schema import TrainingConfig
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             TrainingConfig(n_epochs=50, patience=5)
@@ -451,7 +451,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertAlmostEqual(captured["test/native_spatial_nll"], 0.6, places=6)
 
     def test_compute_seq_nlls_uses_same_raw_reporting_resolution(self):
-        from unified_stpp.evaluation.likelihood import compute_seq_nlls
+        from seahorse.evaluation.likelihood import compute_seq_nlls
 
         result = LossResult(
             loss=torch.tensor(1.0),
@@ -474,7 +474,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertAlmostEqual(float(nlls[0]), 1.25, places=6)
 
     def test_compute_next_event_test_nll_prefers_eventwise_exact_terms(self):
-        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+        from seahorse.evaluation.likelihood import compute_next_event_test_nll
 
         output = {
             "nll_matrix": torch.tensor([[0.5, 0.7, 0.9]], dtype=torch.float32),
@@ -522,7 +522,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertEqual(summary["n_missing_contexts"], 0)
 
     def test_compute_next_event_test_nll_repairs_float32_collapsed_times(self):
-        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+        from seahorse.evaluation.likelihood import compute_next_event_test_nll
 
         seq = {
             "times": np.array(
@@ -567,7 +567,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertEqual(summary["n_contexts"], 2)
 
     def test_compute_next_event_test_nll_marks_monotonicity_failures_missing(self):
-        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+        from seahorse.evaluation.likelihood import compute_next_event_test_nll
 
         runner = SimpleNamespace(
             model=_ExactEvalMonotonicityFailureModel(),
@@ -603,7 +603,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertAlmostEqual(summary["mean_nll"], 0.5, places=6)
 
     def test_compute_next_event_test_nll_approx_tracks_missing_contexts(self):
-        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+        from seahorse.evaluation.likelihood import compute_next_event_test_nll
 
         rng = np.random.default_rng(0)
         sample_dt = rng.normal(loc=0.5, scale=0.03, size=(16,)).astype(np.float32)
@@ -648,7 +648,7 @@ class TestTestNLLReporting(unittest.TestCase):
         )
 
         with patch(
-            "unified_stpp.evaluation.likelihood.compute_predictive_samples",
+            "seahorse.evaluation.likelihood.compute_predictive_samples",
             return_value=samples,
         ):
             summary = compute_next_event_test_nll(runner, [{}], device=torch.device("cpu"))
@@ -662,7 +662,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertTrue(np.isnan(summary["per_context_nll"][1]))
 
     def test_batched_prefix_fallback_matches_unbatched(self):
-        from unified_stpp.evaluation.likelihood import (
+        from seahorse.evaluation.likelihood import (
             _prefix_difference_next_event_nlls,
             _prefix_difference_next_event_nlls_unbatched,
         )
@@ -694,7 +694,7 @@ class TestTestNLLReporting(unittest.TestCase):
         np.testing.assert_allclose(batched, baseline, rtol=1e-8, atol=1e-8)
 
     def test_batched_prefix_fallback_preserves_order_across_chunks(self):
-        from unified_stpp.evaluation.likelihood import (
+        from seahorse.evaluation.likelihood import (
             _prefix_difference_next_event_nlls,
             _prefix_difference_next_event_nlls_unbatched,
         )
@@ -725,7 +725,7 @@ class TestTestNLLReporting(unittest.TestCase):
         )
 
         with patch(
-            "unified_stpp.evaluation.likelihood._prefix_chunk_token_budget",
+            "seahorse.evaluation.likelihood._prefix_chunk_token_budget",
             return_value=8,
         ):
             batched = _prefix_difference_next_event_nlls(
@@ -744,7 +744,7 @@ class TestTestNLLReporting(unittest.TestCase):
         self.assertLess(batched_runner.model.forward_calls, len(seq["times"]))
 
     def test_batched_prefix_fallback_repairs_float32_collapsed_times(self):
-        from unified_stpp.evaluation.likelihood import compute_next_event_test_nll
+        from seahorse.evaluation.likelihood import compute_next_event_test_nll
 
         seq = {
             "times": np.array(

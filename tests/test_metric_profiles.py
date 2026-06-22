@@ -6,16 +6,16 @@ from unittest.mock import patch
 
 import numpy as np
 
-from unified_stpp.evaluation.context import GenerativeRollouts
-from unified_stpp.evaluation import MetricPlanError, evaluate, profile_names
-from unified_stpp.evaluation.profiles import (
+from seahorse.evaluation.context import GenerativeRollouts
+from seahorse.evaluation import MetricPlanError, evaluate, profile_names
+from seahorse.evaluation.profiles import (
     GENERATIVE_ROLLOUTS,
     INTENSITY_GRID,
     PREDICTIVE_SAMPLES,
     resolve_metric_plan,
 )
-from unified_stpp.evaluation.registry import metric_by_name
-from unified_stpp.evaluation.result import Metric, MetricResult
+from seahorse.evaluation.registry import metric_by_name
+from seahorse.evaluation.result import Metric, MetricResult
 
 
 class TestMetricProfiles(unittest.TestCase):

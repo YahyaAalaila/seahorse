@@ -1,16 +1,16 @@
-"""Compatibility coverage for the historical ``unified_stpp.registry`` shim."""
+"""Compatibility coverage for the historical ``seahorse.registry`` shim."""
 
 from __future__ import annotations
 
 import unittest
 
-from unified_stpp.config.schema import STPPConfig
-from unified_stpp.registry import PRESETS, build_model
+from seahorse.config.schema import STPPConfig
+from seahorse.registry import PRESETS, build_model
 
 
 class TestRegistryCompat(unittest.TestCase):
     def test_presets_expose_canonical_public_names(self):
-        from unified_stpp.models.configs import ConfigRegistry
+        from seahorse.models.configs import ConfigRegistry
 
         self.assertEqual(set(PRESETS), set(ConfigRegistry.canonical_preset_names()))
         self.assertIn("njsde", PRESETS)
@@ -18,7 +18,7 @@ class TestRegistryCompat(unittest.TestCase):
         self.assertTrue(all(payload == {} for payload in PRESETS.values()))
 
     def test_registry_exposes_canonical_and_status_metadata(self):
-        from unified_stpp.models.configs import ConfigRegistry
+        from seahorse.models.configs import ConfigRegistry
 
         auto = ConfigRegistry.describe("auto_stpp")
         self.assertEqual(auto.canonical_name, "auto_stpp")
@@ -45,7 +45,7 @@ class TestRegistryCompat(unittest.TestCase):
         self.assertEqual(cfg.model.preset, "njsde")
 
     def test_build_model_supports_known_preset(self):
-        from unified_stpp.models.unified_model import UnifiedSTPP
+        from seahorse.models.unified_model import UnifiedSTPP
 
         model = build_model(
             config={},

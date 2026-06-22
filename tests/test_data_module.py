@@ -1,8 +1,8 @@
 from torch.utils.data import TensorDataset
 import torch
 
-from unified_stpp.data.registry import DataBundle
-from unified_stpp.training.data_module import STPPDataModule
+from seahorse.data.registry import DataBundle
+from seahorse.training.data_module import STPPDataModule
 
 
 def test_batch_sampler_train_loader_allows_zero_workers():

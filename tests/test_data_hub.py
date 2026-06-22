@@ -6,12 +6,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from unified_stpp.data import download_dataset, load_dataset
-from unified_stpp.data.contract import (
+from seahorse.data import download_dataset, load_dataset
+from seahorse.data.contract import (
     validate_sequence_record,
     validate_sequence_records,
 )
-from unified_stpp.data.hub import CuratedDatasetSpec
+from seahorse.data.hub import CuratedDatasetSpec
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -144,8 +144,8 @@ class TestDatasetHub(unittest.TestCase):
                 repo_path="toy_local",
             )
 
-            with patch("unified_stpp.data.hub._CURATED_DATASETS", {"toy_local": spec}):
-                with patch("unified_stpp.data.hub._snapshot_download") as download_mock:
+            with patch("seahorse.data.hub._CURATED_DATASETS", {"toy_local": spec}):
+                with patch("seahorse.data.hub._snapshot_download") as download_mock:
                     resolved = download_dataset("toy_local")
 
         self.assertEqual(resolved, local_root.resolve())
@@ -163,9 +163,9 @@ class TestDatasetHub(unittest.TestCase):
                 repo_path="datasets/toy_remote",
             )
 
-            with patch("unified_stpp.data.hub._CURATED_DATASETS", {"toy_remote": spec}):
+            with patch("seahorse.data.hub._CURATED_DATASETS", {"toy_remote": spec}):
                 with patch(
-                    "unified_stpp.data.hub._snapshot_download",
+                    "seahorse.data.hub._snapshot_download",
                     return_value=str(snapshot_root),
                 ) as download_mock:
                     resolved = download_dataset("toy_remote", revision="branch-2")
@@ -186,7 +186,7 @@ class TestDatasetHub(unittest.TestCase):
             _write_jsonl(snapshot_root / "train.jsonl", _toy_records())
 
             with patch(
-                "unified_stpp.data.hub._snapshot_download",
+                "seahorse.data.hub._snapshot_download",
                 return_value=str(snapshot_root),
             ) as download_mock:
                 resolved = download_dataset("owner/repo", revision="main")
@@ -204,7 +204,7 @@ class TestDatasetHub(unittest.TestCase):
             _write_jsonl(remote_path / "train.jsonl", _toy_records())
 
             with patch(
-                "unified_stpp.data.hub._snapshot_download",
+                "seahorse.data.hub._snapshot_download",
                 return_value=str(snapshot_root),
             ) as download_mock:
                 resolved = download_dataset("owner/repo/datasets/toy_remote")
@@ -215,7 +215,7 @@ class TestDatasetHub(unittest.TestCase):
         self.assertEqual(kwargs["allow_patterns"], ["datasets/toy_remote/**"])
 
     def test_built_in_curated_specs_do_not_use_repo_relative_local_fallbacks(self):
-        from unified_stpp.data.hub import _CURATED_DATASETS
+        from seahorse.data.hub import _CURATED_DATASETS
 
         for key, spec in _CURATED_DATASETS.items():
             self.assertEqual(spec.local_paths, (), key)
@@ -232,7 +232,7 @@ class TestDatasetHub(unittest.TestCase):
                 repo_path="toy_split",
             )
 
-            with patch("unified_stpp.data.hub._CURATED_DATASETS", {"toy_split": spec}):
+            with patch("seahorse.data.hub._CURATED_DATASETS", {"toy_split": spec}):
                 loaded = load_dataset("toy_split", split="val")
 
         self.assertEqual(loaded, records[:1])

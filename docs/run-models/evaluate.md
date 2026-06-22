@@ -7,7 +7,7 @@ Seahorse has two evaluation paths: a lightweight Python method for quick likelih
 After fitting, `evaluate()` returns likelihood metrics without requiring a run directory:
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val   = load_jsonl("data/my_dataset/val.jsonl")
@@ -36,7 +36,7 @@ scores = model.evaluate(test, metrics=["test_nll"])
 The CLI path requires a saved run directory produced by `fit`, `tune`, or `bench`.
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \

@@ -7,9 +7,9 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.evaluation.intensity import calc_lamb, eval_intensity
-from unified_stpp.models.configs import ConfigRegistry
-from unified_stpp.registry import build_model
+from seahorse.evaluation.intensity import calc_lamb, eval_intensity
+from seahorse.models.configs import ConfigRegistry
+from seahorse.registry import build_model
 
 
 _DEVICE = "cpu"

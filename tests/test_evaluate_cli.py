@@ -15,7 +15,7 @@ class TestEvaluateCLI(unittest.TestCase):
         for mode in ("metrics", "predictive-compare", "surface"):
             with self.subTest(mode=mode):
                 proc = subprocess.run(
-                    [sys.executable, "-m", "unified_stpp", "evaluate", mode, "--help"],
+                    [sys.executable, "-m", "seahorse", "evaluate", mode, "--help"],
                     cwd=Path(__file__).resolve().parents[1],
                     capture_output=True,
                     text=True,
@@ -37,7 +37,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "metrics",
                     "--run",
@@ -80,7 +80,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "metrics",
                     "--run",
@@ -126,7 +126,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "metrics",
                     "--run",
@@ -158,7 +158,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "metrics",
                     "--run",
@@ -200,7 +200,7 @@ class TestEvaluateCLI(unittest.TestCase):
             base_cmd = [
                 sys.executable,
                 "-m",
-                "unified_stpp",
+                "seahorse",
                 "evaluate",
                 "metrics",
                 "--run",
@@ -264,7 +264,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "predictive-compare",
                     "--run",
@@ -319,7 +319,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "surface",
                     "--run",
@@ -361,7 +361,7 @@ class TestEvaluateCLI(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "unified_stpp",
+                    "seahorse",
                     "evaluate",
                     "surface",
                     "--run",

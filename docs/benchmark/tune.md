@@ -9,7 +9,7 @@ python -m pip install -e ".[hpo]"
 ## CLI: tune a single preset
 
 ```bash
-python -m unified_stpp tune \
+python -m seahorse tune \
   --preset poisson_gmm \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \
@@ -39,7 +39,7 @@ python -m unified_stpp tune \
 The Python API exposes a thin HPO wrapper that uses the same Ray Tune path:
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val   = load_jsonl("data/my_dataset/val.jsonl")
@@ -56,7 +56,7 @@ print(best_config)
 Run HPO before a benchmark campaign using a designated tuning dataset:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits \
   --tune \
@@ -69,7 +69,7 @@ python -m unified_stpp bench \
 Or re-use previously tuned configs so you do not re-run HPO for every benchmark:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits \
   --hpo_configs_dir runs/hpo \

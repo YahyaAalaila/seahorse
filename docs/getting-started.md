@@ -42,7 +42,7 @@ See [Data Format](data-format.md) for full details and Hugging Face sources.
 ## Run One Model With Python
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val   = load_jsonl("data/my_dataset/val.jsonl")
@@ -68,11 +68,11 @@ paper-style reproducibility.
 Verify the installed commands:
 
 ```bash
-python -m unified_stpp --help
-python -m unified_stpp fit --help
-python -m unified_stpp tune --help
-python -m unified_stpp bench --help
-python -m unified_stpp evaluate --help
+python -m seahorse --help
+python -m seahorse fit --help
+python -m seahorse tune --help
+python -m seahorse bench --help
+python -m seahorse evaluate --help
 ```
 
 The top-level CLI exposes four modes: `fit`, `tune`, `bench`, and `evaluate`.
@@ -80,7 +80,7 @@ The top-level CLI exposes four modes: `fit`, `tune`, `bench`, and `evaluate`.
 ## Train A Local CLI Run
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \
@@ -98,7 +98,7 @@ runs/quickstart/fit/poisson_gmm/<run_id>/
 Evaluate that saved run:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run runs/quickstart/fit/poisson_gmm/<run_id> \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -110,7 +110,7 @@ python -m unified_stpp evaluate metrics \
 Pass a dataset repository, optionally with a subdirectory:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision main \

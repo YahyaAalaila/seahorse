@@ -11,12 +11,12 @@ from unittest.mock import patch
 
 import yaml
 
-from unified_stpp.data.registry import DataBundle
-from unified_stpp.benchmark.hpo import RayTuneValidationReportCallback, run_hpo
-from unified_stpp.config.schema import STPPConfig
-from unified_stpp.config.tuning import TuningConfig
-from unified_stpp.runner import STPPRunner
-from unified_stpp.training.data_module import STPPDataModule
+from seahorse.data.registry import DataBundle
+from seahorse.benchmark.hpo import RayTuneValidationReportCallback, run_hpo
+from seahorse.config.schema import STPPConfig
+from seahorse.config.tuning import TuningConfig
+from seahorse.runner import STPPRunner
+from seahorse.training.data_module import STPPDataModule
 
 
 class ConfigResolutionTest(unittest.TestCase):
@@ -145,7 +145,7 @@ class ConfigResolutionTest(unittest.TestCase):
         self.assertEqual(tuning.scheduler, "none")
 
     def test_bundled_yaml_files_match_runtime_preset_defaults(self):
-        config_dir = Path("unified_stpp/configs")
+        config_dir = Path("seahorse/configs")
         self.assertEqual(
             {path.name for path in config_dir.glob("*.yaml")},
             {
@@ -164,9 +164,9 @@ class ConfigResolutionTest(unittest.TestCase):
         )
 
     def test_preset_resolution_uses_canonical_yaml_or_schema_defaults(self):
-        from unified_stpp.models.configs import ConfigRegistry
+        from seahorse.models.configs import ConfigRegistry
 
-        config_dir = Path("unified_stpp/configs")
+        config_dir = Path("seahorse/configs")
         yaml_defaults = {
             "auto_stpp": "auto_stpp.yaml",
             "deep_stpp": "deep_stpp.yaml",
@@ -228,7 +228,7 @@ class ConfigResolutionTest(unittest.TestCase):
         )
 
     def test_auto_stpp_configs_use_paper_sliding_window_training_view(self):
-        config_dir = Path("unified_stpp/configs")
+        config_dir = Path("seahorse/configs")
         for name in (
             "auto_stpp.yaml",
         ):

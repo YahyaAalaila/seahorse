@@ -16,7 +16,7 @@ runs/fit/auto_stpp/<run_id>/
 `run_id` is a timestamp-based identifier. Use it when re-loading a run:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run runs/fit/auto_stpp/<run_id> \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -80,7 +80,7 @@ For predictive, generative, or surface profiles, additional artifact families ar
 Load a saved run through the Python API:
 
 ```python
-from unified_stpp import AutoSTPP
+from seahorse import AutoSTPP
 
 model = AutoSTPP.load("runs/fit/auto_stpp/<run_id>")
 scores = model.evaluate(test)
@@ -89,7 +89,7 @@ scores = model.evaluate(test)
 Or through the base estimator class:
 
 ```python
-from unified_stpp import STPPEstimator
+from seahorse import STPPEstimator
 
 model = STPPEstimator.load("runs/fit/auto_stpp/<run_id>")
 ```

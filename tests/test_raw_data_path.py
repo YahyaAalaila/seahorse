@@ -8,12 +8,12 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.config.schema import DataConfig
-from unified_stpp.data.dataset import SlidingWindowSTPPDataset, STPPDataset, collate_fn
-from unified_stpp.data.registry import DataRegistry
-from unified_stpp.data.transforms import ZScoreTransformArtifact
-from unified_stpp.models.configs.factorized import FactorizedConfig
-from unified_stpp.models.configs.neural_stpp import NeuralSTPPConfig
+from seahorse.config.schema import DataConfig
+from seahorse.data.dataset import SlidingWindowSTPPDataset, STPPDataset, collate_fn
+from seahorse.data.registry import DataRegistry
+from seahorse.data.transforms import ZScoreTransformArtifact
+from seahorse.models.configs.factorized import FactorizedConfig
+from seahorse.models.configs.neural_stpp import NeuralSTPPConfig
 
 
 def _toy_sequences():

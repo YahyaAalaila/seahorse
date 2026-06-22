@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 import torch
 
-from unified_stpp.config import STPPConfig
-from unified_stpp.runner import STPPRunner
+from seahorse.config import STPPConfig
+from seahorse.runner import STPPRunner
 
 
 class RunnerResumeCheckpointTest(unittest.TestCase):

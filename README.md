@@ -12,12 +12,11 @@ Seahorse couples declarative YAML configuration with PyTorch Lightning execution
 Ray Tune hyper-parameter optimisation, and version-controlled logging to deliver  
 rapid prototyping and rigorous, reproducible benchmarking on streaming event data.
 
-Documentation: https://yahyaaalaila.github.io/STPPGC/
+Documentation: https://yahyaaalaila.github.io/seahorse/
 
-[![PyPI](https://img.shields.io/pypi/v/unified-stpp?label=pypi&color=blue)](https://pypi.org/project/unified-stpp/)
-[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/STPPGC)](https://github.com/YahyaAalaila/STPPGC/commits)
-[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/STPPGC)
-[![Issues](https://img.shields.io/github/issues/YahyaAalaila/STPPGC)](https://github.com/YahyaAalaila/STPPGC/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/commits)
+[![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/seahorse)
+[![Issues](https://img.shields.io/github/issues/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/issues)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
@@ -35,7 +34,7 @@ Documentation: https://yahyaaalaila.github.io/STPPGC/
 
 ## 🗞️ News&nbsp;<a name="news"></a> [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/STPPGC/
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/seahorse/
 
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Seahorse includes executable Colab tutorials for single-model training and benchmark campaigns.
 
@@ -124,7 +123,7 @@ pip install -e .
 **Python API**
 
 ```python
-from unified_stpp import AutoSTPP, PoissonGMM, load_jsonl
+from seahorse import AutoSTPP, PoissonGMM, load_jsonl
 
 train = load_jsonl("dataset_root/train.jsonl")
 val   = load_jsonl("dataset_root/val.jsonl")
@@ -141,7 +140,7 @@ samples = model.predict_next(test, n_samples=32)
 **STPPRunner (lower-level)**
 
 ```python
-from unified_stpp import STPPRunner
+from seahorse import STPPRunner
 
 runner = STPPRunner.from_preset("auto_stpp")
 result = runner.fit(train, val, test)   # returns RunResult
@@ -158,7 +157,7 @@ grid    = runner2.intensity_grid(test[0])
 **Fit one model**
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset auto_stpp \
   --train dataset_root/train.jsonl \
   --val   dataset_root/val.jsonl \
@@ -169,7 +168,7 @@ python -m unified_stpp fit \
 **Benchmark campaign** (multi-preset × multi-seed)
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets auto_stpp deep_stpp njsde poisson_gmm \
   --splits_dir splits/ \
   --seeds 1 2 3 \
@@ -180,7 +179,7 @@ python -m unified_stpp bench \
 **HPO sweep**
 
 ```bash
-python -m unified_stpp tune \
+python -m seahorse tune \
   --preset auto_stpp \
   --search_space configs/hpo/auto_stpp_search.yaml \
   --train dataset_root/train.jsonl \
@@ -211,7 +210,7 @@ If Seahorse supports your work, cite the repository:
 @software{aalaila_seahorse,
   title = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
   author = {Aalaila, Yahya},
-  url = {https://github.com/YahyaAalaila/STPPGC},
+  url = {https://github.com/YahyaAalaila/seahorse},
   license = {MIT}
 }
 ```

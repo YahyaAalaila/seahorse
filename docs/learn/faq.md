@@ -2,7 +2,7 @@
 
 ## Installation and Setup
 
-**`No module named unified_stpp`**
+**`No module named seahorse`**
 : Install in development mode from the repository root: `python -m pip install -e .`
 
 **`No module named ray` or HPO errors**
@@ -32,7 +32,7 @@
 ## Fitting
 
 **`Unknown model preset: my_preset`**
-: The preset is not registered. Check spelling with `list_available_models()`. If you wrote a custom preset, make sure the config module is imported in `unified_stpp/models/configs/__init__.py`.
+: The preset is not registered. Check spelling with `list_available_models()`. If you wrote a custom preset, make sure the config module is imported in `seahorse/models/configs/__init__.py`.
 
 **Out of memory during fit**
 : Reduce `--override training.batch_size=16` (or smaller). Use `--n_workers 1` and fewer concurrent runs. For `auto_stpp` and `deep_stpp`, also reduce hidden dim with `--override model.build_overrides.hidden_dim=64`.

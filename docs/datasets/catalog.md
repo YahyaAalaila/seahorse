@@ -12,7 +12,7 @@ Any public Hugging Face dataset repository that exposes `train.jsonl`,
 usable with:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision <revision> \

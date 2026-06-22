@@ -7,7 +7,7 @@ Seahorse can load datasets directly from the Hugging Face Hub when they follow t
 Pass a repository identifier with optional subdirectory:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision main \
@@ -23,7 +23,7 @@ The resolved repository must expose `train.jsonl` and `val.jsonl`. `test.jsonl` 
 ## In a Benchmark
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm auto_stpp \
   --dataset owner/repo[/subdir] \
   --dataset-revision <revision> \
@@ -36,7 +36,7 @@ python -m unified_stpp bench \
 The Python API does not download HuggingFace datasets automatically. Download and cache the splits first, then load with `load_jsonl`:
 
 ```python
-from unified_stpp import load_jsonl
+from seahorse import load_jsonl
 
 # After downloading splits to a local directory:
 train = load_jsonl("cache/my_dataset/train.jsonl")

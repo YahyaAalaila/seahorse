@@ -10,7 +10,7 @@ artifact-backed metric profiles.
 ## Imports
 
 ```python
-from unified_stpp import AutoSTPP, PoissonGMM, STPPEstimator, load_jsonl
+from seahorse import AutoSTPP, PoissonGMM, STPPEstimator, load_jsonl
 ```
 
 Use concrete classes when they exist:
@@ -44,7 +44,7 @@ The canonical NJSDE preset is available through `STPPEstimator("njsde")`.
 Programmatic discovery is available:
 
 ```python
-from unified_stpp import list_available_models
+from seahorse import list_available_models
 
 print(list_available_models())
 ```
@@ -103,7 +103,7 @@ scores = model.evaluate(test, metrics=["test_nll"])
 ```
 
 Unsupported estimator metrics raise `NotImplementedError`. Use
-`python -m unified_stpp evaluate metrics ...` for the full artifact-backed
+`python -m seahorse evaluate metrics ...` for the full artifact-backed
 evaluation profiles.
 
 ## Predict Next Events

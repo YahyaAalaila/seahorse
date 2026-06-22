@@ -29,7 +29,7 @@ needed for evaluation.
 
 ??? example "Show Python example"
     ```python
-    from unified_stpp import load_jsonl
+    from seahorse import load_jsonl
 
     train = load_jsonl("dataset_root/train.jsonl")
     val   = load_jsonl("dataset_root/val.jsonl")
@@ -38,7 +38,7 @@ needed for evaluation.
 
 ??? example "Show CLI command"
     ```bash
-    python -m unified_stpp fit \
+    python -m seahorse fit \
       --preset poisson_gmm \
       --train dataset_root/train.jsonl \
       --val dataset_root/val.jsonl \
@@ -66,7 +66,7 @@ Use a split collection when benchmarking multiple datasets:
 Run all datasets found under the root:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits_root \
   --seeds 1 2 3 \
@@ -75,7 +75,7 @@ python -m unified_stpp bench \
 
 ??? example "Show CLI command — filter to specific datasets"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm \
       --splits_dir splits_root \
       --datasets dataset_a dataset_b \
@@ -86,7 +86,7 @@ python -m unified_stpp bench \
 ## Hugging Face Data
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision main \
@@ -99,7 +99,7 @@ present.
 
 ??? example "Show CLI command — HuggingFace benchmark source"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --preset poisson_gmm \
       --dataset owner/repo[/subdir] \
       --dataset-revision main \

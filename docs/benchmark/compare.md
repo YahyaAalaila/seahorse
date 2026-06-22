@@ -20,7 +20,7 @@ Open `report.html` in a browser for a quick interactive view. Use the CSV files 
 Load benchmark results with the `BenchmarkTable` class:
 
 ```python
-from unified_stpp import BenchmarkTable
+from seahorse import BenchmarkTable
 
 table = BenchmarkTable.from_bench_dir("runs/bench")
 df = table.to_dataframe()
@@ -32,7 +32,7 @@ print(df.pivot_table(index="preset", columns="dataset", values="test_nll"))
 Visualize where two models place their predictions on a single sequence:
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run runs/bench/fit/auto_stpp/dataset_a/seed_1/<run_id> \
   --run runs/bench/fit/deep_stpp/dataset_a/seed_1/<run_id> \
   --label auto_stpp \
@@ -51,7 +51,7 @@ Look up run directories for specific cells in `cell_index.json`.
 For a benchmark-aligned predictive comparison across multiple models, run `evaluate metrics` on each cell separately and collect the results:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \

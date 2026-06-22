@@ -10,9 +10,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from unified_stpp.evaluation.intensity import calc_lamb_from_runner
-from unified_stpp.registry import build_model
-from unified_stpp.viz import plot_lambst_interactive
+from seahorse.evaluation.intensity import calc_lamb_from_runner
+from seahorse.registry import build_model
+from seahorse.viz import plot_lambst_interactive
 
 
 _SEQ = {

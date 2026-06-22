@@ -18,7 +18,7 @@ Use that path anywhere this page shows `path/to/run_dir`.
 ## Run Evaluation From CLI
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -28,7 +28,7 @@ python -m unified_stpp evaluate metrics \
 
 ??? example "Show CLI command — predictive metrics"
     ```bash
-    python -m unified_stpp evaluate metrics \
+    python -m seahorse evaluate metrics \
       --run path/to/run_dir \
       --data data/my_dataset/test.jsonl \
       --split test \
@@ -39,7 +39,7 @@ python -m unified_stpp evaluate metrics \
 
 ??? example "Show CLI command — cap sequences for quick inspection"
     ```bash
-    python -m unified_stpp evaluate metrics \
+    python -m seahorse evaluate metrics \
       --run path/to/run_dir \
       --data data/my_dataset/test.jsonl \
       --split test \
@@ -64,7 +64,7 @@ availability, scalar value, method, and any reason a metric was unavailable.
 ## Plot Or Visualize Results
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run path/to/run_dir \
   --label auto_stpp \
   --history data/my_dataset/test.jsonl \
@@ -76,7 +76,7 @@ python -m unified_stpp evaluate predictive-compare \
 
 ??? example "Show CLI command — compare two runs"
     ```bash
-    python -m unified_stpp evaluate predictive-compare \
+    python -m seahorse evaluate predictive-compare \
       --run path/to/auto_stpp_run_dir \
       --run path/to/deep_stpp_run_dir \
       --label auto_stpp \
@@ -90,7 +90,7 @@ python -m unified_stpp evaluate predictive-compare \
 
 ??? example "Show CLI command — surface diagnostics"
     ```bash
-    python -m unified_stpp evaluate surface \
+    python -m seahorse evaluate surface \
       --run path/to/run_dir \
       --history data/my_dataset/test.jsonl \
       --split test \
@@ -100,7 +100,7 @@ python -m unified_stpp evaluate predictive-compare \
     ```
 
     `history_frame` supports `auto_stpp` and `deep_stpp`. `future_exact` supports
-    the neural exact families listed by `python -m unified_stpp evaluate surface --help`.
+    the neural exact families listed by `python -m seahorse evaluate surface --help`.
 
 ## Interpret Common Outputs
 

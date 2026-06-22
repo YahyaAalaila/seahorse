@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from unified_stpp.registry import build_model
+from seahorse.registry import build_model
 
 
 # Shared test fixtures
@@ -20,7 +20,7 @@ class TestFactorizedRegistrySmoke(unittest.TestCase):
     """Test 1: config/registry smoke — build_model returns UnifiedSTPP for each preset."""
 
     def test_presets_build(self):
-        from unified_stpp.models.unified_model import UnifiedSTPP
+        from seahorse.models.unified_model import UnifiedSTPP
 
         for preset in ("poisson_gmm", "hawkes_gmm", "selfcorrecting_gmm"):
             with self.subTest(preset=preset):
@@ -48,17 +48,17 @@ class TestTemporalComponentSmoke(unittest.TestCase):
         self.assertTrue(torch.isfinite(out).all(), f"{cls.__name__} logprob not finite: {out}")
 
     def test_poisson(self):
-        from unified_stpp.models.temporal_models.parametric_processes import (
+        from seahorse.models.temporal_models.parametric_processes import (
             HomogeneousPoissonProcess,
         )
         self._check(HomogeneousPoissonProcess)
 
     def test_hawkes(self):
-        from unified_stpp.models.temporal_models.parametric_processes import HawkesProcess
+        from seahorse.models.temporal_models.parametric_processes import HawkesProcess
         self._check(HawkesProcess)
 
     def test_self_correcting(self):
-        from unified_stpp.models.temporal_models.parametric_processes import SelfCorrectingProcess
+        from seahorse.models.temporal_models.parametric_processes import SelfCorrectingProcess
         self._check(SelfCorrectingProcess)
 
 
@@ -66,7 +66,7 @@ class TestSpatialComponentSmoke(unittest.TestCase):
     """Test 3: GaussianMixtureSpatialModel — shape (1, 4) and finite logprob."""
 
     def test_gmm_spatial(self):
-        from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
+        from seahorse.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
 
         model = GaussianMixtureSpatialModel()
         out = model.logprob(_TIMES, _LOCATIONS, _MASK)
@@ -75,7 +75,7 @@ class TestSpatialComponentSmoke(unittest.TestCase):
         # Padding positions should be 0.0 (mask = 1 everywhere here, so check finite is enough)
 
     def test_gmm_spatial_with_padding(self):
-        from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
+        from seahorse.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
 
         model = GaussianMixtureSpatialModel()
         times = torch.tensor([[0.0, 0.2, 0.0, 0.0]])     # last 2 are padding
@@ -94,7 +94,7 @@ class TestFactorizedStateModelSmoke(unittest.TestCase):
     """Test 4: FactorizedStateModel — encode_history payload has correct keys."""
 
     def test_encode_history(self):
-        from unified_stpp.models.state_models.factorized import FactorizedStateModel
+        from seahorse.models.state_models.factorized import FactorizedStateModel
 
         model = FactorizedStateModel()
         ctx = model.encode_history(times=_TIMES, locations=_LOCATIONS, lengths=_LENGTHS)
@@ -110,12 +110,12 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
     """Test 5: FactorizedEventModel.training_loss — nll finite, mask correct shape."""
 
     def test_training_loss(self):
-        from unified_stpp.models.temporal_models.parametric_processes import (
+        from seahorse.models.temporal_models.parametric_processes import (
             HomogeneousPoissonProcess,
         )
-        from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.event_models.factorized import FactorizedEventModel
-        from unified_stpp.models.abstractions import StateContext
+        from seahorse.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
+        from seahorse.models.event_models.factorized import FactorizedEventModel
+        from seahorse.models.abstractions import StateContext
 
         event_model = FactorizedEventModel(
             temporal_model=HomogeneousPoissonProcess(),
@@ -137,10 +137,10 @@ class TestFactorizedEventModelSmoke(unittest.TestCase):
 
     def test_explicit_t1(self):
         """Test that explicit t1 runs without error and gives finite nll."""
-        from unified_stpp.models.temporal_models.parametric_processes import HawkesProcess
-        from unified_stpp.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
-        from unified_stpp.models.event_models.factorized import FactorizedEventModel
-        from unified_stpp.models.abstractions import StateContext
+        from seahorse.models.temporal_models.parametric_processes import HawkesProcess
+        from seahorse.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
+        from seahorse.models.event_models.factorized import FactorizedEventModel
+        from seahorse.models.abstractions import StateContext
 
         event_model = FactorizedEventModel(
             temporal_model=HawkesProcess(),
@@ -242,7 +242,7 @@ class TestIndependentCNFSmoke(unittest.TestCase):
     """Test 7: IndependentCNF spatial model — shape, finiteness, padding."""
 
     def _build(self, squash_time: bool):
-        from unified_stpp.models.spatial_models.independent_cnf import IndependentCNF
+        from seahorse.models.spatial_models.independent_cnf import IndependentCNF
         return IndependentCNF(
             dim=2,
             hidden_dims=(16, 16),
@@ -271,7 +271,7 @@ class TestIndependentCNFSmoke(unittest.TestCase):
         self.assertTrue(torch.isfinite(out).all(), f"squash_time=False not finite: {out}")
 
     def test_padding(self):
-        from unified_stpp.models.spatial_models.independent_cnf import IndependentCNF
+        from seahorse.models.spatial_models.independent_cnf import IndependentCNF
         torch.manual_seed(0)
         model = IndependentCNF(dim=2, hidden_dims=(16, 16), tol=1e-3)
         model.eval()
@@ -337,7 +337,7 @@ class TestFactorizedTVCNFEndToEnd(unittest.TestCase):
 
     def test_squash_time_false_default(self):
         """Ensure tvcnf presets instantiate with squash_time=False."""
-        from unified_stpp.models.configs import (
+        from seahorse.models.configs import (
             PoissonTVCNFConfig, HawkesTVCNFConfig, SelfCorrectingTVCNFConfig,
         )
         for cls in (PoissonTVCNFConfig, HawkesTVCNFConfig, SelfCorrectingTVCNFConfig):

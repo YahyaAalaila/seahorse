@@ -29,7 +29,7 @@ A **preset** is a named model configuration that works immediately with `fit`, `
 Discover all registered presets at runtime:
 
 ```python
-from unified_stpp import list_available_models
+from seahorse import list_available_models
 print(list_available_models())
 ```
 
@@ -37,7 +37,7 @@ print(list_available_models())
 
 Every run needs a config source. In order of precedence when combined:
 
-1. **Preset** (`--preset <name>`): loads defaults from the bundled YAML under `unified_stpp/configs/<preset>.yaml`.
+1. **Preset** (`--preset <name>`): loads defaults from the bundled YAML under `seahorse/configs/<preset>.yaml`.
 2. **Config file** (`--config path/to/config.yaml`): loads a complete or partial YAML config.
 3. **Overrides** (`--override key=value`): dotted-path overrides applied last.
 
@@ -56,14 +56,14 @@ Overrides use dotted paths into `STPPConfig`. Common groups:
 --override model.build_overrides.hidden_dim=128
 ```
 
-Run `python -m unified_stpp fit --help` for the full config schema.
+Run `python -m seahorse fit --help` for the full config schema.
 
 ## Using a Preset
 
 === "Python API"
 
     ```python
-    from unified_stpp import AutoSTPP
+    from seahorse import AutoSTPP
 
     model = AutoSTPP(device="cpu", seed=42)
     model.fit(train, val, test, epochs=10, batch_size=64)
@@ -72,7 +72,7 @@ Run `python -m unified_stpp fit --help` for the full config schema.
 === "CLI fit"
 
     ```bash
-    python -m unified_stpp fit \
+    python -m seahorse fit \
       --preset auto_stpp \
       --train data/my_dataset/train.jsonl \
       --val data/my_dataset/val.jsonl \
@@ -83,7 +83,7 @@ Run `python -m unified_stpp fit --help` for the full config schema.
 === "CLI bench"
 
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm auto_stpp \
       --splits_dir splits \
       --seeds 1 2 3 \
@@ -95,7 +95,7 @@ Run `python -m unified_stpp fit --help` for the full config schema.
 After fitting, the resolved config is written to `{run_dir}/config.yaml`. Load it for a reproducible re-run:
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --config runs/fit/auto_stpp/<run_id>/config.yaml \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \

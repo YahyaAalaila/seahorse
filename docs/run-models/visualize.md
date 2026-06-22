@@ -7,7 +7,7 @@ Seahorse provides two visualization paths: Python helper methods on fitted estim
 Fitted estimators expose two plotting methods:
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 test = load_jsonl("data/my_dataset/test.jsonl")
 model = AutoSTPP.load("runs/api/auto_stpp")
@@ -38,7 +38,7 @@ kde = model.plot_kde_surface(
 Surface diagnostics render an intensity or density grid for one sequence from a saved run:
 
 ```bash
-python -m unified_stpp evaluate surface \
+python -m seahorse evaluate surface \
   --run path/to/run_dir \
   --history data/my_dataset/test.jsonl \
   --split test \
@@ -54,14 +54,14 @@ Two surface profiles are available:
 | `history_frame` | `auto_stpp`, `deep_stpp` | Exact intensity evaluated over a spatial grid given the observed history |
 | `future_exact` | Neural exact families (`njsde`, `neural_jumpcnf`, `neural_attncnf`) | May prefer `--device cpu` for numerical stability |
 
-Run `python -m unified_stpp evaluate surface --help` for the full option list.
+Run `python -m seahorse evaluate surface --help` for the full option list.
 
 ## CLI Predictive Comparison
 
 Overlay sampled next-event predictions against ground truth for one sequence:
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run path/to/run_a \
   --run path/to/run_b \
   --label model_a \

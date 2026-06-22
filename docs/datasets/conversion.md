@@ -103,7 +103,7 @@ for split, seqs in splits.items():
 After converting, load with `load_jsonl` and run the [preparation checklist](add-dataset.md#preparation-checklist) before fitting.
 
 ```python
-from unified_stpp import load_jsonl
+from seahorse import load_jsonl
 
 train = load_jsonl("train.jsonl")
 print(f"{len(train)} sequences, first has {len(train[0]['times'])} events")

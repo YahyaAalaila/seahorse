@@ -6,18 +6,18 @@ from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_SCAN_ROOTS = ("unified_stpp", "tests")
+_SCAN_ROOTS = ("seahorse", "tests")
 _BANNED_MODULES = (
-    "unified_stpp.evaluation.evaluation_helpers",
-    "unified_stpp.evaluation.common",
-    "unified_stpp.evaluation.io",
-    "unified_stpp.evaluation.predictive_compare",
-    "unified_stpp.evaluation.predictive_sampling",
-    "unified_stpp.evaluation.predictive_benchmark",
-    "unified_stpp.evaluation.surface_query",
-    "unified_stpp.evaluation.surface_metrics",
-    "unified_stpp.evaluation.surface_compute",
-    "unified_stpp.evaluation.surface_profiles",
+    "seahorse.evaluation.evaluation_helpers",
+    "seahorse.evaluation.common",
+    "seahorse.evaluation.io",
+    "seahorse.evaluation.predictive_compare",
+    "seahorse.evaluation.predictive_sampling",
+    "seahorse.evaluation.predictive_benchmark",
+    "seahorse.evaluation.surface_query",
+    "seahorse.evaluation.surface_metrics",
+    "seahorse.evaluation.surface_compute",
+    "seahorse.evaluation.surface_profiles",
 )
 
 

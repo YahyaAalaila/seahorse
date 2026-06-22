@@ -5,7 +5,7 @@ Seahorse exposes next-event predictive sampling through `predict_next` in the Py
 ## predict_next (Python API)
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val   = load_jsonl("data/my_dataset/val.jsonl")
@@ -40,7 +40,7 @@ The returned dictionary contains:
 For benchmark-aligned predictive evaluation, use the CLI after saving a run:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -56,7 +56,7 @@ This computes temporal CRPS, spatial energy score, MAE, RMSE, and coverage using
 `predictive-compare` is a qualitative visualization workflow that overlays predictions from one or two models against observed events on a single sequence:
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run path/to/run_a \
   --run path/to/run_b \
   --label model_a \

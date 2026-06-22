@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-from unified_stpp.evaluation.bundle_io import load_predictive_bundle, write_predictive_bundle
-from unified_stpp.evaluation.predictive import (
+from seahorse.evaluation.bundle_io import load_predictive_bundle, write_predictive_bundle
+from seahorse.evaluation.predictive import (
     ExactProposalConfig,
     PredictiveComparator,
     PredictiveCompareSpec,
@@ -15,8 +15,8 @@ from unified_stpp.evaluation.predictive import (
     PredictiveFrameResult,
     PredictiveModelResult,
 )
-from unified_stpp.evaluation.predictive.rollout import evaluate_teacher_forced_frame
-from unified_stpp.evaluation.runtime import (
+from seahorse.evaluation.predictive.rollout import evaluate_teacher_forced_frame
+from seahorse.evaluation.runtime import (
     FrameWindow,
     HistoryQuery,
     RunTarget,
@@ -26,7 +26,7 @@ from unified_stpp.evaluation.runtime import (
     resolve_device,
     slice_initial_history,
 )
-from unified_stpp.viz import PredictiveRenderConfig, render_predictive_bundle
+from seahorse.viz import PredictiveRenderConfig, render_predictive_bundle
 
 from tests.eval_test_helpers import assert_finite_array, make_saved_run, write_history_jsonl
 

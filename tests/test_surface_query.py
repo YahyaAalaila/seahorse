@@ -14,8 +14,8 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.models.configs import ConfigRegistry
-from unified_stpp.registry import build_model
+from seahorse.models.configs import ConfigRegistry
+from seahorse.registry import build_model
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -98,17 +98,17 @@ class TestTemporalIntensityAt(unittest.TestCase):
         self.assertTrue((out >= 0).all(), f"{cls.__name__}: negative values: {out}")
 
     def test_poisson(self):
-        from unified_stpp.models.temporal_models.parametric_processes import (
+        from seahorse.models.temporal_models.parametric_processes import (
             HomogeneousPoissonProcess,
         )
         self._check(HomogeneousPoissonProcess)
 
     def test_hawkes(self):
-        from unified_stpp.models.temporal_models.parametric_processes import HawkesProcess
+        from seahorse.models.temporal_models.parametric_processes import HawkesProcess
         self._check(HawkesProcess)
 
     def test_selfcorrecting(self):
-        from unified_stpp.models.temporal_models.parametric_processes import SelfCorrectingProcess
+        from seahorse.models.temporal_models.parametric_processes import SelfCorrectingProcess
         self._check(SelfCorrectingProcess)
 
 
@@ -120,7 +120,7 @@ class TestGMMLogSpatialDensityAt(unittest.TestCase):
     """GaussianMixtureSpatialModel.log_spatial_density_at returns finite (M,)."""
 
     def test_shape_and_finite(self):
-        from unified_stpp.models.spatial_models.gaussian_mixture import (
+        from seahorse.models.spatial_models.gaussian_mixture import (
             GaussianMixtureSpatialModel,
         )
         torch.manual_seed(0)
@@ -135,7 +135,7 @@ class TestGMMLogSpatialDensityAt(unittest.TestCase):
 
     def test_no_history_uses_prior(self):
         """All-zero mask triggers Gaussian prior fallback — result still finite."""
-        from unified_stpp.models.spatial_models.gaussian_mixture import (
+        from seahorse.models.spatial_models.gaussian_mixture import (
             GaussianMixtureSpatialModel,
         )
         model = GaussianMixtureSpatialModel()
@@ -151,7 +151,7 @@ class TestGMMLogSpatialDensityAt(unittest.TestCase):
     def test_consistent_with_logprob(self):
         """Point-query density at event i should agree with logprob for a single
         query point using the matching history."""
-        from unified_stpp.models.spatial_models.gaussian_mixture import (
+        from seahorse.models.spatial_models.gaussian_mixture import (
             GaussianMixtureSpatialModel,
         )
         torch.manual_seed(1)
@@ -186,7 +186,7 @@ class TestIndependentCNFLogSpatialDensityAt(unittest.TestCase):
     """IndependentCNF.log_spatial_density_at accepts history args and returns finite (M,)."""
 
     def _build_cnf(self, squash_time=True):
-        from unified_stpp.models.spatial_models.independent_cnf import IndependentCNF
+        from seahorse.models.spatial_models.independent_cnf import IndependentCNF
         return IndependentCNF(
             dim=2, hidden_dims=(8, 8), tol=1e-2, squash_time=squash_time
         )
@@ -262,7 +262,7 @@ class TestFactorizedIntensityDensity(unittest.TestCase):
     """FactorizedEventModel.intensity() and density() return correct shapes."""
 
     def _state(self):
-        from unified_stpp.models.abstractions import StateContext
+        from seahorse.models.abstractions import StateContext
         return StateContext(payload={
             "times":     _TIMES_T,
             "locations": _LOCS_T,
@@ -340,7 +340,7 @@ _N_GRID = 4  # small grid to keep ODE-based presets fast
 
 def _check_surface_result(tc, result, surface_type, comparable, n_grid=_N_GRID):
     """Assert the structural contract of a SurfaceResult."""
-    from unified_stpp.evaluation.surface import SurfaceResult
+    from seahorse.evaluation.surface import SurfaceResult
 
     tc.assertIsInstance(result, SurfaceResult)
     tc.assertEqual(result.surface_type, surface_type)
@@ -360,7 +360,7 @@ def _evaluate_surface(
     n_grid=_N_GRID,
     n_samples=500,
 ):
-    from unified_stpp.evaluation.surface import SurfaceEvaluator
+    from seahorse.evaluation.surface import SurfaceEvaluator
 
     evaluator = SurfaceEvaluator(runner.model, runner.norm_stats)
     return evaluator.evaluate_frame(
@@ -468,7 +468,7 @@ class TestSurfaceResultFields(unittest.TestCase):
     """SurfaceResult exposes all required fields with correct types."""
 
     def _make_intensity_result(self):
-        from unified_stpp.evaluation.surface import SurfaceResult
+        from seahorse.evaluation.surface import SurfaceResult
         return SurfaceResult(
             surface_type="intensity",
             values=np.ones((4, 4), dtype=np.float32),
@@ -486,7 +486,7 @@ class TestSurfaceResultFields(unittest.TestCase):
         self.assertIsNone(r.n_samples)
 
     def test_proxy_kde_not_comparable(self):
-        from unified_stpp.evaluation.surface import SurfaceResult
+        from seahorse.evaluation.surface import SurfaceResult
         r = SurfaceResult(
             surface_type="proxy_kde",
             values=np.ones((4, 4), dtype=np.float32),
@@ -502,13 +502,13 @@ class TestSurfaceResultFields(unittest.TestCase):
         self.assertEqual(r.n_samples, 50)
 
     def test_exported_from_evaluation(self):
-        from unified_stpp.evaluation.surface import SurfaceEvaluator, SurfaceResult
+        from seahorse.evaluation.surface import SurfaceEvaluator, SurfaceResult
         self.assertIsNotNone(SurfaceResult)
         self.assertIsNotNone(SurfaceEvaluator)
 
     def test_history_fields_present(self):
         """SurfaceResult carries history_times and history_locs."""
-        from unified_stpp.evaluation.surface import SurfaceResult
+        from seahorse.evaluation.surface import SurfaceResult
         r = SurfaceResult(
             surface_type="intensity",
             values=np.ones((4, 4), dtype=np.float32),
@@ -526,7 +526,7 @@ class TestSurfaceResultFields(unittest.TestCase):
 
     def test_model_name_field(self):
         """SurfaceResult.model_name defaults to None and can be set."""
-        from unified_stpp.evaluation.surface import SurfaceResult
+        from seahorse.evaluation.surface import SurfaceResult
         r = SurfaceResult(
             surface_type="intensity",
             values=np.ones((4, 4), dtype=np.float32),
@@ -665,12 +665,12 @@ class TestQuerySurfaceContract(unittest.TestCase):
     def test_base_event_model_raises(self):
         """Base EventModel.query_surface() must raise NotImplementedError."""
         import torch
-        from unified_stpp.models.abstractions import EventModel, StateContext
+        from seahorse.models.abstractions import EventModel, StateContext
 
         class _Bare(EventModel):
             @property
             def capabilities(self):
-                from unified_stpp.models.abstractions import EventCapabilities
+                from seahorse.models.abstractions import EventCapabilities
                 return EventCapabilities()
 
             def training_loss(self, *, times, locations, lengths, state, **_):

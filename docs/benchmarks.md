@@ -5,7 +5,7 @@
     with saved artifacts. For a single model in a notebook, the [Python API](python-api.md) is simpler.
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits \
   --seeds 1 2 3 \
@@ -25,7 +25,7 @@ splits/
 
 ??? example "Show CLI command — single dataset or HuggingFace source"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --preset poisson_gmm \
       --dataset owner/repo[/subdir] \
       --dataset-revision main \
@@ -35,7 +35,7 @@ splits/
 
 ??? example "Show CLI command — filter specific datasets from a collection"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm \
       --splits_dir splits \
       --datasets dataset_a dataset_b \
@@ -54,7 +54,7 @@ splits/
 | Neural STPP | `njsde`, `neural_jumpcnf`, `neural_attncnf` | Exact-density variants. |
 | Paper families | `auto_stpp`, `deep_stpp`, `smash`, `diffusion_stpp`, `nsmpp` | Registered presets and Python aliases. |
 
-Use `python -m unified_stpp fit --help` for the current preset list.
+Use `python -m seahorse fit --help` for the current preset list.
 
 ## Capability Notes
 
@@ -70,7 +70,7 @@ Use `--normalize` only when you intentionally want z-scored time and space.
 
 ??? example "Show CLI command — short run with training overrides"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm \
       --splits_dir splits \
       --seeds 1 \
@@ -84,7 +84,7 @@ Benchmark HPO requires an explicit tuning dataset:
 
 ??? example "Show CLI command — HPO benchmark"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm \
       --splits_dir splits \
       --tune \
@@ -96,7 +96,7 @@ Benchmark HPO requires an explicit tuning dataset:
 
 ??? example "Show CLI command — reuse previously tuned configs"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --presets poisson_gmm hawkes_gmm \
       --splits_dir splits \
       --hpo_configs_dir runs/hpo \

@@ -8,10 +8,10 @@ import unittest
 import numpy as np
 import torch
 
-from unified_stpp.config.schema import STPPConfig
-from unified_stpp.models.configs.auto_stpp import AutoSTPPConfig
-from unified_stpp.models.event_models.auto_stpp_kernel import AutoSTPPCuboid
-from unified_stpp.registry import build_model
+from seahorse.config.schema import STPPConfig
+from seahorse.models.configs.auto_stpp import AutoSTPPConfig
+from seahorse.models.event_models.auto_stpp_kernel import AutoSTPPCuboid
+from seahorse.registry import build_model
 
 
 def _tiny_batch():

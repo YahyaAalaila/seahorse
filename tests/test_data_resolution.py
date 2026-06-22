@@ -10,9 +10,9 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from unified_stpp.cli import bench, fit, tune
-from unified_stpp.config.schema import DataConfig, STPPConfig
-from unified_stpp.data.resolution import ResolvedBenchmarkData, ResolvedDataPaths
+from seahorse.cli import bench, fit, tune
+from seahorse.config.schema import DataConfig, STPPConfig
+from seahorse.data.resolution import ResolvedBenchmarkData, ResolvedDataPaths
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -56,7 +56,7 @@ class DataConfigResolutionTest(unittest.TestCase):
                 dataset_revision="rev-1",
             )
 
-            with patch("unified_stpp.data.resolution.download_dataset", return_value=root) as download:
+            with patch("seahorse.data.resolution.download_dataset", return_value=root) as download:
                 resolved = cfg.resolve_data(mode="single", include_test=True)
 
         self.assertEqual(resolved.train_path, root / "train.jsonl")
@@ -158,8 +158,8 @@ class FitDatasetCliTest(unittest.TestCase):
             run_dir=None,
         )
 
-        with patch("unified_stpp.runner.STPPRunner.from_config_source", return_value=runner) as factory:
-            with patch("unified_stpp.utils.load_jsonl", return_value=_records()):
+        with patch("seahorse.runner.STPPRunner.from_config_source", return_value=runner) as factory:
+            with patch("seahorse.utils.load_jsonl", return_value=_records()):
                 fit.execute(args)
 
         runner.config.data.resolve_data.assert_called_once_with(mode="single", include_test=True)
@@ -205,11 +205,11 @@ class TuneDatasetCliTest(unittest.TestCase):
                 source_root=root,
             )
 
-            with patch("unified_stpp.config.schema.STPPConfig.raw_source_dict", return_value=raw_cfg):
-                with patch("unified_stpp.config.schema.STPPConfig.split_tuning_dict", return_value=(raw_cfg, {})):
-                    with patch("unified_stpp.config.tuning.TuningConfig.from_sources", return_value="tuning"):
-                        with patch("unified_stpp.config.schema.DataConfig.resolve_data", return_value=resolved) as resolve_data:
-                            with patch("unified_stpp.benchmark.hpo.run_hpo", return_value=best_config) as run_hpo:
+            with patch("seahorse.config.schema.STPPConfig.raw_source_dict", return_value=raw_cfg):
+                with patch("seahorse.config.schema.STPPConfig.split_tuning_dict", return_value=(raw_cfg, {})):
+                    with patch("seahorse.config.tuning.TuningConfig.from_sources", return_value="tuning"):
+                        with patch("seahorse.config.schema.DataConfig.resolve_data", return_value=resolved) as resolve_data:
+                            with patch("seahorse.benchmark.hpo.run_hpo", return_value=best_config) as run_hpo:
                                 tune.execute(args)
 
         resolve_data.assert_called_once_with(mode="single", include_test=False)
@@ -248,11 +248,11 @@ class TuneDatasetCliTest(unittest.TestCase):
             )
             best_config = STPPConfig(**raw_cfg)
 
-            with patch("unified_stpp.config.schema.STPPConfig.raw_source_dict", return_value=raw_cfg):
-                with patch("unified_stpp.config.schema.STPPConfig.split_tuning_dict", return_value=(raw_cfg, {})):
-                    with patch("unified_stpp.config.tuning.TuningConfig.from_sources", return_value="tuning"):
-                        with patch("unified_stpp.config.schema.DataConfig.resolve_data", return_value=resolved):
-                            with patch("unified_stpp.benchmark.hpo.run_hpo", return_value=best_config):
+            with patch("seahorse.config.schema.STPPConfig.raw_source_dict", return_value=raw_cfg):
+                with patch("seahorse.config.schema.STPPConfig.split_tuning_dict", return_value=(raw_cfg, {})):
+                    with patch("seahorse.config.tuning.TuningConfig.from_sources", return_value="tuning"):
+                        with patch("seahorse.config.schema.DataConfig.resolve_data", return_value=resolved):
+                            with patch("seahorse.benchmark.hpo.run_hpo", return_value=best_config):
                                 tune.execute(args)
 
             with open(out_path) as f:
@@ -305,8 +305,8 @@ class BenchDatasetCliTest(unittest.TestCase):
         bench_instance = Mock()
         bench_instance.run.return_value = table
 
-        with patch("unified_stpp.config.schema.DataConfig.resolve_data", return_value=resolved) as resolve_data:
-            with patch("unified_stpp.benchmark.Benchmark", return_value=bench_instance) as benchmark_cls:
+        with patch("seahorse.config.schema.DataConfig.resolve_data", return_value=resolved) as resolve_data:
+            with patch("seahorse.benchmark.Benchmark", return_value=bench_instance) as benchmark_cls:
                 bench.execute(args)
 
         resolve_data.assert_called_once_with(mode="benchmark")

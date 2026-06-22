@@ -5,13 +5,13 @@ inside a script or notebook.
 
 ## Notebook
 
-Use <a href="https://colab.research.google.com/github/YahyaAalaila/STPPGC/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
+Use <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a>
 for an executable walkthrough in Google Colab.
 
 ## Python API Example
 
 ```python
-from unified_stpp import AutoSTPP, load_jsonl
+from seahorse import AutoSTPP, load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 val   = load_jsonl("data/my_dataset/val.jsonl")
@@ -33,7 +33,7 @@ and artifact-backed reports, use the CLI.
 
 ??? example "Show Python example — try a baseline"
     ```python
-    from unified_stpp import PoissonGMM
+    from seahorse import PoissonGMM
 
     baseline = PoissonGMM(device="cpu", seed=42)
     baseline.fit(train, val, test, epochs=5, batch_size=64)

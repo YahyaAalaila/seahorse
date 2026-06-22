@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from unified_stpp.models.configs import ConfigRegistry
-from unified_stpp.registry import build_model
+from seahorse.models.configs import ConfigRegistry
+from seahorse.registry import build_model
 
 
 class SmokeTest(unittest.TestCase):

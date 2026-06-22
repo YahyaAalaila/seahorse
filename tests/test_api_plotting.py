@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock
 
-from unified_stpp.api import STPPEstimator
-from unified_stpp.api.viz import STPPPlotter
+from seahorse.api import STPPEstimator
+from seahorse.api.viz import STPPPlotter
 
 
 class ApiPlottingTest(unittest.TestCase):

@@ -11,7 +11,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from unified_stpp.training.callbacks import (
+from seahorse.training.callbacks import (
     CURVE_FIELDNAMES,
     PeriodicTestNLLCallback,
     _progress_milestones,
@@ -101,7 +101,7 @@ class PeriodicTestNLLCallbackTest(unittest.TestCase):
 
             callback.on_fit_start(trainer, pl_module)
             with patch(
-                "unified_stpp.training.callbacks.compute_next_event_test_nll",
+                "seahorse.training.callbacks.compute_next_event_test_nll",
                 side_effect=_fake_compute,
             ):
                 callback.on_train_epoch_end(trainer, pl_module)

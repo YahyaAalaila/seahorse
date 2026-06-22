@@ -10,7 +10,7 @@ See [Python API](python-api.md).
 The public CLI is the module entrypoint:
 
 ```bash
-python -m unified_stpp --help
+python -m seahorse --help
 ```
 
 It exposes four modes: `fit`, `tune`, `bench`, `evaluate`. Use `--help` on each
@@ -19,7 +19,7 @@ for exact arguments supported by the installed version.
 ## fit: Train One Reproducible Run
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --train data/my_dataset/train.jsonl \
   --val data/my_dataset/val.jsonl \
@@ -30,7 +30,7 @@ python -m unified_stpp fit \
 
 ??? example "Show CLI command — use a YAML config instead of a preset"
     ```bash
-    python -m unified_stpp fit \
+    python -m seahorse fit \
       --config path/to/config.yaml \
       --train data/my_dataset/train.jsonl \
       --val data/my_dataset/val.jsonl \
@@ -53,7 +53,7 @@ Requires HPO dependencies: `python -m pip install -e ".[hpo]"`
 
 ??? example "Show CLI command"
     ```bash
-    python -m unified_stpp tune \
+    python -m seahorse tune \
       --preset poisson_gmm \
       --train data/my_dataset/train.jsonl \
       --val data/my_dataset/val.jsonl \
@@ -77,7 +77,7 @@ Key options:
 ## bench: Run Benchmark Campaigns
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits \
   --seeds 1 2 3 \
@@ -87,7 +87,7 @@ python -m unified_stpp bench \
 
 ??? example "Show CLI command — single dataset or HuggingFace source"
     ```bash
-    python -m unified_stpp bench \
+    python -m seahorse bench \
       --preset poisson_gmm \
       --dataset owner/repo[/subdir] \
       --dataset-revision main \
@@ -114,7 +114,7 @@ Key options:
 `evaluate` is for post-fit analysis on saved runs:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \

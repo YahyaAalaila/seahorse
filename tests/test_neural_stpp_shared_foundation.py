@@ -16,13 +16,13 @@ import unittest
 import torch
 import torch.nn as nn
 
-import unified_stpp.models.temporal_models.neural_point_process as neural_point_process_module
-from unified_stpp.models.base import Decoder
-from unified_stpp.models.configs.neural_stpp import NeuralSTPPConfig
-from unified_stpp.models.event_models.neural import NeuralSTPPEventModel
-from unified_stpp.models.model_registry import register_spatial
-from unified_stpp.models.state_models.neural import NeuralSTPPStateModel
-from unified_stpp.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess, TimeVariableODE
+import seahorse.models.temporal_models.neural_point_process as neural_point_process_module
+from seahorse.models.base import Decoder
+from seahorse.models.configs.neural_stpp import NeuralSTPPConfig
+from seahorse.models.event_models.neural import NeuralSTPPEventModel
+from seahorse.models.model_registry import register_spatial
+from seahorse.models.state_models.neural import NeuralSTPPStateModel
+from seahorse.models.temporal_models.neural_point_process import ActNorm, NeuralPointProcess, TimeVariableODE
 
 
 class _CaptureTemporalCore(nn.Module):

@@ -10,14 +10,14 @@ import numpy as np
 import torch
 
 from tests.eval_test_helpers import SAMPLE_SEQUENCES, make_saved_run
-from unified_stpp.benchmark import Benchmark, BenchmarkTable
-from unified_stpp.config import BenchmarkConfig, STPPConfig, TuningConfig
-from unified_stpp.evaluation.likelihood import (
+from seahorse.benchmark import Benchmark, BenchmarkTable
+from seahorse.config import BenchmarkConfig, STPPConfig, TuningConfig
+from seahorse.evaluation.likelihood import (
     _prefix_difference_next_event_nlls_unbatched,
     compute_next_event_test_nll,
 )
-from unified_stpp.runner import STPPRunner
-from unified_stpp.runner.results import RunResult
+from seahorse.runner import STPPRunner
+from seahorse.runner.results import RunResult
 
 
 class BenchmarkConfigTest(unittest.TestCase):

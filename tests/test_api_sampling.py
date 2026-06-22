@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import torch
 
-from unified_stpp.api import STPPEstimator
+from seahorse.api import STPPEstimator
 
 
 def _estimator_with_caps(*, nll_kind: str, has_native_sampler: bool) -> STPPEstimator:
@@ -26,7 +26,7 @@ def _estimator_with_caps(*, nll_kind: str, has_native_sampler: bool) -> STPPEsti
 
 
 class ApiSamplingTest(unittest.TestCase):
-    @patch("unified_stpp.api.estimator.compute_predictive_samples")
+    @patch("seahorse.api.estimator.compute_predictive_samples")
     def test_predict_next_delegates_for_exact_models(self, compute_samples):
         compute_samples.return_value = SimpleNamespace(
             next_times=np.ones((1, 3), dtype=np.float32),

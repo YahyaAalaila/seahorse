@@ -6,7 +6,7 @@ import unittest
 
 import torch
 
-from unified_stpp.registry import build_model
+from seahorse.registry import build_model
 
 
 def _tiny_batch():

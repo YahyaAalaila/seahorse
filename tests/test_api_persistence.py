@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from unified_stpp.api import STPPEstimator
+from seahorse.api import STPPEstimator
 
 
 class ApiPersistenceTest(unittest.TestCase):
@@ -23,7 +23,7 @@ class ApiPersistenceTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "not fitted"):
             estimator.save("saved")
 
-    @patch("unified_stpp.api.estimator.STPPRunner")
+    @patch("seahorse.api.estimator.STPPRunner")
     def test_load_delegates_to_runner_load(self, runner_cls):
         runner = runner_cls.load.return_value
         runner.config.model.preset = "auto_stpp"

@@ -25,7 +25,7 @@ A reproducible run should record:
 Use a fixed split collection or a pinned Hugging Face dataset revision:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --splits_dir splits \
   --seeds 1 2 3 \
@@ -36,7 +36,7 @@ python -m unified_stpp bench \
 For Hugging Face-backed data:
 
 ```bash
-python -m unified_stpp bench \
+python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision <revision> \
@@ -49,7 +49,7 @@ python -m unified_stpp bench \
 Run post-fit metrics on each saved run:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -60,7 +60,7 @@ python -m unified_stpp evaluate metrics \
 For predictive benchmark artifacts:
 
 ```bash
-python -m unified_stpp evaluate metrics \
+python -m seahorse evaluate metrics \
   --run path/to/run_dir \
   --data data/my_dataset/test.jsonl \
   --split test \
@@ -71,7 +71,7 @@ python -m unified_stpp evaluate metrics \
 For qualitative visual diagnostics:
 
 ```bash
-python -m unified_stpp evaluate predictive-compare \
+python -m seahorse evaluate predictive-compare \
   --run path/to/run_a \
   --run path/to/run_b \
   --label model_a \

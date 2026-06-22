@@ -3,8 +3,8 @@
 Use this table to choose a metric profile and evaluation path for each preset.
 
 !!! tip "Source of truth"
-    Run `python -m unified_stpp evaluate metrics --help` and
-    `python -m unified_stpp evaluate surface --help` for the exact controls in
+    Run `python -m seahorse evaluate metrics --help` and
+    `python -m seahorse evaluate surface --help` for the exact controls in
     your installed version.
 
 ## Capability Flags

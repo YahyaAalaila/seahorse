@@ -30,7 +30,7 @@ data/my_dataset/
 ## Read A Split In Python
 
 ```python
-from unified_stpp import load_jsonl
+from seahorse import load_jsonl
 
 train = load_jsonl("data/my_dataset/train.jsonl")
 first = train[0]
@@ -56,7 +56,7 @@ as `marks`, `event_covariates`, and `field_covariates` must align with `times`.
 ## Hugging Face Sources
 
 ```bash
-python -m unified_stpp fit \
+python -m seahorse fit \
   --preset poisson_gmm \
   --dataset owner/repo[/subdir] \
   --dataset-revision main \

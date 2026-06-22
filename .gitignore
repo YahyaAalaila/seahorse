@@ -69,9 +69,9 @@ original_models_manifesto.md
 requirements.txt
 
 # Retired local AutoSTPP compatibility path
-unified_stpp/models/configs/auto_stpp_compat.py
-unified_stpp/models/event_models/auto_stpp_compat.py
-unified_stpp/models/state_models/auto_stpp_compat.py
+seahorse/models/configs/auto_stpp_compat.py
+seahorse/models/event_models/auto_stpp_compat.py
+seahorse/models/state_models/auto_stpp_compat.py
 tests/test_auto_stpp_state_event_parity.py
 
 # Generated local data/reference artifacts
