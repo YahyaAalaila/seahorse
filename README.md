@@ -58,7 +58,7 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 | **Ray Tune HPO** | YAML search-space files feed directly into distributed hyperparameter sweeps. |
 | **Benchmark campaigns** | Multi-preset × multi-dataset × multi-seed runs with a single CLI command. |
 | **Data contract** | `Benchmark` enforces identical train/val/test splits across all presets so NLL scores are directly comparable. |
-| **HuggingFace datasets** | Stream or cache any JSONL dataset directly from the Hub with `--dataset owner/repo`. |
+| **Hugging Face datasets** | Resolve and cache compatible JSONL datasets directly from the Hub with `--dataset owner/repo`. |
 
 ---
 
@@ -100,14 +100,16 @@ Each line is one sequence:
 {"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
 ```
 
-Datasets from the original NeuralSTPP paper are directly supported:
+Seahorse works with both synthetic examples and real STPP benchmarks:
 
 - **Pinwheel** — Synthetic multimodal non-Gaussian process. 10 clusters in a pinwheel structure; events propagate clock-wise via a multivariate Hawkes mechanism. Tests the ability to capture drastic history-driven spatial shifts.
 - **Earthquake** — Real-world seismic event catalog ([U.S. Geological Survey, 2020](https://earthquake.usgs.gov/)).
 - **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
 - **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
 
-Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`.
+Seahorse also loads compatible public datasets from the [Hugging Face Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. The documentation includes an audited catalog of external STPP datasets for civic service requests, urban mobility, wildfires, traffic incidents, crime reports, terrorism events, and location check-ins.
+
+See the [Dataset Catalog](docs/datasets/catalog.md) and [Ready-to-use HF Datasets](docs/datasets/hf-datasets.md) for pinned revisions and runnable commands.
 
 ---
 

@@ -27,6 +27,7 @@ Rules:
 - [ ] `train.jsonl`, `val.jsonl`, and `test.jsonl` are kept in separate files.
 - [ ] Coordinate ranges are consistent across all splits.
 - [ ] Splits do not overlap (no sequence in both train and test).
+- [ ] Public dataset cards identify the upstream source, license, and preprocessing steps.
 
 ## Split Ratios
 
@@ -70,12 +71,13 @@ python -m seahorse fit \
 
 A successful run writes `run_result.json` under the output directory.
 
-## Publishing to HuggingFace
+## Publishing to Hugging Face
 
 To make the dataset usable with `--dataset owner/repo`:
 
-1. Create a HuggingFace dataset repository.
+1. Create a Hugging Face dataset repository.
 2. Upload `train.jsonl`, `val.jsonl`, and `test.jsonl` to the repository root (or a named subdirectory).
-3. Tag a release or note a commit hash to use as `--dataset-revision`.
+3. Add a dataset card that records the upstream source, license, preprocessing steps, split policy, and contact/maintainer.
+4. Tag a release or note a commit hash to use as `--dataset-revision`.
 
-See [Ready-to-use HF Datasets](hf-datasets.md) for how Seahorse loads HuggingFace data.
+See [Ready-to-use HF Datasets](hf-datasets.md) for how Seahorse loads Hugging Face data.

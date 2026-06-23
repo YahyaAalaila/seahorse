@@ -23,7 +23,7 @@ splits/
   dataset_b/train.jsonl  dataset_b/val.jsonl  dataset_b/test.jsonl
 ```
 
-??? example "Show CLI command — single dataset or HuggingFace source"
+??? example "Show CLI command — single dataset or Hugging Face source"
     ```bash
     python -m seahorse bench \
       --preset poisson_gmm \

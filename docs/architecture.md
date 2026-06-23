@@ -14,7 +14,7 @@ The shared layer runs **identically** for every model family. It fixes the bench
 
 | Component | Module | Responsibility |
 | --- | --- | --- |
-| **Dataset** | `training/data_module.py` | Load local or HuggingFace JSONL splits; apply `protocol` and `normalize` settings |
+| **Dataset** | `training/data_module.py` | Load local or Hugging Face JSONL splits; apply `protocol` and `normalize` settings |
 | **Benchmark policy** | `benchmark/benchmark.py` | Force `protocol="unified"` and a single `normalize` value across all presets; prevent re-splitting or per-model coordinate changes |
 | **Config resolution** | `config/schema.py` | Merge YAML defaults → preset defaults → CLI `--override` into a `STPPConfig` (validated Pydantic v2) |
 | **Training harness** | `training/lightning_module.py` | Per-event NLL aggregation, checkpointing, early stopping — same for all families |

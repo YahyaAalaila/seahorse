@@ -13,6 +13,16 @@ The same format is used by the Python API and the CLI.
 coordinate pairs. Optional per-event arrays (`marks`, `event_covariates`,
 `field_covariates`) must have the same length as `times`.
 
+The loader also accepts a compact event-array record and canonicalizes it to the
+same internal shape:
+
+```json
+{"sequence_id": 0, "events": [{"t": 0.0, "x": -97.77, "y": 30.34}]}
+```
+
+Use `times` and `locations` for new datasets unless you already have event-array
+records.
+
 ## Local Data For One Run
 
 Use this layout for Python API experiments, `fit`, `tune`, or one-dataset `bench` runs:
@@ -97,7 +107,7 @@ Use `--dataset-revision` to pin the source for reproducible runs. The resolved
 dataset must expose `train.jsonl` and `val.jsonl`; `test.jsonl` is used when
 present.
 
-??? example "Show CLI command — HuggingFace benchmark source"
+??? example "Show CLI command — Hugging Face benchmark source"
     ```bash
     python -m seahorse bench \
       --preset poisson_gmm \

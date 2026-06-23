@@ -11,7 +11,7 @@ Existing STPP research code is scattered. Each paper ships its own training loop
 | Without Seahorse | With Seahorse |
 | --- | --- |
 | Per-paper training loops | One shared training harness for all models |
-| Incompatible data layouts | One JSONL format and HuggingFace integration |
+| Incompatible data layouts | One JSONL format and Hugging Face integration |
 | Ad-hoc evaluation scripts | Metric profiles gated by model capability |
 | Results that can't be directly compared | Shared benchmark contract enforced for every run |
 | Saved runs that are hard to reload | `RunResult` artifact + runner save/load |

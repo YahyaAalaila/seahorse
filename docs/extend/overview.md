@@ -6,7 +6,7 @@ Seahorse is designed to be extended. The three main extension points are:
 | --- | --- |
 | **New model family** | Add a `ModelFamilyConfig`, register it, optionally add a `PresetDescriptor` |
 | **Existing PyTorch model** | Wrap it as a `StateModel` / `EventModel` pair |
-| **New dataset** | Format as JSONL splits; optionally publish to HuggingFace |
+| **New dataset** | Format as JSONL splits; optionally publish to Hugging Face |
 
 ## Architecture Recap
 

@@ -85,7 +85,7 @@ python -m seahorse bench \
   --n_workers 1
 ```
 
-??? example "Show CLI command — single dataset or HuggingFace source"
+??? example "Show CLI command — single dataset or Hugging Face source"
     ```bash
     python -m seahorse bench \
       --preset poisson_gmm \
