@@ -50,6 +50,7 @@ nav:
   - Run Models:
       - Start Here: python-api.md
       - Data → Model → Fit: examples/train-one-model.md
+      - Modeling Events in Space and Time: examples/modeling-events-in-space-and-time.md
       - Evaluate a Model: run-models/evaluate.md
       - Predict / Sample Events: run-models/predict.md
       - Visualize Results: run-models/visualize.md
@@ -72,6 +73,7 @@ nav:
   - Extend Seahorse:
       - Extension Overview: extend/overview.md
       - Add a Model: adding-a-model.md
+      - Building a Research Model: extend/building-a-research-model.md
       - Wrap an Existing Model: extend/wrap.md
       - Register a Preset: extend/preset.md
       - Declare Capabilities: extend/capabilities.md

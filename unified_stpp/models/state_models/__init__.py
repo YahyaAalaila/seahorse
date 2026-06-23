@@ -5,6 +5,7 @@ from .smash import SMASHStateModel
 from .diffusion import DiffusionStateModel
 from .factorized import FactorizedStateModel
 from .nsmpp_deepbasis import NSMPPDeepBasisStateModel
+from .demo_gru_gaussian import DemoGRUDecayStateModel
 
 __all__ = [
     "NeuralSTPPStateModel",
@@ -14,4 +15,5 @@ __all__ = [
     "DiffusionStateModel",
     "FactorizedStateModel",
     "NSMPPDeepBasisStateModel",
+    "DemoGRUDecayStateModel",
 ]

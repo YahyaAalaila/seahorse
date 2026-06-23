@@ -5,6 +5,7 @@ from .smash import SMASHEventModel
 from .diffusion import DiffusionEventModel
 from .factorized import FactorizedEventModel
 from .nsmpp_deepbasis import NSMPPDeepBasisEventModel
+from .demo_gru_gaussian import DemoTemporalGaussianEventModel
 
 __all__ = [
     "NeuralSTPPEventModel",
@@ -14,4 +15,5 @@ __all__ = [
     "DiffusionEventModel",
     "FactorizedEventModel",
     "NSMPPDeepBasisEventModel",
+    "DemoTemporalGaussianEventModel",
 ]

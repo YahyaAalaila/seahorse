@@ -24,6 +24,7 @@ from .factorized import (
     FactorizedCNFConfig, PoissonCNFConfig, HawkesCNFConfig, SelfCorrectingCNFConfig,
     PoissonTVCNFConfig, HawkesTVCNFConfig, SelfCorrectingTVCNFConfig,
 )
+from .demo_gru_gaussian import DemoGRUGaussianConfig
 
 __all__ = [
     "BaseModelConfig",
@@ -50,4 +51,5 @@ __all__ = [
     "PoissonTVCNFConfig",
     "HawkesTVCNFConfig",
     "SelfCorrectingTVCNFConfig",
+    "DemoGRUGaussianConfig",
 ]

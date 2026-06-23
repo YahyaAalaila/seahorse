@@ -9,6 +9,8 @@ primary links open the notebooks in Google Colab.
 | --- | --- | --- |
 | <a href="https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a> | Generate tiny JSONL data, fit `AutoSTPP` and `PoissonGMM`, evaluate, call `predict_next`, and plot sampled next locations. | CPU-only, no Hugging Face dependency. |
 | <a href="https://colab.research.google.com/github/YahyaAalaila/uni-stpp/blob/release/v1-integration/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a> | Generate tiny JSONL data, run `python -m unified_stpp bench` with `poisson_gmm`, `hawkes_gmm`, `auto_stpp`, and `deep_stpp`, then inspect benchmark tables. | CPU-only, uses one seed and one epoch. |
+| <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_modeling_events_in_space_and_time.ipynb">03 Modeling Events in Space and Time</a> | End-to-end user workflow: dataset, EDA, event movie, model fitting, evaluation, and conclusion artifacts. | CPU-only; first cell clones and installs Seahorse automatically in Colab. |
+| <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/04_building_a_research_model.ipynb">04 Building a Research Model</a> | Add a small encoder-evolve-decoder model, register it, train/evaluate it, and run a tiny benchmark. | CPU-only; first cell clones and installs Seahorse automatically in Colab. |
 
 ## Running Locally
 

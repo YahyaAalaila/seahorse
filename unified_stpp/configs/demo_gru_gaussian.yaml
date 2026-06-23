@@ -1,0 +1,31 @@
+# Tutorial research preset: compact GRU encoder + exponential/Gaussian decoder.
+
+model:
+  preset: demo_gru_gaussian
+  hidden_dim: 32
+  spatial_dim: 2
+  state:
+    decay_init: 0.25
+  decoder:
+    min_scale: 0.03
+    max_log_scale: 1.5
+
+training:
+  lr: 1.0e-3
+  optimizer: adamw
+  weight_decay: 1.0e-5
+  grad_clip: 5.0
+  n_epochs: 10
+  batch_size: 16
+  patience: null
+  device: auto
+  checkpoint_select: best
+  test_nll_space: native
+
+data:
+  protocol: raw
+  normalize: false
+  batch_size: 16
+  num_workers: 0
+  adapter_kwargs:
+    training_view: full_sequence

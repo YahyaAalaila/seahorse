@@ -22,7 +22,7 @@ dist/
 .ruff_cache/
 
 # Project outputs
-/docs/
+/site/
 /data/
 /local_data/
 /datasets/
