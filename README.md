@@ -166,7 +166,7 @@ Datasets from the original NeuralSTPP paper are directly supported:
 - **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
 - **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
 
-Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. 
+Datasets can also be streamed from [HuggingFace Hub](https://huggingface.co/datasets) via `--dataset owner/repo`.
 
 For a complete catalog of available datasets, please visit the [Datasets Documentation](https://yahyaaalaila.github.io/seahorse/datasets/catalog/).
 

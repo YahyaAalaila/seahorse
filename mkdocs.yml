@@ -17,14 +17,14 @@ theme:
       primary: custom
       accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: custom
       accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Switch to dark mode
   features:
     - navigation.tabs
@@ -39,16 +39,11 @@ theme:
     - content.tabs.link
 
 extra_css:
-  - assets/extra.css?v=4
-  - assets/hero.css?v=22
-
-extra_javascript:
-  - assets/extra.js?v=6
+  - assets/extra.css
 
 nav:
-  - Home: index.md
-  - Getting started:
-      - Overview: overview.md
+  - Home:
+      - Overview: index.md
       - Quickstart: getting-started.md
       - Why Seahorse: why-seahorse.md
   - Run Models:
