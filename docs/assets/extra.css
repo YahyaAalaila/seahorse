@@ -446,3 +446,152 @@
   color: #7dd3fc;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Dataset catalog gallery (datasets/catalog.md)
+ * Events in space and time, ordered from city block to cortex.
+ * ------------------------------------------------------------------ */
+
+.sh-ds-eyebrow {
+  margin: -0.2rem 0 0.9rem;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--lighter);
+}
+
+.sh-ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.85rem;
+  margin: 0 0 0.4rem;
+}
+
+.sh-ds-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.95rem 1.05rem 0.85rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.55rem;
+  background: var(--md-default-bg-color--light, #141b26);
+  color: var(--md-default-fg-color);
+  text-decoration: none;
+  overflow: hidden;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.sh-ds-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--seahorse-accent-hover);
+  box-shadow: 0 10px 24px -16px rgba(2, 132, 199, 0.7);
+}
+
+/* core-benchmark and abstract cards carry a left accent rail */
+.sh-ds-card--bench { border-left: 2px solid var(--seahorse-accent-hover); }
+.sh-ds-card--abstract { border-left: 2px solid #7c4dff; }
+.sh-ds-card--abstract:hover {
+  border-color: #7c4dff;
+  box-shadow: 0 10px 24px -16px rgba(124, 77, 255, 0.7);
+}
+
+.sh-ds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-right: 1.1rem; /* clear the corner arrow */
+}
+.sh-ds-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: #f8fafc;
+}
+
+.sh-ds-chip {
+  flex: none;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  background: var(--seahorse-accent-soft);
+  border: 1px solid rgba(56, 166, 217, 0.35);
+  padding: 0.12rem 0.42rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sh-ds-chip--muted {
+  color: #c4b5fd;
+  background: rgba(124, 77, 255, 0.16);
+  border-color: rgba(124, 77, 255, 0.4);
+}
+
+.sh-ds-id {
+  align-self: flex-start;
+  max-width: 100%;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.7rem;
+  color: #7dd3fc;
+  background: rgba(56, 166, 217, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.3rem;
+  word-break: break-all;
+  box-shadow: none;
+}
+
+.sh-ds-desc {
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color--light);
+}
+
+.sh-ds-axes {
+  display: grid;
+  gap: 0.18rem;
+  margin-top: 0.2rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--seahorse-border);
+}
+.sh-ds-axis {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  font-size: 0.74rem;
+  color: var(--md-default-fg-color--light);
+}
+.sh-ds-k {
+  flex: none;
+  width: 2.6rem;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #38a6d9;
+}
+
+.sh-ds-go {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--md-default-fg-color--lighter);
+  opacity: 0.6;
+  transition: transform 0.16s ease, opacity 0.16s ease, color 0.16s ease;
+}
+.sh-ds-card:hover .sh-ds-go {
+  opacity: 1;
+  color: var(--seahorse-accent-hover);
+  transform: translate(2px, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ds-card,
+  .sh-ds-card:hover,
+  .sh-ds-go,
+  .sh-ds-card:hover .sh-ds-go { transition: none; transform: none; }
+}
