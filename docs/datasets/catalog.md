@@ -24,7 +24,7 @@ real-data comparison.
 
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card sh-ds-card--bench" href="https://huggingface.co/datasets/seahorse-stpp/citibike-stpp" target="_blank" rel="noopener">
-  <span class="sh-ds-head"><span class="sh-ds-name">NYC Citi Bike</span><span class="sh-ds-chip">core benchmark</span></span>
+  <span class="sh-ds-head"><span class="sh-ds-name">NYC Citibike</span><span class="sh-ds-chip">core benchmark</span></span>
   <code class="sh-ds-id">seahorse-stpp/citibike-stpp</code>
   <span class="sh-ds-desc">Bike-share trips between docking stations across New York City.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>dock coordinates</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>ride start</span></span>

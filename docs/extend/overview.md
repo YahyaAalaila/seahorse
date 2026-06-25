@@ -2,7 +2,7 @@
 
 Every model in Seahorse has the **same shape**. Express your freshly built STPP
 model that way once, and it plugs into the entire harness — training, multi-seed
-benchmarks, every metric profile, sampling, and save/load — with no other wiring.
+benchmarks, every metric profile, and sampling — with no other wiring.
 
 <div class="sh-ext-contract" markdown="0">
   <span class="sh-ext-wrap">UnifiedSTPP</span>
@@ -26,7 +26,6 @@ benchmarks, every metric profile, sampling, and save/load — with no other wiri
     <span class="sh-ext-pill">bench · multi-seed</span>
     <span class="sh-ext-pill">evaluate · all profiles</span>
     <span class="sh-ext-pill">predict_next</span>
-    <span class="sh-ext-pill">save / load</span>
     <span class="sh-ext-pill">CLI + Python API</span>
   </div>
 </div>

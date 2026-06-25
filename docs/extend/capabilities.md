@@ -18,7 +18,7 @@ Skip it → those metrics report a clean skip, never a wrong number.
     <div class="sh-cap-top"><span class="sh-cap-name">Bounded NLL</span><span class="sh-cap-tag">bound</span></div>
     <span class="sh-cap-by">declared by <code>log_prob()</code> returning a surrogate (score-matching, ELBO)</span>
     <span class="sh-cap-unlocks">unlocks</span>
-    <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · flagged approximate</span></div>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · flagged non-exact</span></div>
   </div>
   <div class="sh-cap sh-cap--optional">
     <div class="sh-cap-top"><span class="sh-cap-name">Next-event sampling</span><span class="sh-cap-tag">optional</span></div>

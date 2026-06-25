@@ -32,6 +32,9 @@ it into the next shape, ending in the per-event likelihood Seahorse trains on.
   </div>
 </div>
 
+Shapes: **B** sequences per batch, **T** events per sequence, **T_q** query
+times, and **H** = `hidden_dim`.
+
 ## What each part owns
 
 <div class="sh-comp-grid" markdown="0">
