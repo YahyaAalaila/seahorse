@@ -10,8 +10,11 @@ The same format is used by the Python API and the CLI.
 ```
 
 `times[i]` and `locations[i]` describe the same event. `locations` is a list of
-coordinate pairs. Optional per-event arrays (`marks`, `event_covariates`,
-`field_covariates`) must have the same length as `times`.
+fixed-dimensional coordinate vectors; most geospatial datasets use 2D `[x, y]`
+coordinates, while higher-dimensional datasets can use `[x, y, z]` when the
+selected model and visualization path support that dimensionality. Optional
+per-event arrays (`marks`, `event_covariates`, `field_covariates`) must have the
+same length as `times`.
 
 The loader also accepts a compact event-array record and canonicalizes it to the
 same internal shape:
@@ -21,7 +24,7 @@ same internal shape:
 ```
 
 Use `times` and `locations` for new datasets unless you already have event-array
-records.
+records. Event-array records may use `x`/`y` or `x`/`y`/`z` coordinates.
 
 ## Local Data For One Run
 

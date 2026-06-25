@@ -12,7 +12,7 @@ Each JSONL split file must have one JSON object per line. Each object represents
 
 Rules:
 - `times` — list of numeric event times, monotonically increasing within each sequence.
-- `locations` — list of 2D coordinate pairs `[x, y]`, same length as `times`.
+- `locations` — list of fixed-dimensional coordinate vectors, same length as `times`.
 - Optional arrays (`marks`, `event_covariates`, `field_covariates`) must align with `times`.
 - Each split is a separate file (`train.jsonl`, `val.jsonl`, `test.jsonl`).
 - Do **not** use a single JSON array; each line must be a standalone JSON object.
@@ -21,7 +21,7 @@ Rules:
 
 - [ ] Times are numeric (float or int), not strings or datetimes.
 - [ ] `times` within each sequence are monotonically non-decreasing.
-- [ ] `locations` is a list of `[x, y]` pairs (2D only; 3D coordinates are not supported).
+- [ ] `locations` is a list of fixed-dimensional coordinate vectors such as `[x, y]` or `[x, y, z]`.
 - [ ] `times` and `locations` have the same length in every sequence.
 - [ ] Optional per-event arrays have the same length as `times`.
 - [ ] `train.jsonl`, `val.jsonl`, and `test.jsonl` are kept in separate files.

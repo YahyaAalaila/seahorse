@@ -12,7 +12,7 @@ from seahorse.config.schema import STPPConfig
 
 
 HF_SMOKE_ENABLED = os.environ.get("SEAHORSE_RUN_HF_SMOKE") == "1"
-HF_SMOKE_DATASET = os.environ.get("SEAHORSE_HF_SMOKE_DATASET", "I5m41L/austin_311_stpp")
+HF_SMOKE_DATASET = os.environ.get("SEAHORSE_HF_SMOKE_DATASET", "austin_311_stpp")
 HF_SMOKE_DATASET_ID = HF_SMOKE_DATASET.rstrip("/").split("/")[-1]
 
 

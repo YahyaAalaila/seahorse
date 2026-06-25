@@ -107,7 +107,7 @@ Seahorse works with both synthetic examples and real STPP benchmarks:
 - **COVID-19** — Geo-located case reports ([New York Times, 2020](https://github.com/nytimes/covid-19-data)).
 - **Citibike** — NYC bike-share ride starts; useful for dense urban mobility modelling.
 
-Seahorse also loads compatible public datasets from the [Hugging Face Hub](https://huggingface.co/datasets) via `--dataset owner/repo`. The documentation includes an audited catalog of external STPP datasets for civic service requests, urban mobility, wildfires, traffic incidents, crime reports, terrorism events, and location check-ins.
+Seahorse also loads compatible public datasets from the [Hugging Face Hub](https://huggingface.co/datasets) via `--dataset`. Built-in aliases resolve to the project-controlled [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) namespace, including STPP datasets for civic service requests, urban mobility, wildfires, traffic incidents, crime reports, terrorism events, location check-ins, public health events, seismic events, and BOLD5000-derived neural response embeddings.
 
 See the [Dataset Catalog](docs/datasets/catalog.md) and [Ready-to-use HF Datasets](docs/datasets/hf-datasets.md) for pinned revisions and runnable commands.
 

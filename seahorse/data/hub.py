@@ -12,6 +12,7 @@ from seahorse.utils import load_jsonl
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_HF_DATASET_REPO = os.environ.get("SEAHORSE_HF_DATASET_REPO")
+_PROJECT_HF_DATASET_ORG = os.environ.get("SEAHORSE_HF_DATASET_ORG", "seahorse-stpp")
 _SPLIT_NAMES = ("train", "val", "test")
 
 
@@ -101,6 +102,7 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
             ),
         )
     )
+    specs.extend(_project_dataset_specs())
 
     catalog: dict[str, CuratedDatasetSpec] = {}
     for spec in specs:
@@ -109,6 +111,85 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
                 raise ValueError(f"Duplicate curated dataset key '{key}'.")
             catalog[key] = spec
     return catalog
+
+
+def _project_dataset_specs() -> list[CuratedDatasetSpec]:
+    datasets = (
+        (
+            "austin_311_stpp",
+            "806f06a83dd821fda1702f1aa71b1fbeadbff728",
+            ("austin_311",),
+        ),
+        (
+            "uber_pickups_nyc_stpp",
+            "5de1bb62d750c7a225a736a3cb36674bb61e3f70",
+            ("uber_pickups_nyc",),
+        ),
+        (
+            "us_wildfires_stpp",
+            "82e84d9b2d2d0197664e26b3e77d96084c75f368",
+            ("us_wildfires",),
+        ),
+        (
+            "gtd_stpp",
+            "379d8d3de49fdecf8dee797fc3133245d6d8eeec",
+            ("gtd",),
+        ),
+        (
+            "us_accidents_stpp",
+            "20ed5757a52f0b1d67c0ee9cf428a98fa8b1c886",
+            ("us_accidents",),
+        ),
+        (
+            "la_crime_stpp",
+            "1225c94f924839f2e6216d28e35fcd9ddccae370",
+            ("la_crime",),
+        ),
+        (
+            "brightkite_checkins_stpp",
+            "d2e9079a672fd8ed762f2816e2f73a4788b3f95c",
+            ("brightkite_checkins",),
+        ),
+        (
+            "chicago_crime_stpp",
+            "e6dc2c9edc427fac98b61ef181c750ae0b2bb818",
+            ("chicago_crime",),
+        ),
+        (
+            "gowalla_checkins_stpp",
+            "18b615fa840e6f92511c350522c762bcf351d0ec",
+            ("gowalla_checkins",),
+        ),
+        (
+            "earthquakes-stpp",
+            "b8a95e944c696bfe15a9684cc8532d6f0598d648",
+            ("earthquakes_stpp", "earthquakes"),
+        ),
+        (
+            "citibike-stpp",
+            "3e058400fd46eb0995e39d3acf038069d05d2122",
+            ("citibike_stpp", "citibike"),
+        ),
+        (
+            "covid-stpp",
+            "2c235058853d4920a92c42dafb49e1188ff08f86",
+            ("covid_stpp", "covid"),
+        ),
+        (
+            "bold5000-stpp",
+            "928e9cbc6df930e7d895844d64d3f273eed05b69",
+            ("bold5000_stpp", "bold5000"),
+        ),
+    )
+    return [
+        CuratedDatasetSpec(
+            name=name,
+            repo_id=f"{_PROJECT_HF_DATASET_ORG}/{name}",
+            revision=revision,
+            aliases=aliases,
+        )
+        for name, revision, aliases in datasets
+    ]
 
 
 _CURATED_DATASETS = _build_catalog()

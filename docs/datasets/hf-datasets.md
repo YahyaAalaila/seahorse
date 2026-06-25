@@ -27,34 +27,35 @@ against Seahorse's Hugging Face loader. They expose split files at the repositor
 root and use an accepted event-array JSONL layout that Seahorse canonicalizes
 into `times` and `locations`.
 
-Use them directly with `--dataset`:
+Use the built-in aliases directly with `--dataset`:
 
 ```bash
 python -m seahorse fit \
   --preset poisson_gmm \
-  --dataset I5m41L/chicago_crime_stpp \
-  --dataset-revision e6dc2c9edc427fac98b61ef181c750ae0b2bb818 \
+  --dataset chicago_crime_stpp \
   --out runs/chicago_crime_poisson
 ```
 
-For benchmark runs, keep the revision pinned:
+The alias resolves to the project-owned `seahorse-stpp` repository and the
+validated pinned revision listed in the catalog. You can still pass a full
+repository id and `--dataset-revision` when you intentionally want another
+revision.
+
+For benchmark runs:
 
 ```bash
 python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm auto_stpp \
-  --dataset I5m41L/gowalla_checkins_stpp \
-  --dataset-revision 18b615fa840e6f92511c350522c762bcf351d0ec \
+  --dataset gowalla_checkins_stpp \
   --seeds 1 2 3 \
   --out runs/gowalla_benchmark
 ```
 
-!!! warning "Project-controlled mirrors"
-    The current validated repositories are hosted under `I5m41L`, not under the
-    Seahorse project owner. Before a release or paper benchmark depends on them,
-    either mirror the datasets to a project-controlled Hugging Face namespace or
-    make the project owner an admin collaborator on the dataset repositories.
-    The current cards also report `license:unknown`; update that metadata after
-    confirming each upstream source's redistribution terms.
+!!! note "Project namespace"
+    Built-in aliases resolve to repositories under
+    [`seahorse-stpp`](https://huggingface.co/seahorse-stpp). The placeholder
+    repository `earthquake-stpp` is not registered because it does not contain
+    split files; use `earthquakes-stpp` for the validated earthquake dataset.
 
 ## In a Benchmark
 
@@ -85,7 +86,7 @@ test  = load_jsonl("cache/my_dataset/test.jsonl")
 To make a dataset work with `--dataset`, the repository must:
 
 1. Contain `train.jsonl`, `val.jsonl`, and `test.jsonl` at the repository root or a named subdirectory.
-2. Use the Seahorse JSONL format: one JSON object per line, each with `times` and `locations` arrays of equal length. The loader also accepts records with an `events` array whose events expose `t`, `x`, and `y`.
+2. Use the Seahorse JSONL format: one JSON object per line, each with `times` and `locations` arrays of equal length. The loader also accepts records with an `events` array whose events expose `t`, `x`, `y`, and optionally `z`.
 3. Publish the source, license, and any preprocessing notes in the dataset card.
 
 See [Conversion Standard](conversion.md) for format details and [Add Your Dataset](add-dataset.md) for the preparation checklist.

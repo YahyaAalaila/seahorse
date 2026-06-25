@@ -34,7 +34,7 @@ See [Data Format](../data-format.md) for the full contract and command support m
 
 ## Ready-to-use Datasets
 
-Seahorse is designed to work with Hugging Face-hosted STPP datasets that follow the JSONL split convention. See [Ready-to-use HF Datasets](hf-datasets.md) for sources.
+Seahorse is designed to work with Hugging Face-hosted STPP datasets that follow the JSONL split convention. Built-in dataset aliases resolve to the project-controlled `seahorse-stpp` namespace. See [Ready-to-use HF Datasets](hf-datasets.md) for sources.
 
 ## Next Steps
 

@@ -220,6 +220,58 @@ class TestDatasetHub(unittest.TestCase):
         for key, spec in _CURATED_DATASETS.items():
             self.assertEqual(spec.local_paths, (), key)
 
+    def test_project_dataset_alias_uses_seahorse_org_and_pinned_revision(self):
+        from seahorse.data.hub import _CURATED_DATASETS
+
+        spec = _CURATED_DATASETS["austin_311_stpp"]
+        self.assertEqual(spec.repo_id, "seahorse-stpp/austin_311_stpp")
+        self.assertEqual(
+            spec.revision,
+            "806f06a83dd821fda1702f1aa71b1fbeadbff728",
+        )
+        self.assertIs(_CURATED_DATASETS["austin_311"], spec)
+
+    def test_project_dataset_alias_downloads_pinned_revision_by_default(self):
+        with tempfile.TemporaryDirectory() as td:
+            snapshot_root = Path(td) / "snapshot"
+            _write_jsonl(snapshot_root / "train.jsonl", _toy_records())
+
+            with patch(
+                "seahorse.data.hub._snapshot_download",
+                return_value=str(snapshot_root),
+            ) as download_mock:
+                resolved = download_dataset("austin_311_stpp")
+
+        self.assertEqual(resolved, snapshot_root.resolve())
+        kwargs = download_mock.call_args.kwargs
+        self.assertEqual(kwargs["repo_id"], "seahorse-stpp/austin_311_stpp")
+        self.assertEqual(
+            kwargs["revision"],
+            "806f06a83dd821fda1702f1aa71b1fbeadbff728",
+        )
+
+    def test_project_dataset_alias_accepts_revision_override(self):
+        with tempfile.TemporaryDirectory() as td:
+            snapshot_root = Path(td) / "snapshot"
+            _write_jsonl(snapshot_root / "train.jsonl", _toy_records())
+
+            with patch(
+                "seahorse.data.hub._snapshot_download",
+                return_value=str(snapshot_root),
+            ) as download_mock:
+                resolved = download_dataset("austin_311", revision="main")
+
+        self.assertEqual(resolved, snapshot_root.resolve())
+        kwargs = download_mock.call_args.kwargs
+        self.assertEqual(kwargs["repo_id"], "seahorse-stpp/austin_311_stpp")
+        self.assertEqual(kwargs["revision"], "main")
+
+    def test_placeholder_earthquake_repo_is_not_registered(self):
+        from seahorse.data.hub import _CURATED_DATASETS
+
+        self.assertNotIn("earthquake-stpp", _CURATED_DATASETS)
+        self.assertIn("earthquakes-stpp", _CURATED_DATASETS)
+
     def test_load_dataset_can_select_one_split_from_curated_spec(self):
         with tempfile.TemporaryDirectory() as td:
             local_root = Path(td) / "toy_dataset"
