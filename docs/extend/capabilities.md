@@ -15,7 +15,7 @@ Skip it → those metrics report a clean skip, never a wrong number.
     <div class="sh-cap-chips"><span class="sh-cap-chip">core</span><span class="sh-cap-chip">nll</span><span class="sh-cap-chip">benchmark NLL tables</span></div>
   </div>
   <div class="sh-cap sh-cap--approx">
-    <div class="sh-cap-top"><span class="sh-cap-name">Approximate NLL</span><span class="sh-cap-tag">approx</span></div>
+    <div class="sh-cap-top"><span class="sh-cap-name">Bounded NLL</span><span class="sh-cap-tag">bound</span></div>
     <span class="sh-cap-by">declared by <code>log_prob()</code> returning a surrogate (score-matching, ELBO)</span>
     <span class="sh-cap-unlocks">unlocks</span>
     <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · flagged approximate</span></div>
@@ -38,13 +38,10 @@ Skip it → those metrics report a clean skip, never a wrong number.
     <span class="sh-cap-unlocks">unlocks</span>
     <div class="sh-cap-chips"><span class="sh-cap-chip">surface</span><span class="sh-cap-chip">evaluate surface</span></div>
   </div>
-  <div class="sh-cap sh-cap--auto">
-    <div class="sh-cap-top"><span class="sh-cap-name">Save / load</span><span class="sh-cap-tag">automatic</span></div>
-    <span class="sh-cap-by">works for free via the runner checkpoint — nothing to implement</span>
-    <span class="sh-cap-unlocks">unlocks</span>
-    <div class="sh-cap-chips"><span class="sh-cap-chip">STPPEstimator.load()</span><span class="sh-cap-chip">re-evaluation from disk</span></div>
-  </div>
 </div>
+
+Save/load and re-evaluation from disk come for free through the runner — there is
+no capability to declare.
 
 ## Declaring in EventModel
 
