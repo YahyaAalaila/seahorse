@@ -1,19 +1,74 @@
 # Wrap an Existing Model
 
-If you have an existing PyTorch STPP model and want to register it as a Seahorse preset, the adapter pattern requires implementing two classes: a `StateModel` and an `EventModel`.
+Have a PyTorch STPP model already? You expose it to Seahorse by splitting it into
+two `nn.Module` adapters — a **StateModel** and an **EventModel** — that
+`UnifiedSTPP` drives. This page shows how a batch of events flows through them,
+what each part owns, and where an optional **PresetDescriptor** fits.
 
-## The UnifiedSTPP Contract
+## How a batch flows through your model
 
-```
-UnifiedSTPP(state_model, event_model, *, hidden_dim)
-```
+A padded batch of sequences enters at the top; each component's method transforms
+it into the next shape, ending in the per-event likelihood Seahorse trains on.
 
-| Component | Responsibility |
-| --- | --- |
-| `StateModel` | Encodes event history into a hidden state; evolves state to a query time |
-| `EventModel` | Computes `log_prob(event | state)` and optionally samples next events |
+<div class="sh-flow" markdown="0">
+  <div class="sh-flow-node sh-flow-node--io">
+    <span class="sh-flow-shape">(B,T) times · (B,T,2) locations · (B,T) mask</span>
+    <span class="sh-flow-note">a padded batch of event sequences</span>
+  </div>
+  <div class="sh-flow-edge sh-flow-edge--state"><span class="sh-flow-call">StateModel.encode()</span></div>
+  <div class="sh-flow-node">
+    <span class="sh-flow-shape">(B, T, H) hidden</span>
+    <span class="sh-flow-note">one hidden vector per observed event</span>
+  </div>
+  <div class="sh-flow-edge sh-flow-edge--state"><span class="sh-flow-call">StateModel.evolve(query_times)</span></div>
+  <div class="sh-flow-node">
+    <span class="sh-flow-shape">(B, T_q, H) state</span>
+    <span class="sh-flow-note">state carried forward to each query time</span>
+  </div>
+  <div class="sh-flow-edge sh-flow-edge--event"><span class="sh-flow-call">EventModel.log_prob(times, locs, state, mask)</span></div>
+  <div class="sh-flow-node sh-flow-node--io sh-flow-node--out">
+    <span class="sh-flow-shape">(B, T) per-event log-likelihood</span>
+    <span class="sh-flow-note">summed over real events → the NLL Seahorse trains and scores</span>
+  </div>
+</div>
 
-Both are `nn.Module` subclasses. The full API is defined in `seahorse/models/unified_model.py`.
+## What each part owns
+
+<div class="sh-comp-grid" markdown="0">
+  <div class="sh-comp sh-comp--state">
+    <span class="sh-comp-tag">required</span>
+    <span class="sh-comp-name">StateModel</span>
+    <span class="sh-comp-role">Turns raw event history into a state vector.</span>
+    <div class="sh-comp-methods">
+      <div class="sh-comp-m"><code>encode(times, locs, mask)</code><span>→ (B, T, H) hidden</span></div>
+      <div class="sh-comp-m"><code>evolve(hidden, query_times)</code><span>→ (B, T_q, H) state</span></div>
+    </div>
+    <span class="sh-comp-where">your <code>StateModel</code> nn.Module</span>
+  </div>
+  <div class="sh-comp sh-comp--event">
+    <span class="sh-comp-tag">required</span>
+    <span class="sh-comp-name">EventModel</span>
+    <span class="sh-comp-role">Scores events under the state — the likelihood, plus optional generation.</span>
+    <div class="sh-comp-methods">
+      <div class="sh-comp-m"><code>log_prob(times, locs, state, mask)</code><span>→ (B, T) · required</span></div>
+      <div class="sh-comp-m"><code>sample_next(state, t_last)</code><span>→ next events · optional</span></div>
+      <div class="sh-comp-m"><code>intensity_grid(state, t, s)</code><span>→ density · optional</span></div>
+    </div>
+    <span class="sh-comp-where">your <code>EventModel</code> nn.Module</span>
+  </div>
+  <div class="sh-comp sh-comp--descriptor">
+    <span class="sh-comp-tag sh-comp-tag--opt">optional</span>
+    <span class="sh-comp-name">PresetDescriptor</span>
+    <span class="sh-comp-role">Injects data-derived setup before the model is built — bounding box, coordinate stats, device fallback.</span>
+    <div class="sh-comp-methods">
+      <div class="sh-comp-m"><code>data_init_overrides(dm)</code><span>→ dict merged into the build</span></div>
+    </div>
+    <span class="sh-comp-where">runs once before <code>build_model()</code>, given the fitted data module</span>
+  </div>
+</div>
+
+`UnifiedSTPP(state_model, event_model, *, hidden_dim)` is the wiring that ties the
+two modules together; the full API lives in `seahorse/models/unified_model.py`.
 
 ## Minimal StateModel Adapter
 

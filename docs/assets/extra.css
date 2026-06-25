@@ -964,3 +964,142 @@
   .sh-ext-path-go,
   .sh-ext-path:hover .sh-ext-path-go { transition: none; transform: none; }
 }
+
+/* ================================================================== *
+ * Wrap a model — data-flow anatomy + component responsibilities
+ * ================================================================== */
+
+/* --- vertical data-flow diagram (shapes transforming through methods) --- */
+.sh-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1.4rem 0;
+}
+.sh-flow-node {
+  width: 100%;
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.7rem 1rem;
+  text-align: center;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: rgba(15, 23, 42, 0.5);
+}
+.sh-flow-node--io {
+  background: var(--seahorse-accent-soft);
+  border-color: rgba(56, 166, 217, 0.3);
+}
+.sh-flow-shape {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.74rem;
+  color: #9fe0ff;
+}
+.sh-flow-node--io .sh-flow-shape { color: #bae6fd; font-weight: 600; }
+.sh-flow-note { font-size: 0.74rem; color: var(--md-default-fg-color--light); }
+.sh-flow-edge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.7rem;
+}
+.sh-flow-edge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--seahorse-border);
+  transform: translateX(-50%);
+}
+.sh-flow-edge::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--seahorse-border);
+}
+.sh-flow-call {
+  position: relative;
+  z-index: 1;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.68rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #0b1220;
+  border: 1px solid var(--seahorse-border);
+  color: #cbd5e1;
+}
+.sh-flow-edge--state .sh-flow-call { border-color: rgba(56, 166, 217, 0.5); color: #7fd3f0; }
+.sh-flow-edge--event .sh-flow-call { border-color: rgba(45, 212, 191, 0.5); color: #7ff0e0; }
+
+/* --- component responsibility cards (what owns what) --- */
+.sh-comp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+  margin: 1.1rem 0;
+}
+.sh-comp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--seahorse-border);
+  border-top: 2px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: var(--md-default-bg-color--light, #141b26);
+}
+.sh-comp--state { border-top-color: #38a6d9; }
+.sh-comp--event { border-top-color: #2dd4bf; }
+.sh-comp--descriptor { border-top-color: #f5b971; }
+.sh-comp-tag {
+  align-self: flex-start;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(56, 166, 217, 0.14);
+  color: #7dd3fc;
+}
+.sh-comp-tag--opt { background: rgba(245, 185, 113, 0.16); color: #f5cf9b; }
+.sh-comp-name { font-weight: 700; font-size: 1.02rem; color: #f8fafc; }
+.sh-comp--state .sh-comp-name { color: #7fd3f0; }
+.sh-comp--event .sh-comp-name { color: #7ff0e0; }
+.sh-comp--descriptor .sh-comp-name { color: #f5cf9b; }
+.sh-comp-role { font-size: 0.82rem; line-height: 1.5; color: var(--md-default-fg-color--light); }
+.sh-comp-methods { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.1rem; }
+.sh-comp-m { display: flex; flex-direction: column; gap: 0.12rem; }
+.md-typeset .sh-comp-m code {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  color: #bae6fd;
+  background: rgba(56, 166, 217, 0.1);
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.08rem 0.4rem;
+}
+.sh-comp-m span { font-size: 0.69rem; color: var(--md-default-fg-color--lighter); }
+.sh-comp-where {
+  margin-top: auto;
+  padding-top: 0.45rem;
+  border-top: 1px dashed var(--seahorse-border);
+  font-size: 0.72rem;
+  color: var(--md-default-fg-color--lighter);
+}
+.md-typeset .sh-comp-where code {
+  font-size: 0.68rem;
+  background: rgba(148, 163, 184, 0.12);
+  border: none;
+}
