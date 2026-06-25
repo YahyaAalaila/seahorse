@@ -1103,3 +1103,104 @@
   background: rgba(148, 163, 184, 0.12);
   border: none;
 }
+
+/* ================================================================== *
+ * Declare Capabilities — method → unlocks cards + comparability tiers
+ * ================================================================== */
+
+.sh-cap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.85rem;
+  margin: 1.1rem 0;
+}
+.sh-cap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--seahorse-border);
+  border-left: 2px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: var(--md-default-bg-color--light, #141b26);
+}
+.sh-cap--exact { border-left-color: #38a6d9; }
+.sh-cap--approx { border-left-color: #f5b971; }
+.sh-cap--optional { border-left-color: #2dd4bf; }
+.sh-cap--auto { border-left-color: #94a3b8; }
+.sh-cap-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.sh-cap-name { font-weight: 700; font-size: 1rem; color: #f8fafc; }
+.sh-cap-tag {
+  flex: none;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.57rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+.sh-cap--exact .sh-cap-tag { background: rgba(56, 166, 217, 0.16); color: #7dd3fc; }
+.sh-cap--approx .sh-cap-tag { background: rgba(245, 185, 113, 0.16); color: #f5cf9b; }
+.sh-cap--optional .sh-cap-tag { background: rgba(45, 212, 191, 0.16); color: #5eead4; }
+.sh-cap-by { font-size: 0.8rem; line-height: 1.5; color: var(--md-default-fg-color--light); }
+.md-typeset .sh-cap-by code { font-size: 0.72rem; }
+.sh-cap-unlocks {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.57rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--lighter);
+  margin-top: 0.05rem;
+}
+.sh-cap-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.sh-cap-chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #bae6fd;
+  background: rgba(56, 166, 217, 0.12);
+  border: 1px solid rgba(56, 166, 217, 0.28);
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.3rem;
+}
+
+/* exact vs approximate comparability tiers */
+.sh-tier { display: flex; flex-direction: column; gap: 0.7rem; margin: 1.1rem 0; }
+.sh-tier-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) 1fr;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--seahorse-border);
+  border-left: 3px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: var(--md-default-bg-color--light, #141b26);
+}
+.sh-tier-row--exact { border-left-color: #38a6d9; }
+.sh-tier-row--approx { border-left-color: #f5b971; }
+.sh-tier-label { display: flex; flex-direction: column; gap: 0.1rem; }
+.sh-tier-name { font-weight: 700; font-size: 0.95rem; }
+.sh-tier-row--exact .sh-tier-name { color: #7fd3f0; }
+.sh-tier-row--approx .sh-tier-name { color: #f5cf9b; }
+.sh-tier-sub { font-size: 0.72rem; color: var(--md-default-fg-color--lighter); }
+.sh-tier-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.sh-fam {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.45rem;
+}
+.sh-fam em { color: var(--md-default-fg-color--lighter); font-style: normal; font-size: 0.66rem; }
+@media screen and (max-width: 44.9em) {
+  .sh-tier-row { grid-template-columns: 1fr; }
+}

@@ -2,16 +2,49 @@
 
 Seahorse evaluation profiles are gated by **capability flags**. Before adding a preset to benchmark examples, decide which capabilities it supports and verify them with explicit tests.
 
-## Capability Flags
+## What each capability unlocks
 
-| Capability | What it enables | How to declare |
-| --- | --- | --- |
-| **Exact NLL** | `core` and `nll` metric profiles; benchmark NLL tables | `EventModel.log_prob()` returns exact log-likelihood |
-| **Approximate NLL** | Included in tables but flagged as approximate | `log_prob()` returns a surrogate (score-matching, ELBO) |
-| **Next-event sampling** | `predictive` metric profile; `predict_next` Python method | `EventModel.sample_next()` implemented |
-| **Generative rollouts** | `generative` and `autoregressive` profiles | Sampling path supports multi-step rollout |
-| **Intensity surface** | `surface` profile via `evaluate surface` | `EventModel` exposes an intensity or density grid query |
-| **Save / load** | `STPPEstimator.load()`, re-evaluation from disk | Works automatically via runner checkpoint |
+Each capability is a method you implement. Implement it → its metrics turn on.
+Skip it → those metrics report a clean skip, never a wrong number.
+
+<div class="sh-cap-grid" markdown="0">
+  <div class="sh-cap sh-cap--exact">
+    <div class="sh-cap-top"><span class="sh-cap-name">Exact NLL</span><span class="sh-cap-tag">exact</span></div>
+    <span class="sh-cap-by">declared by <code>log_prob()</code> returning an exact log-likelihood</span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">core</span><span class="sh-cap-chip">nll</span><span class="sh-cap-chip">benchmark NLL tables</span></div>
+  </div>
+  <div class="sh-cap sh-cap--approx">
+    <div class="sh-cap-top"><span class="sh-cap-name">Approximate NLL</span><span class="sh-cap-tag">approx</span></div>
+    <span class="sh-cap-by">declared by <code>log_prob()</code> returning a surrogate (score-matching, ELBO)</span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · flagged approximate</span></div>
+  </div>
+  <div class="sh-cap sh-cap--optional">
+    <div class="sh-cap-top"><span class="sh-cap-name">Next-event sampling</span><span class="sh-cap-tag">optional</span></div>
+    <span class="sh-cap-by">declared by implementing <code>sample_next()</code></span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">predictive</span><span class="sh-cap-chip">predict_next</span></div>
+  </div>
+  <div class="sh-cap sh-cap--optional">
+    <div class="sh-cap-top"><span class="sh-cap-name">Generative rollouts</span><span class="sh-cap-tag">optional</span></div>
+    <span class="sh-cap-by">declared by a sampling path that supports multi-step rollout</span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">generative</span><span class="sh-cap-chip">autoregressive</span></div>
+  </div>
+  <div class="sh-cap sh-cap--optional">
+    <div class="sh-cap-top"><span class="sh-cap-name">Intensity surface</span><span class="sh-cap-tag">optional</span></div>
+    <span class="sh-cap-by">declared by implementing <code>intensity_grid()</code></span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">surface</span><span class="sh-cap-chip">evaluate surface</span></div>
+  </div>
+  <div class="sh-cap sh-cap--auto">
+    <div class="sh-cap-top"><span class="sh-cap-name">Save / load</span><span class="sh-cap-tag">automatic</span></div>
+    <span class="sh-cap-by">works for free via the runner checkpoint — nothing to implement</span>
+    <span class="sh-cap-unlocks">unlocks</span>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">STPPEstimator.load()</span><span class="sh-cap-chip">re-evaluation from disk</span></div>
+  </div>
+</div>
 
 ## Declaring in EventModel
 
@@ -35,13 +68,25 @@ class MyEventModel(nn.Module):
 
 When a method raises `NotImplementedError`, the corresponding metric is marked `available: false` in `metrics.json` with a clear reason — it is not treated as a failure.
 
-## Exact vs Approximate NLL
+## Exact vs approximate NLL
 
-| Families | NLL type | Comparable? |
-| --- | --- | --- |
-| `auto_stpp`, `deep_stpp`, `nsmpp`, `njsde`, `neural_*`, `poisson_*`, `hawkes_*`, `rmtpp_gmm`, `thp_gmm` | Exact | Yes — directly comparable in benchmark tables |
-| `smash` | Score-matching surrogate | Note in tables; not directly comparable to exact families |
-| `diffusion_stpp` | ELBO | Note in tables; not directly comparable to exact families |
+NLL is only comparable across families that compute it the same way. Seahorse
+keeps the two tiers visibly separate in benchmark tables.
+
+<div class="sh-tier" markdown="0">
+  <div class="sh-tier-row sh-tier-row--exact">
+    <div class="sh-tier-label"><span class="sh-tier-name">Exact</span><span class="sh-tier-sub">directly comparable</span></div>
+    <div class="sh-tier-chips">
+      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">nsmpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">thp_gmm</span>
+    </div>
+  </div>
+  <div class="sh-tier-row sh-tier-row--approx">
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">flagged, not directly comparable</span></div>
+    <div class="sh-tier-chips">
+      <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
+    </div>
+  </div>
+</div>
 
 ## Capability Testing
 
