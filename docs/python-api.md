@@ -10,7 +10,7 @@ artifact-backed metric profiles.
 ## Imports
 
 ```python
-from seahorse import AutoSTPP, PoissonGMM, STPPEstimator, load_jsonl
+from seahorse import AutoSTPP, DeepSTPP, PoissonGMM, STPPEstimator, load_dataset, load_jsonl
 ```
 
 Use concrete classes when they exist:
@@ -51,7 +51,16 @@ print(list_available_models())
 
 ## Data
 
-Load canonical JSONL split files with `load_jsonl`:
+Load a Seahorse-ready Hugging Face dataset with `load_dataset`:
+
+```python
+splits = load_dataset("yahya021/citibike-stpp")
+train = splits["train"]
+val = splits["val"]
+test = splits["test"]
+```
+
+Load your own canonical JSONL split files with `load_jsonl`:
 
 ```python
 train = load_jsonl("data/my_dataset/train.jsonl")

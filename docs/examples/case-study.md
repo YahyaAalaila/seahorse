@@ -1,9 +1,10 @@
 # End-to-End Case Study
 
-This case study shows the complete Seahorse workflow on a small JSONL dataset:
-inspect the data contract, fit a model, run a benchmark, and inspect saved
-artifacts. It is the recommended path for new users who want to understand how
-the repository works before moving to larger datasets.
+This case study shows the complete Seahorse workflow on the
+`yahya021/citibike-stpp` Hugging Face JSONL dataset: inspect the data contract,
+fit a model, run a benchmark, and inspect saved artifacts. It is the recommended
+path for new users who want to understand how the repository works before
+moving to larger datasets.
 
 ## 1. Start From The Data Contract
 
@@ -22,24 +23,25 @@ Each line is one event sequence:
 {"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
 ```
 
-The Colab tutorials generate this layout automatically, so a new user can run
-the workflow without downloading data.
+The Python API Colab reads this layout from the Citibike dataset shipped on
+Hugging Face.
 
 ## 2. Fit One Model
 
 Use the Python API for a focused single-model experiment:
 
 ```python
-from seahorse import AutoSTPP, load_jsonl
+from seahorse import DeepSTPP, load_dataset
 
-train = load_jsonl("data/my_dataset/train.jsonl")
-val = load_jsonl("data/my_dataset/val.jsonl")
-test = load_jsonl("data/my_dataset/test.jsonl")
+splits = load_dataset("yahya021/citibike-stpp")
+train = splits["train"][:128]
+val = splits["val"][:32]
+test = splits["test"][:32]
 
-model = AutoSTPP(device="cpu", seed=42)
-model.fit(train, val, test, epochs=10, batch_size=64)
+model = DeepSTPP(device="cpu", seed=42)
+model.fit(train, val, test, epochs=1, batch_size=16)
 scores = model.evaluate(test)
-samples = model.predict_next(test, n_samples=32)
+samples = model.predict_next(test[:4], n_samples=8)
 ```
 
 Open the executable walkthrough:
@@ -52,7 +54,7 @@ Use the CLI when comparing presets or preserving benchmark artifacts:
 ```bash
 python -m seahorse bench \
   --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
-  --dataset data/my_dataset \
+  --dataset yahya021/citibike-stpp \
   --seeds 1 \
   --out runs/examples/small_benchmark \
   --n_workers 1
@@ -80,7 +82,7 @@ profiles:
 ```bash
 python -m seahorse evaluate metrics \
   --run path/to/run_dir \
-  --data data/my_dataset/test.jsonl \
+  --data path/to/citibike-stpp/test.jsonl \
   --split test \
   --metric-profile core \
   --out runs/examples/small_benchmark/evaluate_core

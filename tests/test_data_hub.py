@@ -220,6 +220,11 @@ class TestDatasetHub(unittest.TestCase):
         for key, spec in _CURATED_DATASETS.items():
             self.assertEqual(spec.local_paths, (), key)
 
+    def test_public_api_exports_load_dataset(self):
+        from seahorse import load_dataset as public_load_dataset
+
+        self.assertIs(public_load_dataset, load_dataset)
+
     def test_load_dataset_can_select_one_split_from_curated_spec(self):
         with tempfile.TemporaryDirectory() as td:
             local_root = Path(td) / "toy_dataset"

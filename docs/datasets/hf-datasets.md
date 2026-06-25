@@ -33,15 +33,16 @@ python -m seahorse bench \
 
 ## Python API
 
-The Python API does not download HuggingFace datasets automatically. Download and cache the splits first, then load with `load_jsonl`:
+The Python API can resolve the same Hugging Face dataset identifiers with
+`load_dataset`:
 
 ```python
-from seahorse import load_jsonl
+from seahorse import load_dataset
 
-# After downloading splits to a local directory:
-train = load_jsonl("cache/my_dataset/train.jsonl")
-val   = load_jsonl("cache/my_dataset/val.jsonl")
-test  = load_jsonl("cache/my_dataset/test.jsonl")
+splits = load_dataset("yahya021/citibike-stpp")
+train = splits["train"]
+val   = splits["val"]
+test  = splits["test"]
 ```
 
 ## Hosting Your Own Dataset on HuggingFace

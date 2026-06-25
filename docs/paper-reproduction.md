@@ -98,5 +98,6 @@ Keep the following with a paper reproduction bundle:
 ## Public Tutorials
 
 For a runnable end-to-end walkthrough, use the Colab notebooks linked from
-[Tutorial Notebooks](examples/colabs.md). They generate demo JSONL data, execute
-the public API or CLI, and inspect the resulting artifacts on CPU.
+[Tutorial Notebooks](examples/colabs.md). They cover a Hugging Face Citibike
+case study for the Python API and a generated-data benchmark walkthrough for
+the CLI, both on CPU.

@@ -1,5 +1,6 @@
 """Lightweight Python-first API for ``seahorse``."""
 
+from seahorse.data import load_dataset
 from seahorse.utils import load_jsonl
 
 from .estimator import STPPEstimator
@@ -38,6 +39,7 @@ __all__ = [
     "STPPEstimator",
     "STPPPlotter",
     "list_available_models",
+    "load_dataset",
     "load_jsonl",
     "resolve_preset",
     *FRIENDLY_MODEL_CLASSES,

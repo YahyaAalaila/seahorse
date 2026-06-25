@@ -123,18 +123,19 @@ pip install -e .
 **Python API**
 
 ```python
-from seahorse import AutoSTPP, PoissonGMM, load_jsonl
+from seahorse import DeepSTPP, PoissonGMM, load_dataset
 
-train = load_jsonl("dataset_root/train.jsonl")
-val   = load_jsonl("dataset_root/val.jsonl")
-test  = load_jsonl("dataset_root/test.jsonl")
+splits = load_dataset("yahya021/citibike-stpp")
+train = splits["train"][:128]
+val   = splits["val"][:32]
+test  = splits["test"][:32]
 
-model    = AutoSTPP(device="cpu")
+model    = DeepSTPP(device="cpu")
 baseline = PoissonGMM()
 
-model.fit(train, val, test, epochs=50, batch_size=64)
+model.fit(train, val, test, epochs=1, batch_size=16)
 scores  = model.evaluate(test)          # {"test_nll": ..., "mean_seq_nll": ...}
-samples = model.predict_next(test, n_samples=32)
+samples = model.predict_next(test[:4], n_samples=8)
 ```
 
 **STPPRunner (lower-level)**

@@ -8,6 +8,7 @@ from .api import (
     STPPEstimator,
     STPPPlotter,
     list_available_models,
+    load_dataset,
     load_jsonl,
     resolve_preset,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "STPPEstimator",
     "STPPPlotter",
     "list_available_models",
+    "load_dataset",
     "load_jsonl",
     "resolve_preset",
     *FRIENDLY_MODEL_CLASSES,
