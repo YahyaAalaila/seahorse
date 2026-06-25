@@ -754,3 +754,213 @@
   .sh-home-arrow,
   .sh-home-card:hover .sh-home-arrow { transition: none; transform: none; }
 }
+
+/* ================================================================== *
+ * Extend Seahorse — the "bring your model" hub
+ * ================================================================== */
+
+/* --- the contract diagram: UnifiedSTPP(StateModel, EventModel) --- */
+.sh-ext-contract {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 1.5rem 0;
+  padding: 1.4rem 1.3rem 1.3rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.85rem;
+  background:
+    radial-gradient(150% 120% at 50% -10%, rgba(56, 166, 217, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(15, 23, 42, 0.7));
+}
+.sh-ext-wrap {
+  align-self: flex-start;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--lighter);
+}
+.sh-ext-boxes {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0.65rem;
+  width: 100%;
+}
+.sh-ext-mod {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: rgba(15, 23, 42, 0.5);
+}
+.sh-ext-mod--state { border-top: 2px solid #38a6d9; }
+.sh-ext-mod--event { border-top: 2px solid #2dd4bf; }
+.sh-ext-mod-name { font-weight: 700; font-size: 1.02rem; }
+.sh-ext-mod--state .sh-ext-mod-name { color: #7fd3f0; }
+.sh-ext-mod--event .sh-ext-mod-name { color: #7ff0e0; }
+.sh-ext-mod-flow { font-size: 0.82rem; color: var(--md-default-fg-color--light); }
+.sh-ext-mod-api { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.15rem; }
+.md-typeset .sh-ext-mod-api code {
+  font-size: 0.66rem;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.35rem;
+}
+.sh-ext-join {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  color: var(--seahorse-accent-hover);
+}
+.sh-ext-down { color: var(--md-default-fg-color--lighter); font-size: 0.85rem; }
+.sh-ext-out {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed rgba(56, 166, 217, 0.4);
+  border-radius: 0.6rem;
+  background: var(--seahorse-accent-soft);
+}
+.sh-ext-out-k {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--lighter);
+  margin-right: 0.25rem;
+}
+.sh-ext-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #bae6fd;
+  background: rgba(56, 166, 217, 0.14);
+  border: 1px solid rgba(56, 166, 217, 0.3);
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+}
+@media screen and (max-width: 44.9em) {
+  .sh-ext-boxes { grid-template-columns: 1fr; }
+  .sh-ext-join { transform: rotate(90deg); }
+}
+
+/* --- the four-step flow (a real ordered sequence) --- */
+.md-typeset .sh-ext-steps {
+  list-style: none;
+  margin: 1.2rem 0;
+  padding: 0;
+}
+.sh-ext-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.95rem;
+  padding-bottom: 1.15rem;
+}
+.sh-ext-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 0.95rem;
+  top: 2.1rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--seahorse-border);
+}
+.sh-ext-num {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #bae6fd;
+  background: var(--seahorse-accent-soft);
+  border: 1px solid rgba(56, 166, 217, 0.4);
+}
+.sh-ext-step-body { display: flex; flex-direction: column; gap: 0.45rem; padding-top: 0.1rem; min-width: 0; }
+.sh-ext-step-title { font-weight: 680; font-size: 1.04rem; color: #f8fafc; }
+.md-typeset .sh-ext-step-body p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--light);
+}
+.sh-ext-code {
+  display: block;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.72rem;
+  color: #9fe0ff;
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+.sh-ext-more { font-size: 0.82rem; font-weight: 600; color: var(--seahorse-accent-hover); text-decoration: none; }
+.sh-ext-more:hover { text-decoration: underline; }
+
+/* --- scenario path cards --- */
+.sh-ext-paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin: 0.6rem 0 0.4rem;
+}
+.sh-ext-path {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.6rem;
+  background: var(--md-default-bg-color--light, #141b26);
+  text-decoration: none;
+  color: var(--md-default-fg-color);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.sh-ext-path:hover {
+  transform: translateY(-3px);
+  border-color: var(--seahorse-accent-hover);
+  box-shadow: 0 10px 24px -16px rgba(2, 132, 199, 0.7);
+}
+.sh-ext-path-when {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.63rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #38a6d9;
+}
+.sh-ext-path-title { font-weight: 680; font-size: 1.02rem; color: #f8fafc; padding-right: 1rem; }
+.sh-ext-path-desc { font-size: 0.82rem; line-height: 1.5; color: var(--md-default-fg-color--light); }
+.sh-ext-path-go {
+  position: absolute;
+  top: 0.95rem;
+  right: 1rem;
+  color: var(--md-default-fg-color--lighter);
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+.sh-ext-path:hover .sh-ext-path-go { color: var(--seahorse-accent-hover); transform: translateX(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ext-path,
+  .sh-ext-path:hover,
+  .sh-ext-path-go,
+  .sh-ext-path:hover .sh-ext-path-go { transition: none; transform: none; }
+}
