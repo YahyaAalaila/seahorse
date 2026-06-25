@@ -54,6 +54,27 @@
   }
 }
 
+/* Readability: hold running text to a comfortable reading measure on wide
+   screens, while cards, tables, code, diagrams, and figures keep the full
+   canvas. Classed blocks (cards, eyebrows, hero) opt out and stay full width. */
+.md-content__inner.md-typeset > p:not([class]),
+.md-content__inner.md-typeset > ul:not([class]),
+.md-content__inner.md-typeset > ol:not([class]),
+.md-content__inner.md-typeset > blockquote,
+.md-content__inner.md-typeset > .admonition,
+.md-content__inner.md-typeset > h1:not([class]),
+.md-content__inner.md-typeset > h2,
+.md-content__inner.md-typeset > h3,
+.md-content__inner.md-typeset > h4 {
+  max-width: 32rem;
+}
+/* code and tabbed code share the reading column (a touch wider for long lines) */
+.md-content__inner.md-typeset > .highlight,
+.md-content__inner.md-typeset > pre,
+.md-content__inner.md-typeset > .tabbed-set {
+  max-width: 36rem;
+}
+
 .md-main__inner {
   margin-top: 1.2rem;
 }
