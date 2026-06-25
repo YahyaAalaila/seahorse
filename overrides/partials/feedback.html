@@ -29,18 +29,24 @@
 {#- ── Seahorse page footer ──────────────────────────────────────────────── -#}
 <div class="sh-page-footer" data-sh-feedback="pending">
 
-  <div class="sh-feedback">
-    <span class="sh-feedback__prompt">Was this page helpful?</span>
-    <button class="sh-feedback__btn" type="button"
-      onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
-      Yes
-    </button>
-    <button class="sh-feedback__btn" type="button"
-      onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
-      No
-    </button>
-    <span class="sh-feedback__thanks">Thanks for the feedback.</span>
-  </div>
+  {% if page.is_homepage %}
+    <div class="sh-feedback">
+      <a href="{{ 'getting-started/' | url }}" class="md-button md-button--primary" style="margin-top: 0;">Next: Getting Started &rarr;</a>
+    </div>
+  {% else %}
+    <div class="sh-feedback">
+      <span class="sh-feedback__prompt">Was this page helpful?</span>
+      <button class="sh-feedback__btn" type="button"
+        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+        Yes
+      </button>
+      <button class="sh-feedback__btn" type="button"
+        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+        No
+      </button>
+      <span class="sh-feedback__thanks">Thanks for the feedback.</span>
+    </div>
+  {% endif %}
 
   <div class="sh-page-actions">
     {% if page.edit_url %}
