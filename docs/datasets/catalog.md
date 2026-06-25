@@ -157,6 +157,24 @@ real-data comparison.
     Citibike** — because several benchmark presets are built for
     two-dimensional spatial event domains.
 
+## Synthetic benchmark suites
+
+<p class="sh-ds-eyebrow">space · whatever you configure it to be</p>
+
+When you need known ground truth — to isolate one factor that real data
+confounds — Seahorse uses synthetic sequences from
+[HawkesNest](https://github.com/YahyaAalaila/HawkesNest).
+
+<div class="sh-ds-grid" markdown="0">
+<a class="sh-ds-card sh-ds-card--synth sh-ds-card--wide" href="https://github.com/YahyaAalaila/HawkesNest" target="_blank" rel="noopener">
+  <span class="sh-ds-head"><span class="sh-ds-name">HawkesNest · entanglement suite</span><span class="sh-ds-chip sh-ds-chip--synth">synthetic</span></span>
+  <code class="sh-ds-id">github.com/YahyaAalaila/HawkesNest</code>
+  <span class="sh-ds-desc">Spatio-temporal sequences generated with tunable <em>entanglement</em> between the space and time dimensions, under known ground truth — so a model's behaviour can be probed against a factor that real-world data cannot cleanly separate.</span>
+  <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>configurable domain</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>configurable process</span></span>
+  <span class="sh-ds-go" aria-hidden="true">↗</span>
+</a>
+</div>
+
 ---
 
 Want to add your own? See [Add Your Dataset](add-dataset.md) for the preparation

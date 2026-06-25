@@ -33,15 +33,22 @@ python -m seahorse bench \
 
 ## Python API
 
-The Python API does not download HuggingFace datasets automatically. Download and cache the splits first, then load with `load_jsonl`:
+`load_dataset` resolves a HuggingFace repo id (or a curated `seahorse-stpp`
+name), downloads the splits, caches them, and returns parsed sequences:
+
+```python
+from seahorse.data import load_dataset
+
+splits = load_dataset("seahorse-stpp/citibike-stpp")
+train, val, test = splits["train"], splits["val"], splits["test"]
+```
+
+For splits already on local disk, use `load_jsonl` directly:
 
 ```python
 from seahorse import load_jsonl
 
-# After downloading splits to a local directory:
 train = load_jsonl("cache/my_dataset/train.jsonl")
-val   = load_jsonl("cache/my_dataset/val.jsonl")
-test  = load_jsonl("cache/my_dataset/test.jsonl")
 ```
 
 ## Hosting Your Own Dataset on HuggingFace
@@ -55,4 +62,8 @@ See [Conversion Standard](conversion.md) for format details and [Add Your Datase
 
 ## Dataset Catalog
 
-See [Dataset Catalog](catalog.md) for a list of known-working public datasets.
+Seahorse curates **13 ready-to-use datasets** in the
+[`seahorse-stpp`](https://huggingface.co/seahorse-stpp) organization, spanning
+urban mobility, crime, natural hazards, public health, social check-ins, and
+neuroimaging. Browse them — with load snippets and per-dataset space/time axes —
+in the **[Dataset Catalog](catalog.md)**.

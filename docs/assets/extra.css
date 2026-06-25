@@ -488,13 +488,20 @@
   box-shadow: 0 10px 24px -16px rgba(2, 132, 199, 0.7);
 }
 
-/* core-benchmark and abstract cards carry a left accent rail */
+/* core-benchmark, abstract, and synthetic cards carry a left accent rail */
 .sh-ds-card--bench { border-left: 2px solid var(--seahorse-accent-hover); }
 .sh-ds-card--abstract { border-left: 2px solid #7c4dff; }
 .sh-ds-card--abstract:hover {
   border-color: #7c4dff;
   box-shadow: 0 10px 24px -16px rgba(124, 77, 255, 0.7);
 }
+.sh-ds-card--synth { border-left: 2px solid #2dd4bf; }
+.sh-ds-card--synth:hover {
+  border-color: #2dd4bf;
+  box-shadow: 0 10px 24px -16px rgba(45, 212, 191, 0.7);
+}
+/* a full-width card spans the whole grid row */
+.sh-ds-card--wide { grid-column: 1 / -1; }
 
 .sh-ds-head {
   display: flex;
@@ -527,6 +534,11 @@
   color: #c4b5fd;
   background: rgba(124, 77, 255, 0.16);
   border-color: rgba(124, 77, 255, 0.4);
+}
+.sh-ds-chip--synth {
+  color: #5eead4;
+  background: rgba(45, 212, 191, 0.14);
+  border-color: rgba(45, 212, 191, 0.4);
 }
 
 .sh-ds-id {
@@ -594,4 +606,23 @@
   .sh-ds-card:hover,
   .sh-ds-go,
   .sh-ds-card:hover .sh-ds-go { transition: none; transform: none; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Homepage hero action cards
+ * Material puts display:grid on the .grid div (auto-fit) and makes the
+ * inner <ul> display:contents, so its <li> cards are the grid items.
+ * The default auto-fit lays the four cards out 3-then-1; override the
+ * column track on the div to force a balanced 2x2 (one column on phones).
+ * ------------------------------------------------------------------ */
+
+.md-typeset .grid.cards.hero-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+@media screen and (max-width: 44.9em) {
+  .md-typeset .grid.cards.hero-cards {
+    grid-template-columns: 1fr;
+  }
 }

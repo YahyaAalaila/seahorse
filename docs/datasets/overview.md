@@ -26,19 +26,40 @@ Each file is one JSON object per line. Each object is one event sequence.
 
 | Source | How to use |
 | --- | --- |
+| Curated `seahorse-stpp` datasets | `load_dataset("seahorse-stpp/<id>")` or `--dataset seahorse-stpp/<id>` |
+| Any Hugging Face repo | Pass `--dataset owner/repo[/subdir]` — Seahorse downloads and caches |
 | Local JSONL files | Pass `--train`, `--val`, `--test` flags or a directory with `--dataset` |
 | Local split collection | Point `--splits_dir` at a root with one subdirectory per dataset |
-| Hugging Face Hub | Pass `--dataset owner/repo[/subdir]` — Seahorse downloads and caches |
 
 See [Data Format](../data-format.md) for the full contract and command support matrix.
 
 ## Ready-to-use Datasets
 
-Seahorse is designed to work with HuggingFace-hosted STPP datasets that follow the JSONL split convention. See [Ready-to-use HF Datasets](hf-datasets.md) for sources.
+Seahorse curates **13 real-world STPP datasets** in the
+[`seahorse-stpp`](https://huggingface.co/seahorse-stpp) Hugging Face
+organization — spanning urban mobility, crime, natural hazards, public health,
+social check-ins, and even neuroimaging — all in the same JSONL split format.
+Load any of them by id:
+
+```python
+from seahorse.data import load_dataset
+
+splits = load_dataset("seahorse-stpp/citibike-stpp")  # downloads + caches
+```
+
+Browse the full collection, with load snippets and each dataset's space/time
+axes, in the **[Dataset Catalog](catalog.md)**.
+
+Need controlled ground truth? Seahorse's synthetic benchmark sequences are
+generated with [HawkesNest](https://github.com/YahyaAalaila/HawkesNest) — its
+**entanglement suite** produces spatio-temporal data with tunable space–time
+coupling for stress-testing models. See
+[Synthetic benchmark suites](catalog.md#synthetic-benchmark-suites).
 
 ## Next Steps
 
+- [Dataset Catalog](catalog.md) — browse the 13 ready-to-use datasets.
 - [Data Format](../data-format.md) — detailed format specification and command matrix.
-- [Ready-to-use HF Datasets](hf-datasets.md) — pre-formatted datasets you can use immediately.
+- [Ready-to-use HF Datasets](hf-datasets.md) — load by repo id, or host your own.
 - [Add Your Dataset](add-dataset.md) — how to prepare your own data.
 - [Conversion Standard](conversion.md) — how to convert from common formats.
