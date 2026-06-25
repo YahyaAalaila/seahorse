@@ -645,19 +645,112 @@
 
 /* ------------------------------------------------------------------ *
  * Homepage hero action cards
- * Material puts display:grid on the .grid div (auto-fit) and makes the
- * inner <ul> display:contents, so its <li> cards are the grid items.
- * The default auto-fit lays the four cards out 3-then-1; override the
- * column track on the div to force a balanced 2x2 (one column on phones).
+ * Same DNA as the dataset cards (dark panel, mono "handle", corner arrow)
+ * dialed up for the front door: icon badges, an accent radial glow, a
+ * hover sheen line, and a gradient-railed primary card. Fixed 2x2.
  * ------------------------------------------------------------------ */
 
-.md-typeset .grid.cards.hero-cards {
+.md-typeset .sh-home-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: 1rem;
+  margin: 1.4rem 0 0.5rem;
+}
+@media screen and (max-width: 44.9em) {
+  .md-typeset .sh-home-grid { grid-template-columns: 1fr; }
 }
 
-@media screen and (max-width: 44.9em) {
-  .md-typeset .grid.cards.hero-cards {
-    grid-template-columns: 1fr;
-  }
+.sh-home-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.25rem 1.35rem 1.15rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.7rem;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(56, 166, 217, 0.08), transparent 45%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(15, 23, 42, 0.72));
+  color: var(--md-default-fg-color);
+  text-decoration: none;
+  overflow: hidden;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+/* a thin accent sheen along the top edge, revealed on hover */
+.sh-home-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 166, 217, 0.55), transparent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sh-home-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--seahorse-accent-hover);
+  box-shadow: 0 18px 40px -24px rgba(2, 132, 199, 0.8);
+}
+.sh-home-card:hover::after { opacity: 1; }
+
+/* primary card: stronger glow + gradient rail */
+.sh-home-card--primary {
+  border-left: 2px solid var(--seahorse-accent-hover);
+  background:
+    radial-gradient(130% 130% at 100% 0%, rgba(56, 166, 217, 0.16), transparent 50%),
+    linear-gradient(180deg, rgba(18, 30, 48, 0.95), rgba(15, 23, 42, 0.78));
+}
+
+.sh-home-top { display: flex; align-items: center; gap: 0.65rem; }
+.sh-home-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.55rem;
+  background: var(--seahorse-accent-soft);
+  border: 1px solid rgba(56, 166, 217, 0.3);
+}
+.sh-home-icon svg { width: 1.2rem; height: 1.2rem; fill: #58c4e8; }
+.sh-home-title { font-weight: 680; font-size: 1.12rem; color: #f8fafc; }
+
+.sh-home-handle {
+  align-self: flex-start;
+  max-width: 100%;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.72rem;
+  color: #9fe0ff;
+  background: rgba(56, 166, 217, 0.1);
+  border: 1px solid rgba(56, 166, 217, 0.18);
+  padding: 0.18rem 0.5rem;
+  border-radius: 0.35rem;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+}
+
+.sh-home-desc {
+  flex: 1 1 auto;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--light);
+}
+
+.sh-home-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--seahorse-accent-hover);
+}
+.sh-home-arrow { transition: transform 0.18s ease; }
+.sh-home-card:hover .sh-home-arrow { transform: translateX(4px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-home-card,
+  .sh-home-card:hover,
+  .sh-home-arrow,
+  .sh-home-card:hover .sh-home-arrow { transition: none; transform: none; }
 }
