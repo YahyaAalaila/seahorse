@@ -1,6 +1,26 @@
 # Register a Preset
 
-A **preset** is a named entry in the config registry. Once registered, it is usable with `fit`, `bench`, `evaluate`, and the Python API without any additional wiring.
+A **preset** is a named entry in the config registry — and that registry is the
+quiet trick that makes Seahorse composable. You register your model **once**, and
+every entry point resolves it by name through the same lookup. No import-path
+changes, no per-command wiring.
+
+<div class="sh-hub" markdown="0">
+  <div class="sh-hub-center">
+    <span class="sh-hub-k">register once</span>
+    <code class="sh-hub-token">@ConfigRegistry.register("my_preset")</code>
+  </div>
+  <span class="sh-hub-fan" aria-hidden="true"></span>
+  <div class="sh-hub-spokes">
+    <span class="sh-hub-spoke">fit</span>
+    <span class="sh-hub-spoke">bench</span>
+    <span class="sh-hub-spoke">evaluate</span>
+    <span class="sh-hub-spoke">predict_next</span>
+    <span class="sh-hub-spoke">CLI&nbsp;·&nbsp;--preset my_preset</span>
+    <span class="sh-hub-spoke">STPPEstimator("my_preset")</span>
+  </div>
+  <span class="sh-hub-cap">One name, reachable everywhere. The registry is the single source every entry point shares — so one decorator is the only wiring you write.</span>
+</div>
 
 ## Step 1: Create a ModelFamilyConfig
 

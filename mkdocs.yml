@@ -72,6 +72,7 @@ nav:
       - Evaluation Semantics: learn/evaluation-semantics.md
       - Reproduce Paper Results: paper-reproduction.md
       - FAQ / Common Errors: learn/faq.md
+      - Cite Seahorse: cite.md
 
 markdown_extensions:
   - attr_list
