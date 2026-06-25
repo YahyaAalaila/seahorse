@@ -463,8 +463,8 @@
 
 .sh-ds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 0.9rem;
   margin: 0 0 0.4rem;
 }
 
@@ -503,18 +503,52 @@
 /* a full-width card spans the whole grid row */
 .sh-ds-card--wide { grid-column: 1 / -1; }
 
+/* feature row: one card paired with an explanatory aside (Beyond the map) */
+.sh-ds-feature {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 0.9rem;
+  align-items: stretch;
+  margin: 0 0 0.4rem;
+}
+@media screen and (max-width: 44.9em) {
+  .sh-ds-feature { grid-template-columns: 1fr; }
+}
+.sh-ds-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 1.1rem 1.3rem;
+  border: 1px dashed rgba(124, 77, 255, 0.4);
+  border-radius: 0.55rem;
+  background: rgba(124, 77, 255, 0.05);
+}
+.sh-ds-aside-title {
+  font-weight: 650;
+  font-size: 0.92rem;
+  color: #d8c7ff;
+}
+.md-typeset .sh-ds-aside p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--md-default-fg-color--light);
+}
+
 .sh-ds-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding-right: 1.1rem; /* clear the corner arrow */
+  flex-direction: column; /* title on its own line; chip sits beneath it */
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding-right: 1.4rem; /* clear the corner arrow */
 }
 .sh-ds-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  line-height: 1.2;
+  font-weight: 650;
+  font-size: 1.05rem;
+  line-height: 1.25;
   color: #f8fafc;
+  overflow-wrap: anywhere; /* break gracefully, never one char per line */
 }
 
 .sh-ds-chip {
@@ -550,7 +584,8 @@
   background: rgba(56, 166, 217, 0.1);
   padding: 0.1rem 0.4rem;
   border-radius: 0.3rem;
-  word-break: break-all;
+  word-break: normal;
+  overflow-wrap: anywhere; /* prefer breaking at / - _ rather than mid-token */
   box-shadow: none;
 }
 

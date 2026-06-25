@@ -141,7 +141,7 @@ real-data comparison.
 
 <p class="sh-ds-eyebrow">space · not a map at all</p>
 
-<div class="sh-ds-grid" markdown="0">
+<div class="sh-ds-feature" markdown="0">
 <a class="sh-ds-card sh-ds-card--abstract" href="https://huggingface.co/datasets/seahorse-stpp/bold5000-stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">BOLD5000</span><span class="sh-ds-chip sh-ds-chip--muted">non-2D</span></span>
   <code class="sh-ds-id">seahorse-stpp/bold5000-stpp</code>
@@ -149,13 +149,11 @@ real-data comparison.
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>the brain</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>scan time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
+<div class="sh-ds-aside">
+  <span class="sh-ds-aside-title">Supported — but not in the headline benchmark</span>
+  <p>BOLD5000 ships as a fully supported dataset. The main real-data comparison stays on the 2D-spatial trio — <strong>COVID</strong>, <strong>Earthquakes</strong>, and <strong>Citibike</strong> — because several benchmark presets are built for two-dimensional spatial event domains.</p>
 </div>
-
-!!! note "BOLD5000 is supported, not part of the headline benchmark"
-    BOLD5000 ships as a fully supported dataset, but the main real-data
-    comparison stays on the 2D-spatial trio — **COVID, Earthquakes, and
-    Citibike** — because several benchmark presets are built for
-    two-dimensional spatial event domains.
+</div>
 
 ## Synthetic benchmark suites
 
