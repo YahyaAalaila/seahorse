@@ -1386,3 +1386,126 @@
   .sh-colab-go,
   .sh-colab-cta:hover .sh-colab-go { transition: none; transform: none; }
 }
+
+/* ================================================================== *
+ * Benchmark overview — the payoff: your model meets the field, fairly
+ * Signature: the campaign matrix. Rows are presets, columns are the
+ * core-trio datasets, and every cell is one (preset × dataset × seed)
+ * run executed under the same contract. The left rail encodes the NLL
+ * class (exact / bound); your model slots in as a glowing row.
+ * ================================================================== */
+
+.sh-bench-board {
+  margin: 1.4rem 0 0.5rem;
+  padding: 1.25rem 1.4rem 1.15rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.85rem;
+  background:
+    radial-gradient(150% 130% at 50% -10%, rgba(56, 166, 217, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(15, 23, 42, 0.7));
+  overflow-x: auto;
+}
+.sh-bench-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 28rem;
+}
+.sh-bench-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1.5fr) repeat(3, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.36rem 0.6rem 0.36rem 0.7rem;
+  border-left: 2px solid transparent;
+  border-radius: 0.4rem;
+}
+.sh-bench-row--head {
+  padding-top: 0;
+  padding-bottom: 0.45rem;
+  margin-bottom: 0.1rem;
+  border-left-color: transparent;
+  border-bottom: 1px solid var(--seahorse-border);
+  border-radius: 0;
+}
+.sh-bench-row--exact { border-left-color: rgba(56, 166, 217, 0.55); }
+.sh-bench-row--bound,
+.sh-bench-row--approx { border-left-color: #f5b971; }
+.sh-bench-row--you {
+  border-left-color: var(--seahorse-accent-hover);
+  background: rgba(56, 166, 217, 0.1);
+}
+
+.sh-bench-model {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  overflow-wrap: anywhere;
+}
+.sh-bench-row--you .sh-bench-model { color: #bae6fd; font-weight: 600; }
+.sh-bench-model--head {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--lighter);
+}
+.sh-bench-col {
+  font-family: var(--md-code-font-family, "Roboto Mono", monospace);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--md-default-fg-color--lighter);
+}
+.sh-bench-cell { display: flex; align-items: center; justify-content: center; }
+.sh-bench-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.5);
+}
+.sh-bench-row--you .sh-bench-dot {
+  background: #38a6d9;
+  box-shadow: 0 0 0 3px rgba(56, 166, 217, 0.2);
+}
+.sh-bench-newchip {
+  flex: none;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  background: var(--seahorse-accent-soft);
+  border: 1px solid rgba(56, 166, 217, 0.4);
+  padding: 0.05rem 0.34rem;
+  border-radius: 999px;
+}
+
+.sh-bench-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin-top: 0.95rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--seahorse-border);
+  font-size: 0.71rem;
+  color: var(--md-default-fg-color--light);
+}
+.sh-bench-legend > span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.sh-bench-rail { width: 0.2rem; height: 0.85rem; border-radius: 1px; flex: none; }
+.sh-bench-rail--exact { background: rgba(56, 166, 217, 0.8); }
+.sh-bench-rail--bound { background: #f5b971; }
+.sh-bench-keydot {
+  width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: none;
+  background: #38a6d9; box-shadow: 0 0 0 3px rgba(56, 166, 217, 0.2);
+}
+.sh-bench-cap {
+  max-width: 46rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--lighter);
+}

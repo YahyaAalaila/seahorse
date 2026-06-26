@@ -18,7 +18,7 @@ Skip it → those metrics report a clean skip, never a wrong number.
     <div class="sh-cap-top"><span class="sh-cap-name">Bounded NLL</span><span class="sh-cap-tag">bound</span></div>
     <span class="sh-cap-by">declared by <code>log_prob()</code> returning a surrogate (score-matching, ELBO)</span>
     <span class="sh-cap-unlocks">unlocks</span>
-    <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · flagged non-exact</span></div>
+    <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · non-exact</span></div>
   </div>
   <div class="sh-cap sh-cap--optional">
     <div class="sh-cap-top"><span class="sh-cap-name">Next-event sampling</span><span class="sh-cap-tag">optional</span></div>
@@ -78,7 +78,7 @@ keeps the two tiers visibly separate in benchmark tables.
     </div>
   </div>
   <div class="sh-tier-row sh-tier-row--approx">
-    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">flagged, not directly comparable</span></div>
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">a bound on the likelihood</span></div>
     <div class="sh-tier-chips">
       <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
     </div>

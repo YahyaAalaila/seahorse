@@ -20,7 +20,7 @@ A **preset** is a named model configuration that works immediately with `fit`, `
 | AutoSTPP | `auto_stpp` | `AutoSTPP` | Exact |
 | DeepSTPP | `deep_stpp` | `DeepSTPP` | Exact |
 | NSMPP DeepBasis | `nsmpp` | `NSMPP` | Exact |
-| NJSDE | `njsde` | `STPPEstimator("njsde")` | Exact |
+| NJSDE | `njsde` | `NJSDE` | Exact |
 | Neural JumpCNF | `neural_jumpcnf` | `NeuralJumpCNF` | Exact |
 | Neural AttnCNF | `neural_attncnf` | `NeuralAttnCNF` | Exact |
 | SMASH | `smash` | `SMASH` | Approximate |

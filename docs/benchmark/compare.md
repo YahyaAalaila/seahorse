@@ -2,6 +2,25 @@
 
 After running a benchmark you typically want to compare models by NLL, inspect predictive quality on specific sequences, and understand which families differ meaningfully.
 
+NLL is only comparable across presets that compute it the same way, so the tables separate two tiers:
+
+<div class="sh-tier" markdown="0">
+  <div class="sh-tier-row sh-tier-row--exact">
+    <div class="sh-tier-label"><span class="sh-tier-name">Exact</span><span class="sh-tier-sub">directly comparable</span></div>
+    <div class="sh-tier-chips">
+      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">nsmpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">thp_gmm</span>
+    </div>
+  </div>
+  <div class="sh-tier-row sh-tier-row--approx">
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">a bound on the likelihood</span></div>
+    <div class="sh-tier-chips">
+      <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
+    </div>
+  </div>
+</div>
+
+The `table_test_nll_exact.csv` table is already restricted to the exact tier, which is the natural starting point.
+
 ## Reading the Benchmark Tables
 
 `bench` writes summary tables to the campaign directory:
@@ -65,8 +84,7 @@ Then read `metrics.json` from each output directory to compare CRPS, energy scor
 ## Interpreting NLL Differences
 
 - NLL values are only directly comparable across presets that share the **same dataset, normalization policy, and metric definition** — which `bench` enforces via the [benchmark contract](../learn/execution-contract.md).
-- Exact-NLL families (`auto_stpp`, `deep_stpp`, `poisson_gmm`, ...) are comparable with each other.
-- Approximate families (`smash`, `diffusion_stpp`) optimize surrogate objectives; note this when including them in comparison tables.
+- Stay within a tier (above): exact families are read directly against each other; approximate families report a bound (score-matching or ELBO), so present them on those terms rather than ranking them against exact NLL.
 - See the [Model Capability Matrix](../model-capability-matrix.md) for the NLL type of each preset.
 
 ## Common Pitfalls
