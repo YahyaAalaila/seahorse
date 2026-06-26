@@ -1,98 +1,57 @@
 # End-to-End Case Study
 
-This case study shows the complete Seahorse workflow on a small JSONL dataset:
-inspect the data contract, fit a model, run a benchmark, and inspect saved
-artifacts. It is the recommended path for new users who want to understand how
-the repository works before moving to larger datasets.
+Real dataset, real numbers, one click. This is the fastest way to watch Seahorse
+do something real: it installs from PyPI, loads the **Citibike** spatio-temporal
+dataset, trains a baseline and a neural model, scores both under one metric, and
+plots the predictions — all on CPU, in a few minutes.
 
-## 1. Start From The Data Contract
+<a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb" target="_blank" rel="noopener">
+  <span class="sh-colab-badge" aria-hidden="true">▶</span>
+  <span class="sh-colab-text"><strong>Open the case study in Colab</strong><span>Citibike · CPU-only · no local setup</span></span>
+  <span class="sh-colab-go" aria-hidden="true">↗</span>
+</a>
 
-Seahorse expects three JSONL split files:
+## What the notebook walks through
 
-```text
-data/my_dataset/
-  train.jsonl
-  val.jsonl
-  test.jsonl
-```
+<ol class="sh-ext-steps" markdown="0">
+  <li class="sh-ext-step">
+    <span class="sh-ext-num">1</span>
+    <div class="sh-ext-step-body">
+      <span class="sh-ext-step-title">Install and load real data</span>
+      <p><code>pip install seahorse-stpp</code>, then <code>load_dataset("citibike")</code> pulls the Citibike splits straight from the Hugging Face hub — no manual download.</p>
+    </div>
+  </li>
+  <li class="sh-ext-step">
+    <span class="sh-ext-num">2</span>
+    <div class="sh-ext-step-body">
+      <span class="sh-ext-step-title">Train a baseline and a neural model</span>
+      <p>Fit <code>PoissonGMM</code> as a fast parametric baseline and <code>DeepSTPP</code> as the neural model — the same <code>fit()</code> call for both.</p>
+    </div>
+  </li>
+  <li class="sh-ext-step">
+    <span class="sh-ext-num">3</span>
+    <div class="sh-ext-step-body">
+      <span class="sh-ext-step-title">Evaluate head-to-head</span>
+      <p>Score both on held-out test sequences and compare <code>test_nll</code> under one shared metric definition — comparable by construction.</p>
+    </div>
+  </li>
+  <li class="sh-ext-step">
+    <span class="sh-ext-num">4</span>
+    <div class="sh-ext-step-body">
+      <span class="sh-ext-step-title">Visualize the predictions</span>
+      <p>Sample next events with <code>predict_next</code> and plot the sampled locations against the true next event.</p>
+    </div>
+  </li>
+</ol>
 
-Each line is one event sequence:
+## Why this dataset
 
-```json
-{"times": [0.1, 0.4, 1.2], "locations": [[0.2, 0.4], [0.3, 0.8], [0.7, 0.1]]}
-```
+- **Real, not synthetic** — Citibike is the lightest real public dataset in the [catalog](../datasets/catalog.md), so it runs on a free CPU runtime.
+- **Comparable by construction** — the baseline and the neural model share the same splits, normalization, and metric, so the numbers actually mean something.
+- **One click** — the notebook installs the published package; nothing to clone or configure.
 
-The Colab tutorials generate this layout automatically, so a new user can run
-the workflow without downloading data.
+## Then go deeper
 
-## 2. Fit One Model
-
-Use the Python API for a focused single-model experiment:
-
-```python
-from seahorse import AutoSTPP, load_jsonl
-
-train = load_jsonl("data/my_dataset/train.jsonl")
-val = load_jsonl("data/my_dataset/val.jsonl")
-test = load_jsonl("data/my_dataset/test.jsonl")
-
-model = AutoSTPP(device="cpu", seed=42)
-model.fit(train, val, test, epochs=10, batch_size=64)
-scores = model.evaluate(test)
-samples = model.predict_next(test, n_samples=32)
-```
-
-Open the executable walkthrough:
-[Run One Model With The Python API](colabs.md).
-
-## 3. Run A Benchmark Campaign
-
-Use the CLI when comparing presets or preserving benchmark artifacts:
-
-```bash
-python -m seahorse bench \
-  --presets poisson_gmm hawkes_gmm auto_stpp deep_stpp \
-  --dataset data/my_dataset \
-  --seeds 1 \
-  --out runs/examples/small_benchmark \
-  --n_workers 1
-```
-
-The benchmark path records the preset, dataset source, seed, overrides, and run
-directory for each benchmark cell. Open the executable walkthrough:
-[Benchmark Models With The CLI](colabs.md).
-
-## 4. Inspect The Artifacts
-
-A benchmark directory contains campaign-level tables and per-run directories:
-
-```text
-runs/examples/small_benchmark/
-  bench_meta.json
-  cell_index.json
-  results.json
-  table_test_nll_all.csv
-```
-
-Use `cell_index.json` to find a saved run and evaluate additional metric
-profiles:
-
-```bash
-python -m seahorse evaluate metrics \
-  --run path/to/run_dir \
-  --data data/my_dataset/test.jsonl \
-  --split test \
-  --metric-profile core \
-  --out runs/examples/small_benchmark/evaluate_core
-```
-
-## 5. Scale The Same Pattern
-
-After the case study runs, scale in three directions:
-
-- replace the demo data with your own JSONL splits;
-- add presets and seeds to the benchmark campaign;
-- pin dataset revisions and commit hashes for paper-grade reproducibility.
-
-The same data contract, CLI commands, and artifact layout apply to larger
-experiments.
+- [Dataset Catalog](../datasets/catalog.md) — swap Citibike for any of the 13 datasets.
+- [Run a Benchmark](run-a-small-benchmark.md) — compare many presets and seeds.
+- [Python API](../python-api.md) — the full programmatic surface behind the notebook.

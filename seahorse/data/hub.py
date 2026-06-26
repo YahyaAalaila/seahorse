@@ -14,6 +14,28 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_HF_DATASET_REPO = os.environ.get("SEAHORSE_HF_DATASET_REPO")
 _SPLIT_NAMES = ("train", "val", "test")
 
+# Consolidated Hugging Face organization holding the ready-to-use datasets.
+_SEAHORSE_HF_ORG = "seahorse-stpp"
+
+# Short, friendly names for the curated real-world datasets, each mapping to its
+# repo under the seahorse-stpp org. These let users pass `--dataset citibike`
+# instead of the full `seahorse-stpp/citibike-stpp` id.
+_REAL_WORLD_DATASETS = {
+    "citibike": "citibike-stpp",
+    "uber_pickups": "uber_pickups_nyc_stpp",
+    "us_accidents": "us_accidents_stpp",
+    "chicago_crime": "chicago_crime_stpp",
+    "la_crime": "la_crime_stpp",
+    "gtd": "gtd_stpp",
+    "austin_311": "austin_311_stpp",
+    "earthquakes": "earthquakes-stpp",
+    "us_wildfires": "us_wildfires_stpp",
+    "covid": "covid-stpp",
+    "gowalla": "gowalla_checkins_stpp",
+    "brightkite": "brightkite_checkins_stpp",
+    "bold5000": "bold5000-stpp",
+}
+
 
 @dataclass(frozen=True)
 class CuratedDatasetSpec:
@@ -100,6 +122,14 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
                 + [f"topology_T{i}" for i in range(6)]
             ),
         )
+    )
+
+    specs.extend(
+        CuratedDatasetSpec(
+            name=name,
+            repo_id=f"{_SEAHORSE_HF_ORG}/{repo_leaf}",
+        )
+        for name, repo_leaf in _REAL_WORLD_DATASETS.items()
     )
 
     catalog: dict[str, CuratedDatasetSpec] = {}

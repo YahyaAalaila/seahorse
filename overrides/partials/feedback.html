@@ -37,14 +37,19 @@
     <div class="sh-feedback">
       <span class="sh-feedback__prompt">Was this page helpful?</span>
       <button class="sh-feedback__btn" type="button"
-        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','yes')">
         Yes
       </button>
       <button class="sh-feedback__btn" type="button"
-        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','answered')">
+        onclick="this.closest('[data-sh-feedback]').setAttribute('data-sh-feedback','no')">
         No
       </button>
-      <span class="sh-feedback__thanks">Thanks for the feedback.</span>
+      <span class="sh-feedback__yes">
+        Glad it helped — a <a href="{{ config.repo_url }}" target="_blank" rel="noopener noreferrer">&#11088; star on GitHub</a> helps other researchers find Seahorse, and here is <a href="{{ 'cite/' | url }}">how to cite it</a>.
+      </span>
+      <span class="sh-feedback__no">
+        Sorry that missed — <a href="{{ config.repo_url }}/issues/new?labels=documentation&amp;template=doc-feedback.md&amp;title=Docs+feedback%3A+{{ page.title | urlencode }}" target="_blank" rel="noopener noreferrer">tell us what's missing</a>.
+      </span>
     </div>
   {% endif %}
 

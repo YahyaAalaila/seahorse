@@ -21,6 +21,7 @@ FRIENDLY_TO_PRESET: dict[str, str] = {
     "NeuralJumpCNF": "neural_jumpcnf",
     "NeuralAttnCNF": "neural_attncnf",
     "NeuralCondGMM": "neural_cond_gmm",
+    "NJSDE": "njsde",
     "DeepSTPP": "deep_stpp",
     "AutoSTPP": "auto_stpp",
     "SMASH": "smash",
