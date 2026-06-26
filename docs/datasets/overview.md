@@ -26,7 +26,7 @@ Each file is one JSON object per line. Each object is one event sequence.
 
 | Source | How to use |
 | --- | --- |
-| Curated `seahorse-stpp` datasets | `load_dataset("seahorse-stpp/<id>")` or `--dataset seahorse-stpp/<id>` |
+| Curated `seahorse-stpp` datasets | `load_dataset("citibike")` or `--dataset citibike` (short name) |
 | Any Hugging Face repo | Pass `--dataset owner/repo[/subdir]` — Seahorse downloads and caches |
 | Local JSONL files | Pass `--train`, `--val`, `--test` flags or a directory with `--dataset` |
 | Local split collection | Point `--splits_dir` at a root with one subdirectory per dataset |
@@ -39,12 +39,12 @@ Seahorse curates **13 real-world STPP datasets** in the
 [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) Hugging Face
 organization — spanning urban mobility, crime, natural hazards, public health,
 social check-ins, and even neuroimaging — all in the same JSONL split format.
-Load any of them by id:
+Load any of them by its short name:
 
 ```python
 from seahorse.data import load_dataset
 
-splits = load_dataset("seahorse-stpp/citibike-stpp")  # downloads + caches
+splits = load_dataset("citibike")  # downloads + caches
 ```
 
 Browse the full collection, with load snippets and each dataset's space/time

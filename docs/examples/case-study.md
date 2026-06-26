@@ -18,7 +18,7 @@ plots the predictions — all on CPU, in a few minutes.
     <span class="sh-ext-num">1</span>
     <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Install and load real data</span>
-      <p><code>pip install seahorse-stpp</code>, then <code>load_dataset("seahorse-stpp/citibike-stpp")</code> pulls the Citibike splits straight from the Hugging Face hub — no manual download.</p>
+      <p><code>pip install seahorse-stpp</code>, then <code>load_dataset("citibike")</code> pulls the Citibike splits straight from the Hugging Face hub — no manual download.</p>
     </div>
   </li>
   <li class="sh-ext-step">

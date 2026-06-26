@@ -39,7 +39,7 @@ name), downloads the splits, caches them, and returns parsed sequences:
 ```python
 from seahorse.data import load_dataset
 
-splits = load_dataset("seahorse-stpp/citibike-stpp")
+splits = load_dataset("citibike")
 train, val, test = splits["train"], splits["val"], splits["test"]
 ```
 

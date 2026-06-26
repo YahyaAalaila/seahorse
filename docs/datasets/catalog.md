@@ -2,21 +2,22 @@
 
 Thirteen ready-to-use spatio-temporal point-process datasets, hosted on the
 [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) Hugging Face organization
-and loadable by id. They share one trait — events observed in **space and
-time** — but the meaning of "space" stretches from a city block to the human
+and loadable by a short name. They share one trait — events observed in **space
+and time** — but the meaning of "space" stretches from a city block to the human
 cortex. The catalog is ordered along that arc.
 
-Every dataset loads the same way:
+Every dataset loads the same way, by the short name shown on each card:
 
 ```python
 from seahorse.data import load_dataset
 
-splits = load_dataset("seahorse-stpp/citibike-stpp")  # {"train": [...], "val": [...], "test": [...]}
+splits = load_dataset("citibike")  # {"train": [...], "val": [...], "test": [...]}
 ```
 
-…or from the command line with `--dataset seahorse-stpp/<id>`. Three of them —
-marked **core benchmark** below — are the 2D-spatial trio used for the headline
-real-data comparison.
+…or from the command line with `--dataset citibike`. The full
+`seahorse-stpp/<id>` reference still works everywhere a short name does. Three of
+them — marked **core benchmark** below — are the 2D-spatial trio used for the
+headline real-data comparison.
 
 ## Moving through the city
 
@@ -25,21 +26,21 @@ real-data comparison.
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card sh-ds-card--bench" href="https://huggingface.co/datasets/seahorse-stpp/citibike-stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">NYC Citibike</span><span class="sh-ds-chip">core benchmark</span></span>
-  <code class="sh-ds-id">seahorse-stpp/citibike-stpp</code>
+  <code class="sh-ds-id">citibike</code>
   <span class="sh-ds-desc">Bike-share trips between docking stations across New York City.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>dock coordinates</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>ride start</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/uber_pickups_nyc_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Uber Pickups · NYC</span></span>
-  <code class="sh-ds-id">seahorse-stpp/uber_pickups_nyc_stpp</code>
+  <code class="sh-ds-id">uber_pickups</code>
   <span class="sh-ds-desc">Ride-hailing pickup requests across New York City.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>pickup location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>request time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/us_accidents_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">US Traffic Accidents</span></span>
-  <code class="sh-ds-id">seahorse-stpp/us_accidents_stpp</code>
+  <code class="sh-ds-id">us_accidents</code>
   <span class="sh-ds-desc">Road traffic accident reports across the United States.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>accident location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>report time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
@@ -53,28 +54,28 @@ real-data comparison.
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/chicago_crime_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Chicago Crime</span></span>
-  <code class="sh-ds-id">seahorse-stpp/chicago_crime_stpp</code>
+  <code class="sh-ds-id">chicago_crime</code>
   <span class="sh-ds-desc">Reported crime incidents across the city of Chicago.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>block location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>incident time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/la_crime_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">LA Crime</span></span>
-  <code class="sh-ds-id">seahorse-stpp/la_crime_stpp</code>
+  <code class="sh-ds-id">la_crime</code>
   <span class="sh-ds-desc">Reported crime incidents across Los Angeles.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>report location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>incident time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/gtd_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Global Terrorism Database</span></span>
-  <code class="sh-ds-id">seahorse-stpp/gtd_stpp</code>
+  <code class="sh-ds-id">gtd</code>
   <span class="sh-ds-desc">Worldwide terrorism events from the GTD.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>event location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>event date</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/austin_311_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Austin 311</span></span>
-  <code class="sh-ds-id">seahorse-stpp/austin_311_stpp</code>
+  <code class="sh-ds-id">austin_311</code>
   <span class="sh-ds-desc">Non-emergency city service requests in Austin, Texas.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>request location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>request time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
@@ -88,14 +89,14 @@ real-data comparison.
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card sh-ds-card--bench" href="https://huggingface.co/datasets/seahorse-stpp/earthquakes-stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Earthquakes</span><span class="sh-ds-chip">core benchmark</span></span>
-  <code class="sh-ds-id">seahorse-stpp/earthquakes-stpp</code>
+  <code class="sh-ds-id">earthquakes</code>
   <span class="sh-ds-desc">Seismic events with epicenter and origin time.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>epicenter</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>origin time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/us_wildfires_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">US Wildfires</span></span>
-  <code class="sh-ds-id">seahorse-stpp/us_wildfires_stpp</code>
+  <code class="sh-ds-id">us_wildfires</code>
   <span class="sh-ds-desc">Wildfire ignition records across the United States.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>ignition location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>discovery date</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
@@ -109,7 +110,7 @@ real-data comparison.
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card sh-ds-card--bench" href="https://huggingface.co/datasets/seahorse-stpp/covid-stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">COVID-19</span><span class="sh-ds-chip">core benchmark</span></span>
-  <code class="sh-ds-id">seahorse-stpp/covid-stpp</code>
+  <code class="sh-ds-id">covid</code>
   <span class="sh-ds-desc">Reported COVID-19 cases over space and time.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>case location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>report date</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
@@ -123,14 +124,14 @@ real-data comparison.
 <div class="sh-ds-grid" markdown="0">
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/gowalla_checkins_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Gowalla</span></span>
-  <code class="sh-ds-id">seahorse-stpp/gowalla_checkins_stpp</code>
+  <code class="sh-ds-id">gowalla</code>
   <span class="sh-ds-desc">Location-based social check-ins from the Gowalla network.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>venue location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>check-in time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
 </a>
 <a class="sh-ds-card" href="https://huggingface.co/datasets/seahorse-stpp/brightkite_checkins_stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">Brightkite</span></span>
-  <code class="sh-ds-id">seahorse-stpp/brightkite_checkins_stpp</code>
+  <code class="sh-ds-id">brightkite</code>
   <span class="sh-ds-desc">Location-based social check-ins from the Brightkite network.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>venue location</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>check-in time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
@@ -144,7 +145,7 @@ real-data comparison.
 <div class="sh-ds-feature" markdown="0">
 <a class="sh-ds-card sh-ds-card--abstract" href="https://huggingface.co/datasets/seahorse-stpp/bold5000-stpp" target="_blank" rel="noopener">
   <span class="sh-ds-head"><span class="sh-ds-name">BOLD5000</span><span class="sh-ds-chip sh-ds-chip--muted">non-2D</span></span>
-  <code class="sh-ds-id">seahorse-stpp/bold5000-stpp</code>
+  <code class="sh-ds-id">bold5000</code>
   <span class="sh-ds-desc">Eventized neural responses derived from BOLD5000 fMRI recordings — included to show STPP space need not be geographic.</span>
   <span class="sh-ds-axes"><span class="sh-ds-axis"><span class="sh-ds-k">space</span>the brain</span><span class="sh-ds-axis"><span class="sh-ds-k">time</span>scan time</span></span>
   <span class="sh-ds-go" aria-hidden="true">↗</span>
