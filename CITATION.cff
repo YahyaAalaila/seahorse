@@ -6,13 +6,13 @@ type: software
 authors:
   - family-names: Aalaila
     given-names: Yahya
-    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+    orcid: "https://orcid.org/0000-0002-0661-317X"
   - family-names: Großmann
     given-names: Gerrit
-    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+    orcid: "https://orcid.org/0000-0002-4933-447X"
   - family-names: Vollmer
     given-names: Sebastian
-    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+    orcid: "https://orcid.org/0000-0003-2831-1401"
 version: 0.1.0
 license: Apache-2.0
 repository-code: "https://github.com/YahyaAalaila/seahorse"
@@ -31,9 +31,12 @@ preferred-citation:
   authors:
     - family-names: Aalaila
       given-names: Yahya
+      orcid: "https://orcid.org/0000-0002-0661-317X"
     - family-names: Großmann
       given-names: Gerrit
+      orcid: "https://orcid.org/0000-0002-4933-447X"
     - family-names: Vollmer
       given-names: Sebastian
+      orcid: "https://orcid.org/0000-0003-2831-1401"
   year: 2026
   # notes: arXiv identifier to be added once the preprint is public (Phase 5).
