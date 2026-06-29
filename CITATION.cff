@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use Seahorse in your research, please cite the software (and the accompanying paper once it is public)."
+title: "Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes"
+abstract: "A modular, research-grade framework for end-to-end development, training, and evaluation of spatio-temporal point-process (STPP) models."
+type: software
+authors:
+  - family-names: Aalaila
+    given-names: Yahya
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+  - family-names: Großmann
+    given-names: Gerrit
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+  - family-names: Vollmer
+    given-names: Sebastian
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add ORCID
+version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/YahyaAalaila/seahorse"
+url: "https://yahyaaalaila.github.io/seahorse/"
+keywords:
+  - spatio-temporal point process
+  - Hawkes process
+  - neural STPP
+  - benchmarking
+  - PyTorch
+# doi: "10.5281/zenodo.XXXXXXX"   # TODO: add the reserved Zenodo DOI before release (Phase 3)
+# date-released: 2026-XX-XX        # TODO: set to the v0.1.0 release date
+preferred-citation:
+  type: article
+  title: "TODO: paper title"
+  authors:
+    - family-names: Aalaila
+      given-names: Yahya
+    - family-names: Großmann
+      given-names: Gerrit
+    - family-names: Vollmer
+      given-names: Sebastian
+  year: 2026
+  # notes: arXiv identifier to be added once the preprint is public (Phase 5).

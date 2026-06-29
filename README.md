@@ -13,9 +13,9 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 [![Last Commit](https://img.shields.io/github/last-commit/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/commits)
 [![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/seahorse)
 [![Issues](https://img.shields.io/github/issues/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/issues)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
 
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.2%2B-orange?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/lightning-2.2%2B-792ee5)](https://lightning.ai/)
 [![Ray Tune](https://img.shields.io/badge/ray__tune-2.9%2B-028CF0)](https://docs.ray.io/en/latest/tune/)
@@ -211,25 +211,34 @@ python -m seahorse tune \
 
 ## 📝 Citation [[Back&nbsp;to&nbsp;Top](#top)]
 
-If Seahorse supports your work, cite the repository:
+If Seahorse supports your work, please cite it. The accompanying paper is in
+preparation; until the preprint is public, cite the software release:
 
 ```bibtex
-@software{aalaila_seahorse,
-  title = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
-  author = {Aalaila, Yahya},
-  url = {https://github.com/YahyaAalaila/seahorse},
-  license = {MIT}
+@software{seahorse2026,
+  title   = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
+  author  = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/YahyaAalaila/seahorse},
+  license = {Apache-2.0}
 }
 ```
+
+GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) offers the same entry in APA and BibTeX.
 
 ---
 
 ## ⚖️ License [[Back&nbsp;to&nbsp;Top](#top)]
 
-Seahorse is distributed under the **MIT License**. See [LICENSE](LICENSE).
+Seahorse is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ---
 
 ## 🙏 Acknowledgment [[Back&nbsp;to&nbsp;Top](#top)]
 
-Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.
+**Funding.** The authors received support from the Bundesministerium für Bildung und Forschung (BMBF) under Grant No. 01W23005 for the project EVENTFUL.
+
+**Contributors.** Beyond the authors, we thank Ismail Drief and Raphael Sonabend-Friend for their contributions to the codebase and its early design.
+
+**Upstream implementations.** Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.

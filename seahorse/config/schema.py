@@ -484,10 +484,24 @@ class STPPConfig(BaseModel):
                 if ConfigRegistry.is_registered(preset)
                 else preset
             )
-            yaml_path = Path(__file__).parent.parent / "configs" / f"{source_preset}.yaml"
+            configs_dir = Path(__file__).parent.parent / "configs"
+            yaml_path = configs_dir / f"{source_preset}.yaml"
             if yaml_path.exists():
                 with open(yaml_path) as f:
                     return _yaml_load_compat(f)
+            # Some presets (e.g. the factorized GMM/CNF families) ship no YAML
+            # and build entirely from schema defaults — that is legitimate, but
+            # ONLY when the bundled config directory itself is intact. An empty
+            # or missing directory means the package was built without its YAML
+            # data files (see [tool.setuptools.package-data] in pyproject.toml);
+            # falling back to an empty dict would silently produce a wrong model.
+            if not configs_dir.is_dir() or not any(configs_dir.glob("*.yaml")):
+                raise FileNotFoundError(
+                    f"Bundled Seahorse config directory is missing or empty: {configs_dir}. "
+                    "This indicates a broken installation where the YAML preset data was "
+                    "not packaged. Reinstall a correctly built 'seahorse-stpp' "
+                    "(pip install --force-reinstall seahorse-stpp)."
+                )
             return {"data": {}, "model": {"preset": source_preset}, "training": {}}
         raise ValueError("Either 'preset' or 'config' must be provided.")
 

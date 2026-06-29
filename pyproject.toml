@@ -8,8 +8,31 @@ version = "0.1.0"
 description = "Seahorse: unified benchmarking for spatio-temporal point-process models"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [{ name = "Yahya Aalaila" }]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+  { name = "Yahya Aalaila" },
+  { name = "Gerrit Großmann" },
+  { name = "Sebastian Vollmer" },
+]
+keywords = [
+  "spatio-temporal",
+  "point-process",
+  "hawkes",
+  "neural-stpp",
+  "benchmark",
+  "pytorch",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "torch>=2.8.0",
   "pytorch-lightning>=2.3.3",
@@ -45,9 +68,21 @@ all = [
   "seahorse-stpp[runner,hpo,docs]",
 ]
 
+[project.urls]
+Homepage = "https://github.com/YahyaAalaila/seahorse"
+Repository = "https://github.com/YahyaAalaila/seahorse"
+Documentation = "https://yahyaaalaila.github.io/seahorse/"
+Issues = "https://github.com/YahyaAalaila/seahorse/issues"
+
+[project.scripts]
+seahorse = "seahorse.__main__:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["seahorse", "seahorse.*"]
+
+[tool.setuptools.package-data]
+seahorse = ["configs/*.yaml"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
