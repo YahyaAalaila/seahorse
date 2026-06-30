@@ -23,8 +23,15 @@ keywords:
   - neural STPP
   - benchmarking
   - PyTorch
-# doi: "10.5281/zenodo.XXXXXXX"   # TODO: add the reserved Zenodo DOI before release (Phase 3)
-# date-released: 2026-XX-XX        # TODO: set to the v0.1.0 release date
+doi: "10.5281/zenodo.21078077"
+date-released: 2026-06-30
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21078077"
+    description: "Concept DOI (all versions)"
+  - type: doi
+    value: "10.5281/zenodo.21078078"
+    description: "Version DOI (v0.1.0)"
 preferred-citation:
   type: article
   title: "TODO: paper title"
