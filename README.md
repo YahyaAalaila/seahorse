@@ -14,6 +14,8 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 [![Branch](https://img.shields.io/badge/branch-latest-brightgreen)](https://github.com/YahyaAalaila/seahorse)
 [![Issues](https://img.shields.io/github/issues/YahyaAalaila/seahorse)](https://github.com/YahyaAalaila/seahorse/issues)
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/seahorse-stpp.svg)](https://pypi.org/project/seahorse-stpp/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21078077.svg)](https://doi.org/10.5281/zenodo.21078077)
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.2%2B-orange?logo=pytorch&logoColor=white)](https://pytorch.org/)
@@ -220,6 +222,7 @@ preparation; until the preprint is public, cite the software release:
   author  = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
   year    = {2026},
   version = {0.1.0},
+  doi     = {10.5281/zenodo.21078077},
   url     = {https://github.com/YahyaAalaila/seahorse},
   license = {Apache-2.0}
 }

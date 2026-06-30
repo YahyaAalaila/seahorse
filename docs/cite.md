@@ -14,11 +14,14 @@ way to support the project — and it helps other researchers find the tooling.
   author  = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
   title   = {Seahorse: Unified benchmarking for spatio-temporal point processes},
   year    = {2026},
+  doi     = {10.5281/zenodo.21078077},
   url     = {https://github.com/YahyaAalaila/seahorse},
   version = {0.1.0},
   license = {Apache-2.0}
 }
 ```
 
-Once a `CITATION.cff` is published in the repository, GitHub's **Cite this
-repository** button will offer the same entry in APA and BibTeX.
+Every release is archived on Zenodo with a DOI — cite the **concept DOI**
+[10.5281/zenodo.21078077](https://doi.org/10.5281/zenodo.21078077) to reference
+the software across versions. GitHub's **Cite this repository** button (from the
+repository's `CITATION.cff`) offers the same entry in APA and BibTeX.
