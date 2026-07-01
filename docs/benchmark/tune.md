@@ -3,7 +3,7 @@
 Seahorse uses Ray Tune for HPO. Install the HPO extras before running any tune command:
 
 ```bash
-python -m pip install -e ".[hpo]"
+pip install "seahorse-stpp[hpo]"
 ```
 
 ## CLI: tune a single preset

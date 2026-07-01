@@ -49,7 +49,7 @@ Key options:
 
 ## tune: Search Hyperparameters
 
-Requires HPO dependencies: `python -m pip install -e ".[hpo]"`
+Requires HPO dependencies: `pip install "seahorse-stpp[hpo]"`
 
 ??? example "Show CLI command"
     ```bash

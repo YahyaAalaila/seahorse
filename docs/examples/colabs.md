@@ -20,8 +20,7 @@ From the repository root:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
-python -m pip install notebook
+python -m pip install seahorse-stpp notebook
 jupyter notebook docs/notebooks/
 ```
 

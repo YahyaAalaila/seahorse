@@ -74,13 +74,22 @@ For more detailed guides, check out our documentation:
 - [End-to-End Case Study](https://yahyaaalaila.github.io/seahorse/examples/case-study/)
 - [Predicting with Models](https://yahyaaalaila.github.io/seahorse/run-models/predict/)
 
-**Install**
+**Install** (from PyPI):
+
+```bash
+pip install seahorse-stpp
+```
+
+Optional extras: `pip install "seahorse-stpp[hpo]"` for Ray Tune HPO.
+
+<details>
+<summary>Development install from source</summary>
 
 *macOS / Linux:*
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 *Windows:*
@@ -88,8 +97,10 @@ pip install -e .
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -e .
+pip install -e ".[dev]"
 ```
+
+</details>
 
 **Python API**
 
