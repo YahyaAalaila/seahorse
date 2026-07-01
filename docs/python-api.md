@@ -139,7 +139,7 @@ best_config = model.tune(train, val, n_trials=10, max_epochs=20)
 This uses the existing Ray Tune path. Install HPO dependencies before using it:
 
 ```bash
-python -m pip install -e ".[hpo]"
+pip install "seahorse-stpp[hpo]"
 ```
 
 ## Save And Load

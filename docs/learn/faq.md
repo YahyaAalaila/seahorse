@@ -3,10 +3,10 @@
 ## Installation and Setup
 
 **`No module named seahorse`**
-: Install in development mode from the repository root: `python -m pip install -e .`
+: Install Seahorse — `pip install seahorse-stpp` (or `pip install -e .` from a source checkout).
 
 **`No module named ray` or HPO errors**
-: Install HPO dependencies: `python -m pip install -e ".[hpo]"`
+: Install the HPO extras: `pip install "seahorse-stpp[hpo]"`
 
 **`No module named plotly`**
 : `plot_kde_surface` requires Plotly: `python -m pip install plotly`
@@ -67,7 +67,7 @@
 ## Benchmarking
 
 **HPO dependency errors with `--tune`**
-: Remove `--tune` unless you intend to run HPO, or install HPO extras: `python -m pip install -e ".[hpo]"`
+: Remove `--tune` unless you intend to run HPO, or install HPO extras: `pip install "seahorse-stpp[hpo]"`
 
 **Benchmark cells have inconsistent NLL**
 : Check that all presets were run under the same `--normalize` / `--no-normalize` setting. The benchmark contract enforces this when using `bench` directly, but manual `fit` runs do not automatically apply the contract.

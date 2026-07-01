@@ -4,23 +4,25 @@ Two main workflows: one-model Python experiments and reproducible CLI runs.
 
 ## Install
 
-=== "Core"
+=== "PyPI"
 
     ```bash
     python -m venv .venv && source .venv/bin/activate
-    python -m pip install -e .
+    python -m pip install seahorse-stpp
     ```
 
-=== "With dev tools"
+=== "With HPO (Ray Tune)"
 
     ```bash
+    python -m pip install "seahorse-stpp[hpo]"
+    ```
+
+=== "From source (development)"
+
+    ```bash
+    git clone https://github.com/YahyaAalaila/seahorse.git
+    cd seahorse
     python -m pip install -e ".[dev]"
-    ```
-
-=== "With HPO"
-
-    ```bash
-    python -m pip install -e ".[hpo]"
     ```
 
 ## Prepare Data
