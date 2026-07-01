@@ -2,10 +2,10 @@
 
 Real dataset, real numbers, one click. This is the fastest way to watch Seahorse
 do something real: it installs from PyPI, loads the **Citibike** spatio-temporal
-dataset, trains a baseline and a neural model, scores both under one metric, and
-plots the predictions — all on CPU, in a few minutes.
+dataset, explores it on a map, trains a baseline and a neural model, scores both
+under one metric, and visualizes the predictions — all on CPU, in a few minutes.
 
-<a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb" target="_blank" rel="noopener">
+<a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_citibike.ipynb" target="_blank" rel="noopener">
   <span class="sh-colab-badge" aria-hidden="true">▶</span>
   <span class="sh-colab-text"><strong>Open the case study in Colab</strong><span>Citibike · CPU-only · no local setup</span></span>
   <span class="sh-colab-go" aria-hidden="true">↗</span>
@@ -24,22 +24,29 @@ plots the predictions — all on CPU, in a few minutes.
   <li class="sh-ext-step">
     <span class="sh-ext-num">2</span>
     <div class="sh-ext-step-body">
+      <span class="sh-ext-step-title">Explore it like a practitioner</span>
+      <p>Inspect events per sequence, the daily ride rhythm, and a map of ride density across New York City — the spatial pattern a model has to capture.</p>
+    </div>
+  </li>
+  <li class="sh-ext-step">
+    <span class="sh-ext-num">3</span>
+    <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Train a baseline and a neural model</span>
       <p>Fit <code>PoissonGMM</code> as a fast parametric baseline and <code>DeepSTPP</code> as the neural model — the same <code>fit()</code> call for both.</p>
     </div>
   </li>
   <li class="sh-ext-step">
-    <span class="sh-ext-num">3</span>
+    <span class="sh-ext-num">4</span>
     <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Evaluate head-to-head</span>
       <p>Score both on held-out test sequences and compare <code>test_nll</code> under one shared metric definition — comparable by construction.</p>
     </div>
   </li>
   <li class="sh-ext-step">
-    <span class="sh-ext-num">4</span>
+    <span class="sh-ext-num">5</span>
     <div class="sh-ext-step-body">
-      <span class="sh-ext-step-title">Visualize the predictions</span>
-      <p>Sample next events with <code>predict_next</code> and plot the sampled locations against the true next event.</p>
+      <span class="sh-ext-step-title">Visualize on the map</span>
+      <p>Sample next events with <code>predict_next</code> and plot the model's predicted ride locations against the true next event, over the NYC map.</p>
     </div>
   </li>
 </ol>
