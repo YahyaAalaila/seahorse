@@ -3,9 +3,20 @@
 If Seahorse helped your research, please cite it. A citation is the most direct
 way to support the project — and it helps other researchers find the tooling.
 
-!!! note "Paper coming soon"
-    The Seahorse paper is in preparation. Until the preprint is public, cite the
-    software release below; this page will be updated with the paper reference.
+## Paper
+
+The Seahorse preprint is on [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
+
+```bibtex
+@misc{aalaila2026seahorse,
+  title         = {Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling},
+  author        = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
+  year          = {2026},
+  eprint        = {2607.01022},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG}
+}
+```
 
 ## Software
 
