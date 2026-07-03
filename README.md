@@ -229,8 +229,20 @@ python -m seahorse tune \
 
 ## 📝 Citation [[Back&nbsp;to&nbsp;Top](#top)]
 
-If Seahorse supports your work, please cite it. The accompanying paper is in
-preparation; until the preprint is public, cite the software release:
+If Seahorse supports your work, please cite the paper:
+
+```bibtex
+@misc{aalaila2026seahorse,
+  title         = {Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling},
+  author        = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
+  year          = {2026},
+  eprint        = {2607.01022},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG}
+}
+```
+
+To cite the software release specifically, use the Zenodo DOI:
 
 ```bibtex
 @software{seahorse2026,
@@ -244,7 +256,7 @@ preparation; until the preprint is public, cite the software release:
 }
 ```
 
-GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) offers the same entry in APA and BibTeX.
+GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) offers these entries in APA and BibTeX.
 
 ---
 

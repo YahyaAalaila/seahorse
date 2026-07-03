@@ -34,7 +34,7 @@ identifiers:
     description: "Version DOI (v0.1.0)"
 preferred-citation:
   type: article
-  title: "TODO: paper title"
+  title: "Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling"
   authors:
     - family-names: Aalaila
       given-names: Yahya
@@ -46,4 +46,5 @@ preferred-citation:
       given-names: Sebastian
       orcid: "https://orcid.org/0000-0003-2831-1401"
   year: 2026
-  # notes: arXiv identifier to be added once the preprint is public (Phase 5).
+  journal: "arXiv preprint arXiv:2607.01022"
+  url: "https://arxiv.org/abs/2607.01022"
