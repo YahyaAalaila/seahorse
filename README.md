@@ -32,12 +32,17 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ## 🗞️ News [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Documentation: https://yahyaaalaila.github.io/seahorse/
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; Seahorse includes executable Colab tutorials for single-model training and benchmark campaigns.
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The documentation includes an end-to-end case study that walks from JSONL data to benchmark artifacts.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The **Seahorse** paper is out on [arXiv](https://arxiv.org/abs/2607.01022) — and `v0.1.0` is on PyPI: `pip install seahorse-stpp`.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; **HawkesNest**, our synthetic STPP stress-test suite, is released: [code](https://github.com/YahyaAalaila/HawkesNest) · [paper](https://arxiv.org/abs/2606.16863).
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning &amp; Global Health Network (MLGH)](https://mlgh.net/), London, UK.
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [13-02-2025] Our review paper about [Neural Spatiotemporal Point Processes: Trends and Challenges](https://arxiv.org/abs/2502.09341) is up on [arxiv](https://arxiv.org/abs/2502.09341).
+
+<details>
+<summary>More news</summary>
+
+- [13-02-2025] Our review paper about [Neural Spatiotemporal Point Processes: Trends and Challenges](https://arxiv.org/abs/2502.09341) is up on [arxiv](https://arxiv.org/abs/2502.09341).
+
+</details>
 
 ---
 
