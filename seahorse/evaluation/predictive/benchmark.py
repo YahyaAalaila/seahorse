@@ -17,6 +17,7 @@ _SUMMARY_METRICS = (
     "spatial_energy_score",
     "temporal_mae",
     "spatial_mae",
+    "next_event_distance_km",
     "joint_distance",
     "temporal_nll_sample_kde",
     "spatial_nll_sample_kde",

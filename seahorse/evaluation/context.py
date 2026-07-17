@@ -149,6 +149,7 @@ class EvalContext:
         n_context_events: int = 50,
         exact_time_bins: int = 8,
         exact_spatial_bins: int = 8,
+        exact_max_window_expansions: int = 18,
         grid_spec: dict[str, Any] | None = None,
         seed: int = 0,
         planned_artifact_families: set[str] | frozenset[str] | None = None,
@@ -167,6 +168,9 @@ class EvalContext:
             raise ValueError("n_context_events must be >= 1")
         self.exact_time_bins = int(exact_time_bins)
         self.exact_spatial_bins = int(exact_spatial_bins)
+        self.exact_max_window_expansions = int(exact_max_window_expansions)
+        if self.exact_max_window_expansions < 0:
+            raise ValueError("exact_max_window_expansions must be >= 0")
         self.grid_spec = grid_spec or {}
         self.seed = seed
         self.planned_artifact_families = frozenset(planned_artifact_families or ())
@@ -297,6 +301,7 @@ class EvalContext:
             device=str(self.device),
             exact_time_bins=self.exact_time_bins,
             exact_spatial_bins=self.exact_spatial_bins,
+            exact_max_window_expansions=self.exact_max_window_expansions,
         )
         loaded = load_predictive_samples_artifact(self.artifact_dir, key)
         if loaded is not None:
@@ -333,6 +338,7 @@ class EvalContext:
             seed=self.seed,
             exact_time_bins=self.exact_time_bins,
             exact_spatial_bins=self.exact_spatial_bins,
+            exact_max_window_expansions=self.exact_max_window_expansions,
         )
         if memory_only:
             self.artifact_events[PREDICTIVE_SAMPLES] = {

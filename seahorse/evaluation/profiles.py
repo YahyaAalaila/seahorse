@@ -79,6 +79,11 @@ PREDICTIVE_EXTENDED_METRICS = (
     "spatial_nll_sample_kde",
 )
 
+OPERATIONAL_GEOGRAPHIC_METRICS = (
+    "temporal_mae",
+    "next_event_distance_km",
+)
+
 GENERATIVE_METRICS = (
     "wasserstein",
     "mmd",
@@ -124,6 +129,15 @@ METRIC_PROFILES = {
         allowed_artifact_families=frozenset({PREDICTIVE_SAMPLES}),
         description="Predictive metrics from next-event samples; excludes KDE NLL/hotspot extras.",
     ),
+    "operational-geographic": MetricProfile(
+        name="operational-geographic",
+        metric_names=OPERATIONAL_GEOGRAPHIC_METRICS,
+        allowed_artifact_families=frozenset({PREDICTIVE_SAMPLES}),
+        description=(
+            "Immediate next-event time error and deployable location miss in kilometres; "
+            "requires raw [longitude, latitude] degrees."
+        ),
+    ),
     "generative": MetricProfile(
         name="generative",
         metric_names=GENERATIVE_METRICS,
@@ -154,7 +168,10 @@ METRIC_PROFILES = {
             *SURFACE_METRICS,
         ),
         allowed_artifact_families=HEAVY_ARTIFACT_FAMILIES,
-        description="All registered benchmark metrics with all heavy artifact families planned.",
+        description=(
+            "All coordinate-agnostic benchmark metrics with all heavy artifact families planned; "
+            "geographic operational metrics remain explicitly opt-in."
+        ),
     ),
 }
 

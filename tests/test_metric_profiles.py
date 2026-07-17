@@ -227,6 +227,7 @@ class TestMetricProfiles(unittest.TestCase):
         names = profile_names()
         self.assertIn("core", names)
         self.assertIn("predictive", names)
+        self.assertIn("operational-geographic", names)
         self.assertIn("generative", names)
         self.assertIn("autoregressive", names)
         self.assertIn("surface", names)

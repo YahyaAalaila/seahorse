@@ -24,6 +24,9 @@ from seahorse.evaluation.profiles import PREDICTIVE_SAMPLES
 from seahorse.evaluation.registry import metric_by_name
 from seahorse.evaluation.result import MetricResult, Report
 from seahorse.models.abstractions import StateContext
+from seahorse.models.event_models.factorized import FactorizedEventModel
+from seahorse.models.spatial_models.gaussian_mixture import GaussianMixtureSpatialModel
+from seahorse.models.temporal_models.parametric_processes import HomogeneousPoissonProcess
 from seahorse.runner.runner import STPPRunner
 
 
@@ -349,6 +352,43 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
         )
         self.assertEqual(tuple(values.shape), (1,))
         self.assertTrue(torch.isfinite(values).all())
+        self.assertAlmostEqual(float(values.item()), 1.0, places=6)
+
+    def test_factorized_intensity_adapter_applies_data_normalization_jacobian(self):
+        class ConstantFactorizedEventModel(FactorizedEventModel):
+            def intensity(self, *, state, query_times, query_locations, device=None):
+                del state, query_times, device
+                return torch.full(
+                    (query_locations.shape[0],),
+                    24.0,
+                    dtype=torch.float32,
+                )
+
+        event_model = ConstantFactorizedEventModel(
+            temporal_model=HomogeneousPoissonProcess(),
+            spatial_model=GaussianMixtureSpatialModel(),
+        )
+        runner = SimpleNamespace(
+            model=SimpleNamespace(event_model=event_model),
+            norm_stats={
+                "normalize": True,
+                "time_mean": 10.0,
+                "time_std": 2.0,
+                "loc_mean": [20.0, 30.0],
+                "loc_std": [3.0, 4.0],
+            },
+        )
+        intensity_fn = build_exact_intensity_fn(
+            runner,
+            StateContext(payload={"input_transform": {}}),
+            torch.device("cpu"),
+        )
+
+        values = intensity_fn(
+            torch.tensor([12.0], dtype=torch.float32),
+            torch.tensor([[23.0, 34.0]], dtype=torch.float32),
+        )
+
         self.assertAlmostEqual(float(values.item()), 1.0, places=6)
 
     def test_neural_like_exact_intensity_adapter_splits_mixed_query_times(self):

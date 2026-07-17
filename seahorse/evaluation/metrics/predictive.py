@@ -1,4 +1,4 @@
-"""Predictive-quality metrics (M6–M14).
+"""Predictive-quality metrics (M6–M15).
 
 Registers:
   temporal_crps          — Temporal CRPS (catalog M6)
@@ -11,6 +11,7 @@ Registers:
   spatial_mae            — Spatial MAE (catalog M13)
   spatial_rmse           — Spatial RMSE (catalog M13)
   joint_distance         — Normalized joint event distance (catalog M14)
+  next_event_distance_km — Deployable next-location miss in kilometres (catalog M15)
 
 All metrics in this file share ctx.samples_predictive (K=200 next-event
 samples per test event), which is computed lazily once on first access.
@@ -44,6 +45,41 @@ def _nan_out_failed_contexts(values: np.ndarray, samples) -> np.ndarray:
     if out.ndim == 1 and out.shape[0] == mask.shape[0]:
         out[~mask] = np.nan
     return out
+
+
+_EARTH_MEAN_RADIUS_KM = 6371.0088
+
+
+def _validate_lon_lat(values: np.ndarray, *, label: str) -> None:
+    """Validate geographic coordinates in ``[longitude, latitude]`` order."""
+    coords = np.asarray(values, dtype=np.float64)
+    if coords.shape[-1:] != (2,):
+        raise ValueError(f"{label} must have shape (..., 2) in [longitude, latitude] order.")
+    if not np.isfinite(coords).all():
+        raise ValueError(f"{label} contains non-finite geographic coordinates.")
+    if np.any(np.abs(coords[..., 0]) > 180.0) or np.any(np.abs(coords[..., 1]) > 90.0):
+        raise ValueError(
+            f"{label} falls outside valid longitude/latitude bounds; "
+            "next_event_distance_km requires raw [longitude, latitude] degrees."
+        )
+
+
+def _haversine_km(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Great-circle distance between broadcastable ``[..., lon, lat]`` arrays."""
+    a_rad = np.radians(np.asarray(a, dtype=np.float64))
+    b_rad = np.radians(np.asarray(b, dtype=np.float64))
+    delta_lon = b_rad[..., 0] - a_rad[..., 0]
+    delta_lat = b_rad[..., 1] - a_rad[..., 1]
+    sin_lat = np.sin(delta_lat / 2.0)
+    sin_lon = np.sin(delta_lon / 2.0)
+    hav = sin_lat**2 + np.cos(a_rad[..., 1]) * np.cos(b_rad[..., 1]) * sin_lon**2
+    return 2.0 * _EARTH_MEAN_RADIUS_KM * np.arcsin(np.sqrt(np.clip(hav, 0.0, 1.0)))
+
+
+def _predictive_sample_medoid_lon_lat(samples: np.ndarray) -> np.ndarray:
+    """Return the sampled location minimizing total great-circle distance."""
+    pairwise_km = _haversine_km(samples[:, None, :], samples[None, :, :])
+    return samples[int(np.argmin(pairwise_km.sum(axis=1)))]
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +440,6 @@ class TemporalMAE(Metric):
 
     def compute(self, ctx: "EvalContext") -> MetricResult:
         samples = ctx.samples_predictive
-        true_iets = (samples.true_next_times - samples.history_end_times).astype(np.float64)
         pred_iets = (samples.next_times - samples.history_end_times[:, None]).astype(np.float64)
         pred_median_iet = np.median(pred_iets, axis=1)  # (N,)
         pred_t = samples.history_end_times.astype(np.float64) + pred_median_iet
@@ -519,4 +554,51 @@ class JointDistance(Metric):
             value=float(np.nanmean(per_event)),
             per_event=per_event,
             method=samples.sampling_backend,
+        )
+
+
+# ---------------------------------------------------------------------------
+# M15: Geographic next-event point-forecast distance
+# ---------------------------------------------------------------------------
+
+
+@register_metric
+class NextEventDistanceKm(Metric):
+    """M15: Next-location point-forecast error in kilometres.
+
+    This metric turns each predictive sample distribution into one operational
+    location: the predictive sample medoid under great-circle distance. It then
+    reports the great-circle miss to the observed immediate next event.
+
+    Locations must be raw geographic coordinates in ``[longitude, latitude]``
+    order and decimal degrees. Use only on georeferenced datasets; raw Euclidean
+    ``spatial_mae`` remains available for synthetic or projected coordinates.
+    """
+
+    name = "next_event_distance_km"
+    catalog_id = "M15"
+    requires = frozenset({"samples_predictive"})
+    artifact_families = frozenset({PREDICTIVE_SAMPLES})
+    cost_class = "sampling_heavy"
+
+    def compute(self, ctx: "EvalContext") -> MetricResult:
+        samples = ctx.samples_predictive
+        pred_locs = samples.next_locs.astype(np.float64)
+        true_locs = samples.true_next_locs.astype(np.float64)
+        success_mask = _sampling_success_mask(samples)
+        per_event = np.full(true_locs.shape[0], np.nan, dtype=np.float64)
+
+        for index in np.flatnonzero(success_mask):
+            draws = pred_locs[index]
+            target = true_locs[index]
+            _validate_lon_lat(draws, label="predictive locations")
+            _validate_lon_lat(target, label="true next-event location")
+            point_forecast = _predictive_sample_medoid_lon_lat(draws)
+            per_event[index] = float(_haversine_km(point_forecast, target))
+
+        value = float(np.nanmean(per_event)) if np.isfinite(per_event).any() else float("nan")
+        return MetricResult(
+            value=value,
+            per_event=per_event,
+            method="predictive_sample_medoid_haversine_km",
         )

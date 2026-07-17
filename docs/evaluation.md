@@ -11,10 +11,11 @@
 | `core` | Basic NLL/report metrics | none |
 | `nll` | Extended NLL-family checks | none |
 | `predictive` | Next-event predictive scores | predictive samples |
+| `operational-geographic` | Immediate next-event time error and location miss in km | predictive samples |
 | `generative` | Full-rollout distribution metrics | generative rollouts |
 | `autoregressive` | Fixed-prefix autoregressive degradation | generative rollouts |
 | `surface` | Intensity-grid diagnostics | intensity grids or approximations |
-| `full` | All registered benchmark metrics | all heavy artifact families |
+| `full` | All coordinate-agnostic benchmark metrics | all heavy artifact families |
 
 Run `python -m seahorse evaluate metrics --help` for the exact metric names
 in the installed version.
@@ -45,6 +46,7 @@ Useful controls:
 - `--max-seqs`: cap the number of sequences.
 - `--max-events`: cap events per sequence.
 - `--k-pred`: next-event sample count.
+- `--exact-max-window-expansions`: time-window doubling budget for low-rate exact samplers.
 - `--k-gen`: full-rollout sample count.
 - `--n-context-events`: observed prefix length for rollout metrics.
 - `--device`: `auto`, `cpu`, `cuda`, `cuda:0`, `mps`, or another device string.
@@ -61,6 +63,30 @@ Outputs depend on the chosen profile and model capabilities:
 - rendered HTML or image files for visualization commands.
 
 Heavy artifacts are profile-gated so expensive sampling or grid work is explicit.
+
+## Geographic Next-Event Distance
+
+For a deployment-facing answer in physical units, use the opt-in geographic profile:
+
+```bash
+python -m seahorse evaluate metrics \
+  --run path/to/run_dir \
+  --data data/my_dataset/test.jsonl \
+  --metric-profile operational-geographic \
+  --out runs/evaluate/operational_test
+```
+
+`next_event_distance_km` converts the predictive distribution into one action—the
+predictive sample medoid under great-circle distance—and measures its miss to the
+observed immediate next event. Its scalar and per-event values are kilometres
+(multiply by 1,000 for metres). Input locations must be raw decimal degrees in
+`[longitude, latitude]` order. Do not use this metric for synthetic coordinates or
+already projected coordinates.
+
+This metric complements NLL; it does not replace it. NLL scores the complete
+predictive distribution with a proper scoring rule, while next-event distance answers
+the narrower operational question of how far one selected forecast location was from
+the event that occurred.
 
 ## Sharded Metric Evaluation
 

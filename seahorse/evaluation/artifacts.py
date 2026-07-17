@@ -141,6 +141,7 @@ def build_predictive_samples_key(
     device: str,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    exact_max_window_expansions: int = 18,
 ) -> ArtifactKey:
     run_dir = getattr(runner, "_run_dir", None)
     run_dir = None if run_dir is None else Path(run_dir).resolve()
@@ -173,7 +174,7 @@ def build_predictive_samples_key(
             "proposal_spatial_bins": int(exact_spatial_bins),
             "initial_time_window_policy": "max(4*median_inter_event_time,1e-3)",
             "window_expansion_factor": 2.0,
-            "max_window_expansions": 8,
+            "max_window_expansions": int(exact_max_window_expansions),
         },
         "k_pred": int(k),
         "seed": int(seed),

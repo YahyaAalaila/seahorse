@@ -13,6 +13,7 @@ import torch
 from seahorse.data.transforms import transform_from_spec
 from seahorse.evaluation.intensity import paper_output_scale_factor
 from seahorse.evaluation.context import GenerativeRollouts
+from seahorse.models.event_models.factorized import FactorizedEventModel
 from seahorse.evaluation.runtime import (
     FrameWindow,
     LoadedRun,
@@ -499,6 +500,11 @@ def build_exact_intensity_fn(
     transform = transform_from_spec(transform_spec if isinstance(transform_spec, dict) else None)
     event_model = runner.model.event_model
     requires_fixed_time_batches = callable(getattr(event_model, "fixed_time_query_terms", None))
+    data_normalization_volume = (
+        float(t_std * np.prod(loc_std))
+        if normalize and isinstance(event_model, FactorizedEventModel)
+        else 1.0
+    )
 
     def _transform_queries_if_needed(
         qt: torch.Tensor,
@@ -576,6 +582,10 @@ def build_exact_intensity_fn(
             values = _call_event_intensity(qt, qs)
         values = values.to(dtype=torch.float32)
         values = values / _intensity_reporting_scale(values)
+        # The family reporting scale above maps factorized intensity back to
+        # data-normalized coordinates. Thinning proposals integrate over raw
+        # time/space cells, so also apply the data-layer change of variables.
+        values = values / values.new_tensor(max(data_normalization_volume, 1e-8))
         return values.clamp(min=0.0)
 
     return intensity_fn

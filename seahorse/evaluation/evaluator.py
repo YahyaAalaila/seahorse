@@ -86,6 +86,7 @@ def evaluate(
     n_context_events: int = 50,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    exact_max_window_expansions: int = 18,
     grid_spec: dict[str, Any] | None = None,
     seed: int = 0,
     device: torch.device | str | None = None,
@@ -122,6 +123,8 @@ def evaluate(
     grid_spec:
         Dict with keys ``x_resolution``, ``y_resolution``, ``t_resolution``,
         ``x_range``, ``y_range``.  Controls the intensity grid for grid metrics.
+    exact_max_window_expansions:
+        Number of time-window doublings after the initial thinning window.
     seed:
         Base random seed for reproducible sampling.
     device:
@@ -204,6 +207,7 @@ def evaluate(
         n_context_events=n_context_events,
         exact_time_bins=exact_time_bins,
         exact_spatial_bins=exact_spatial_bins,
+        exact_max_window_expansions=exact_max_window_expansions,
         grid_spec=grid_spec,
         seed=seed,
         planned_artifact_families=plan.allowed_artifact_families,

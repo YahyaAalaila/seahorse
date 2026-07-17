@@ -102,6 +102,12 @@ def _add_metrics_subparser(sub) -> None:
         default=8,
         help="Number of proposal bins per spatial axis for thinning-based next-event sampling.",
     )
+    p.add_argument(
+        "--exact-max-window-expansions",
+        type=int,
+        default=18,
+        help="Maximum thinning-window doublings after the initial time window.",
+    )
     p.add_argument("--seed", type=int, default=0, help="Evaluation sampling seed.")
     p.add_argument(
         "--device",
@@ -502,6 +508,7 @@ def _execute_metrics(args) -> None:
             n_context_events=int(args.n_context_events),
             exact_time_bins=int(args.exact_time_bins),
             exact_spatial_bins=int(args.exact_spatial_bins),
+            exact_max_window_expansions=int(args.exact_max_window_expansions),
             seed=int(args.seed),
             device=device,
             metric_profile=canonical_profile,
@@ -733,6 +740,7 @@ def _metrics_evaluation_manifest(
             "n_context_events": int(args.n_context_events),
             "exact_time_bins": int(args.exact_time_bins),
             "exact_spatial_bins": int(args.exact_spatial_bins),
+            "exact_max_window_expansions": int(args.exact_max_window_expansions),
             "out_dir": str(out_dir),
         },
         "evaluation_task": (

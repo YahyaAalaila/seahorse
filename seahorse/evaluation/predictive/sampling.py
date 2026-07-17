@@ -81,6 +81,7 @@ def _thinning_next_events_adaptive_batch(
     device: torch.device,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    exact_max_window_expansions: int = 18,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Draw K next-event samples via adaptive batched thinning."""
     if k <= 0:
@@ -96,6 +97,8 @@ def _thinning_next_events_adaptive_batch(
         time_bins=int(exact_time_bins),
         spatial_bins=int(exact_spatial_bins),
     )
+    if exact_max_window_expansions < 0:
+        raise ValueError("exact_max_window_expansions must be >= 0")
 
     state_ctx = build_state_from_history(runner, history, device)
     intensity_fn = build_exact_intensity_fn(runner, state_ctx, device)
@@ -106,7 +109,8 @@ def _thinning_next_events_adaptive_batch(
     window_start = float(t_start)
     horizon = float(initial_horizon)
 
-    for _ in range(9):
+    # One initial window followed by the configured number of doublings.
+    for _ in range(int(exact_max_window_expansions) + 1):
         if remaining.size == 0:
             break
         t_end = window_start + float(horizon)
@@ -241,6 +245,7 @@ def compute_predictive_samples(
     seed: int = 0,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    exact_max_window_expansions: int = 18,
 ) -> PredictiveSamples:
     """Compute K next-event samples for every held-out next-event context."""
     np.random.seed(seed)
@@ -334,6 +339,7 @@ def compute_predictive_samples(
                         device=device,
                         exact_time_bins=exact_time_bins,
                         exact_spatial_bins=exact_spatial_bins,
+                        exact_max_window_expansions=exact_max_window_expansions,
                     )
                     sampling_succeeded = bool(success_mask.all())
 

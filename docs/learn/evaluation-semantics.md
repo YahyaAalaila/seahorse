@@ -57,10 +57,11 @@ Seahorse gates metrics behind explicit profiles so expensive sampling or grid wo
 | `core` | `test_nll`, `temporal_nll`, `spatial_nll`, `mean_seq_nll` | Exact or approximate NLL |
 | `nll` | Extended NLL-family checks | Exact NLL |
 | `predictive` | CRPS, energy score, MAE, RMSE, coverage | Next-event sampling |
+| `operational-geographic` | Temporal MAE and next-location miss in km | Geographic next-event sampling |
 | `generative` | Distribution metrics over full rollouts | Generative sampling |
 | `autoregressive` | Fixed-prefix degradation metrics | Generative sampling |
 | `surface` | Intensity/density grid diagnostics | Intensity surface query |
-| `full` | All registered benchmark metrics | All of the above |
+| `full` | All coordinate-agnostic benchmark metrics | All of the above |
 
 ## Predictive Metrics
 
@@ -73,6 +74,23 @@ Predictive metrics use sampled next-event predictions. They measure how well a m
 | MAE | Mean absolute error in time | Mean absolute error in space |
 | RMSE | Root mean squared error in time | Root mean squared error in space |
 | Coverage | Marginal calibration (temporal) | — |
+
+### Interpreting physical next-event error
+
+`next_event_distance_km` is an opt-in geographic metric for deployment-facing
+interpretation. For every conditioning history, Seahorse selects the predictive sample
+medoid—the sampled location minimizing total great-circle distance to the other
+predictive draws—and measures its great-circle distance to the observed immediate next
+event. The mean and saved per-event array are in kilometres.
+
+The metric requires raw `[longitude, latitude]` decimal degrees. It is intentionally
+separate from `spatial_mae`, whose Euclidean units depend on the dataset coordinate
+system. Multiply kilometre results by 1,000 to express them in metres.
+
+NLL and physical error answer different questions and should normally be reported
+together. NLL evaluates the full probability distribution; `next_event_distance_km`
+evaluates one explicit point action derived from that distribution. A model can be
+better on either measure without being better on the other.
 
 ## Unavailable Metrics
 
