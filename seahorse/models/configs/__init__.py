@@ -24,6 +24,9 @@ from .factorized import (
     FactorizedCNFConfig, PoissonCNFConfig, HawkesCNFConfig, SelfCorrectingCNFConfig,
     PoissonTVCNFConfig, HawkesTVCNFConfig, SelfCorrectingTVCNFConfig,
 )
+from .marked_hawkes import (
+    MarkedHawkesBaseConfig, MarkedHawkesConfig, MarkedHawkesDiagConfig,
+)
 
 __all__ = [
     "BaseModelConfig",
@@ -50,4 +53,7 @@ __all__ = [
     "PoissonTVCNFConfig",
     "HawkesTVCNFConfig",
     "SelfCorrectingTVCNFConfig",
+    "MarkedHawkesBaseConfig",
+    "MarkedHawkesConfig",
+    "MarkedHawkesDiagConfig",
 ]
