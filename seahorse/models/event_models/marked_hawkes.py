@@ -70,6 +70,36 @@ the negative log-likelihood of sequence ``b`` over ``[t0, t_last]``.  This is a
 *coupled* space-time model, so there is no meaningful temporal/spatial split of
 ``nll_matrix`` and none is reported.
 
+Mark panel and the mark / space-time split
+------------------------------------------
+Integrating ``lambda_k(t, y)`` over all of ``R^d`` kills both spatial factors
+(each integrates to 1) and leaves the space-marginalised per-mark rate::
+
+    lambda_k(t) = mu_k + sum_{j: t_j < t} alpha[k_j, k] g(t - t_j)
+
+from which the per-event mark distribution follows directly::
+
+    p(k | t_i, H_i) = lambda_k(t_i) / sum_l lambda_l(t_i)
+
+This conditions on time and history but **not** on the observed location, which
+is the convention the other marked presets report, so the mark panel compares
+them like for like.  Reported as ``mark_logprob_matrix`` ``(B, T, M)`` (rows
+normalised), the padding-free views ``mark_logprob_events`` ``(n_events, M)`` and
+``mark_targets_events`` ``(n_events,)``, and the scalar ``mark_nll``.
+
+Writing ``Lambda*(t) = sum_l lambda_l(t)`` for the ground intensity, the joint
+per-event term factorises exactly::
+
+    log lambda_{k_i}(t_i, x_i) = log Lambda*(t_i)
+                                 + log p(k_i | t_i, H_i)
+                                 + log p(x_i | k_i, t_i, H_i)
+
+so ``spatiotemporal_nll = nll - mark_nll`` strips out the discrete mark factor.
+That subtraction is what makes the number comparable across models with
+different mark cardinality and against unmarked baselines — the joint marked NLL
+is a density over a larger space and is *not* comparable.  For ``M = 1`` the mark
+factor is identically zero and ``spatiotemporal_nll == nll``.
+
 Observation window
 ------------------
 ``t0``/``t1`` are interpreted in the sequence-relative frame (times are shifted so
@@ -297,19 +327,36 @@ class MarkedHawkesEventModel(EventModel):
         z = (diff - mean) / scale
         return -0.5 * (z * z).sum(-1) - torch.log(scale).sum(-1) - 0.5 * self.spatial_dim * _LOG_2PI
 
-    def _log_intensity_at_events(
+    def _event_terms(
         self,
         *,
         times: Tensor,
         locations: Tensor,
         marks: Tensor,
         mask: Tensor,
-    ) -> Tensor:
-        """``log lambda_{k_i}(t_i, x_i | H_{t_i})`` for every event — shape ``(B, T)``.
+    ) -> tuple[Tensor, Tensor]:
+        """Both per-event likelihood terms, sharing one ``O(T^2)`` pass.
 
-        Computed with ``logsumexp`` over {background, each strictly-earlier event}
-        so that far-field Gaussian factors underflow gracefully rather than
-        driving the total rate to zero.
+        Returns
+        -------
+        log_lambda : ``(B, T)``
+            ``log lambda_{k_i}(t_i, x_i | H_{t_i})`` — the full space-time
+            intensity at the observed mark and location.  Computed with
+            ``logsumexp`` over {background, each strictly-earlier event} so that
+            far-field Gaussian factors underflow gracefully rather than driving
+            the total rate to zero.
+        mark_logprob : ``(B, T, M)``
+            ``log p(k | t_i, H_i)`` with rows normalised over marks, obtained
+            from the **space-marginalised** per-mark rates
+
+                lambda_k(t) = \\int_{R^d} lambda_k(t, y) dy
+                            = mu_k + sum_{j: t_j < t} alpha[k_j, k] g(t - t_j)
+
+            (the spatial factors drop out exactly because every ``rho_k`` and
+            ``f_{j,k}`` integrates to 1), so that
+            ``p(k | t, H) = lambda_k(t) / sum_l lambda_l(t)``.  This conditions on
+            time and history but **not** on the observed location, matching the
+            convention the other marked presets report.
         """
         b, t = times.shape
         device = times.device
@@ -320,13 +367,17 @@ class MarkedHawkesEventModel(EventModel):
         src = marks.unsqueeze(1).expand(b, t, t)
         tgt = marks.unsqueeze(2).expand(b, t, t)
 
-        # Strictly-causal, padding-aware, structurally-allowed pairs.
+        # Strictly-causal, padding-aware pairs.
         lower = torch.tril(torch.ones(t, t, device=device, dtype=torch.bool), diagonal=-1)
-        valid = lower.unsqueeze(0) & (mask.unsqueeze(-2) > 0)
-        if self.diagonal_only:
-            valid = valid & (self.alpha_mask[src, tgt] > 0)
+        causal = lower.unsqueeze(0) & (mask.unsqueeze(-2) > 0)
 
         dt = (times.unsqueeze(-1) - times.unsqueeze(-2)).clamp(min=0.0)  # (B,T,T)
+        decay_kernel = q * torch.exp(-q * dt)                            # g(t_i - t_j)
+
+        # ---- joint space-time log-intensity at the observed (t_i, x_i, k_i) ----
+        valid = causal
+        if self.diagonal_only:
+            valid = valid & (self.alpha_mask[src, tgt] > 0)
 
         log_alpha = torch.log(alpha.clamp_min(_TINY))[src, tgt]          # (B,T,T)
         log_terms = log_alpha + torch.log(q) - q * dt
@@ -348,9 +399,24 @@ class MarkedHawkesEventModel(EventModel):
                 locations, self._bg_mean[marks], bg_scale[marks]
             )
 
-        return torch.logsumexp(
+        log_lambda = torch.logsumexp(
             torch.cat([log_bg.unsqueeze(-1), log_terms], dim=-1), dim=-1
         )
+
+        # ---- space-marginalised per-mark rates -> p(k | t_i, H_i) ----
+        # alpha is already hard-masked, so the diagonal variant needs no extra
+        # masking here: its off-diagonal entries contribute exactly 0.
+        alpha_rows = alpha[marks]                                        # (B,T,M) rows by parent
+        excite = torch.einsum(
+            "bij,bjm->bim", decay_kernel * causal.to(times.dtype), alpha_rows
+        )                                                                # (B,T,M)
+        lam_marks = self.mu.reshape(1, 1, -1) + excite                   # (B,T,M), > 0
+        log_lam_marks = torch.log(lam_marks.clamp_min(_TINY))
+        mark_logprob = log_lam_marks - torch.logsumexp(
+            log_lam_marks, dim=-1, keepdim=True
+        )
+
+        return log_lambda, mark_logprob
 
     def _interval_compensator(
         self,
@@ -430,11 +496,20 @@ class MarkedHawkesEventModel(EventModel):
         if t == 0:
             zero = times.new_zeros(b, 0)
             total = times.new_zeros(())
+            extra = self.branching_diagnostics()
+            extra["alpha_matrix"] = self.alpha_matrix()
+            extra["spatiotemporal_nll"] = 0.0
+            extra["mark_nll"] = 0.0
             return {
                 "loss": total, "nll": total, "nll_matrix": zero, "mask": zero,
                 "next_event_mask": zero, "total_events": times.new_zeros(()),
                 "nll_per_event": times.new_zeros(b),
-                "extra_metrics": self.branching_diagnostics(),
+                "log_intensity_matrix": zero, "compensator_matrix": zero,
+                "mark_logprob_matrix": times.new_zeros(b, 0, self.n_marks),
+                "mark_logprob_events": times.new_zeros(0, self.n_marks),
+                "mark_targets_events": torch.zeros(0, dtype=torch.long, device=device),
+                "mark_nll": total,
+                "extra_metrics": extra,
             }
 
         # Sequence-relative shift: parametric Hawkes needs t >= 0 and the
@@ -445,7 +520,7 @@ class MarkedHawkesEventModel(EventModel):
 
         t0_tensor = torch.full((b,), self.t0, device=device, dtype=times.dtype)
 
-        log_lambda = self._log_intensity_at_events(
+        log_lambda, mark_logprob = self._event_terms(
             times=times_s, locations=locations, marks=marks_idx, mask=mask
         )
         comp = self._interval_compensator(
@@ -476,8 +551,26 @@ class MarkedHawkesEventModel(EventModel):
         next_event_mask = mask.clone()
         next_event_mask[:, 0] = 0.0
 
+        # ---- mark panel -------------------------------------------------
+        # -log p(k_i | t_i, H_i) at the observed mark.
+        mark_nll_matrix = -mark_logprob.gather(
+            -1, marks_idx.unsqueeze(-1)
+        ).squeeze(-1) * mask                                             # (B,T)
+        mark_nll = mark_nll_matrix.sum() / n_events_total
+
+        # Padding-free views, flattened row-major over (B, T).
+        valid_sel = mask > 0
+        mark_logprob_events = mark_logprob[valid_sel]                    # (n_events, M)
+        mark_targets_events = marks_idx[valid_sel]                       # (n_events,)
+
+        # Joint minus the mark factor: the only NLL comparable across models
+        # with different mark cardinality, and to unmarked baselines.
+        spatiotemporal_nll = mean_nll - mark_nll
+
         extra = self.branching_diagnostics()
         extra["alpha_matrix"] = self.alpha_matrix()
+        extra["spatiotemporal_nll"] = float(spatiotemporal_nll.detach())
+        extra["mark_nll"] = float(mark_nll.detach())
 
         return {
             "loss": mean_nll,
@@ -489,6 +582,10 @@ class MarkedHawkesEventModel(EventModel):
             "total_events": mask.sum(),
             "mask": mask,
             "next_event_mask": next_event_mask,
+            "mark_logprob_matrix": mark_logprob,
+            "mark_logprob_events": mark_logprob_events,
+            "mark_targets_events": mark_targets_events,
+            "mark_nll": mark_nll,
             "extra_metrics": extra,
         }
 

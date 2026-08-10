@@ -363,6 +363,156 @@ def test_alpha_matrix_reaches_extra_metrics():
 
 
 # ---------------------------------------------------------------------------
+# 3b. Mark panel  (four-key convention shared with the other marked presets)
+# ---------------------------------------------------------------------------
+
+MARK_PANEL_KEYS = (
+    "mark_logprob_matrix",
+    "mark_logprob_events",
+    "mark_targets_events",
+    "mark_nll",
+)
+
+
+def _panel_fixture(n_marks=3, spatial=True, n=7, seed=21, diagonal_only=False):
+    model = _make_model(n_marks=n_marks, spatial=spatial, diagonal_only=diagonal_only)
+    rng = np.random.default_rng(seed)
+    times = np.sort(rng.uniform(0.0, 5.0, n)); times -= times[0]
+    locs = rng.normal(0.0, 1.0, (n, 2))
+    marks = rng.integers(0, n_marks, n)
+    tt, ll, kk, lens, state = _single_seq_batch(times, locs, marks)
+    out = model.training_loss(times=tt, locations=ll, lengths=lens, state=state, marks=kk)
+    return model, out, times, locs, marks
+
+
+@pytest.mark.parametrize("spatial", [True, False])
+def test_mark_panel_keys_present_with_expected_shapes(spatial):
+    model, out, _, _, marks = _panel_fixture(spatial=spatial)
+    for key in MARK_PANEL_KEYS:
+        assert key in out, f"missing mark-panel key {key!r}"
+
+    n, m = marks.shape[0], model.n_marks
+    assert out["mark_logprob_matrix"].shape == (1, n, m)
+    assert out["mark_logprob_events"].shape == (n, m)
+    assert out["mark_targets_events"].shape == (n,)
+    assert out["mark_targets_events"].dtype == torch.int64
+    assert out["mark_nll"].ndim == 0
+
+
+def test_mark_logprob_rows_are_normalised():
+    _, out, _, _, _ = _panel_fixture()
+    total = torch.logsumexp(out["mark_logprob_matrix"], dim=-1)
+    assert torch.allclose(total, torch.zeros_like(total), atol=1e-10)
+
+
+def test_mark_distribution_is_space_marginalised():
+    """p(k|t,H) must come from the SPACE-INTEGRAL of lambda_k, not from lambda_k
+    at the observed location.
+
+    Verified by integrating lambda_k(t_i, y) over R^2 by quadrature and comparing
+    the resulting normalised mark distribution to the reported one.
+    """
+    model, out, times, locs, marks = _panel_fixture(spatial=True)
+    P = _numpy_params(model)
+
+    ax = np.arange(-8.0, 8.0 + 0.05, 0.1)
+    xx, yy = np.meshgrid(ax, ax, indexing="ij")
+    grid = np.stack([xx.ravel(), yy.ravel()], -1)
+    cell = 0.1 * 0.1
+
+    got = out["mark_logprob_matrix"][0].detach().exp().numpy()
+    for i in range(times.shape[0]):
+        lam_grid = _lambda_per_mark(
+            P, times[i], grid, times[:i], locs[:i], marks[:i], True
+        )                                   # (G, M)
+        lam_k = lam_grid.sum(axis=0) * cell  # integral over space, per mark
+        want = lam_k / lam_k.sum()
+        assert np.abs(got[i] - want).max() < 1e-6, (
+            f"event {i}: mark distribution is not the space-marginalised one\n"
+            f"got  {got[i]}\nwant {want}"
+        )
+
+    # And it is genuinely different from conditioning on the observed location,
+    # so the test above is not vacuous.
+    at_loc = _lambda_per_mark(
+        P, times[-1], locs[-1][None, :], times[:-1], locs[:-1], marks[:-1], True
+    )[0]
+    at_loc = at_loc / at_loc.sum()
+    assert np.abs(got[-1] - at_loc).max() > 1e-3
+
+
+def test_mark_nll_matches_gathered_logprob():
+    _, out, _, _, marks = _panel_fixture()
+    lp = out["mark_logprob_events"]
+    tgt = out["mark_targets_events"]
+    manual = -lp.gather(-1, tgt.unsqueeze(-1)).squeeze(-1).mean()
+    assert torch.allclose(manual, out["mark_nll"], atol=1e-12)
+    assert np.array_equal(tgt.numpy(), marks)
+
+
+def test_spatiotemporal_nll_is_joint_minus_mark():
+    _, out, _, _, _ = _panel_fixture()
+    st = out["extra_metrics"]["spatiotemporal_nll"]
+    assert abs(st - (float(out["nll"].detach()) - float(out["mark_nll"].detach()))) < 1e-9
+
+
+def test_single_mark_has_zero_mark_factor():
+    """With M=1 the mark factor vanishes and spatiotemporal_nll == joint nll."""
+    _, out, _, _, _ = _panel_fixture(n_marks=1)
+    assert torch.allclose(
+        out["mark_logprob_matrix"], torch.zeros_like(out["mark_logprob_matrix"]), atol=1e-12
+    )
+    assert abs(float(out["mark_nll"].detach())) < 1e-12
+    assert abs(
+        out["extra_metrics"]["spatiotemporal_nll"] - float(out["nll"].detach())
+    ) < 1e-9
+
+
+def test_padding_excluded_from_mark_panel():
+    """The padding-free views must contain exactly the valid events."""
+    model = _make_model(n_marks=3, spatial=True)
+    rng = np.random.default_rng(31)
+    times = np.sort(rng.uniform(0.0, 5.0, 6)); times -= times[0]
+    locs = rng.normal(0.0, 1.0, (6, 2))
+    marks = rng.integers(0, 3, 6)
+    tt, ll, kk, lens, _ = _single_seq_batch(times, locs, marks)
+    short = torch.tensor([4])
+    state = StateContext(
+        payload={"times": tt, "locations": ll, "lengths": short, "marks": kk}
+    )
+    out = model.training_loss(times=tt, locations=ll, lengths=short, state=state, marks=kk)
+    assert out["mark_logprob_events"].shape == (4, 3)
+    assert np.array_equal(out["mark_targets_events"].numpy(), marks[:4])
+    assert torch.allclose(
+        out["mark_logprob_events"], out["mark_logprob_matrix"][0, :4], atol=1e-12
+    )
+
+
+def test_diagonal_variant_changes_the_mark_distribution():
+    """The mark panel must actually reflect the structural restriction."""
+    _, full, _, _, _ = _panel_fixture(diagonal_only=False)
+    _, diag, _, _, _ = _panel_fixture(diagonal_only=True)
+    assert not torch.allclose(
+        full["mark_logprob_matrix"], diag["mark_logprob_matrix"], atol=1e-6
+    )
+
+
+def test_mark_panel_flows_through_unified_model():
+    model = ConfigRegistry.build("marked_hawkes", {"n_marks": 3}, spatial_dim=2)
+    seqs = simulate_marked_hawkes_sequences(
+        n_sequences=3, T=20.0, mu=MU_TRUE, alpha=ALPHA_TRUE, decay=Q_TRUE, seed=1
+    )
+    times, locs, marks, lens = _pack(seqs)
+    out = model(times=times, locations=locs, lengths=lens, marks=marks)
+    for key in MARK_PANEL_KEYS:
+        assert key in out
+    n_events = int(lens.sum())
+    assert out["mark_logprob_events"].shape == (n_events, 3)
+    assert out["mark_targets_events"].shape == (n_events,)
+    assert "spatiotemporal_nll" in out["extra_metrics"]
+
+
+# ---------------------------------------------------------------------------
 # 4. Simulator + alpha recovery  (the key scientific test)
 # ---------------------------------------------------------------------------
 
