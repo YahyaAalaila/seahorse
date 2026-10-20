@@ -3,31 +3,7 @@
 from __future__ import annotations
 
 
-FRIENDLY_TO_PRESET: dict[str, str] = {
-    "PoissonGMM": "poisson_gmm",
-    "PoissonCNF": "poisson_cnf",
-    "PoissonTVCNF": "poisson_tvcnf",
-    "HawkesGMM": "hawkes_gmm",
-    "HawkesCNF": "hawkes_cnf",
-    "HawkesTVCNF": "hawkes_tvcnf",
-    "SelfCorrectingGMM": "selfcorrecting_gmm",
-    "SelfCorrectingCNF": "selfcorrecting_cnf",
-    "SelfCorrectingTVCNF": "selfcorrecting_tvcnf",
-    "RMTPPGMM": "rmtpp_gmm",
-    "THPGMM": "thp_gmm",
-    "NeuralSTPP": "neural_stpp_attn_sc",
-    "NeuralJumpSC": "neural_stpp_jump_sc",
-    "NeuralAttnSC": "neural_stpp_attn_sc",
-    "NeuralJumpCNF": "neural_jumpcnf",
-    "NeuralAttnCNF": "neural_attncnf",
-    "NeuralCondGMM": "neural_cond_gmm",
-    "NJSDE": "njsde",
-    "DeepSTPP": "deep_stpp",
-    "AutoSTPP": "auto_stpp",
-    "SMASH": "smash",
-    "DiffusionSTPP": "diffusion_stpp",
-    "NSMPP": "nsmpp",
-}
+from seahorse._friendly_names import FRIENDLY_TO_PRESET
 
 
 def _registry_names() -> set[str]:
