@@ -337,3 +337,32 @@ class ConfigResolutionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSearchSpaceSanitiserKeepsAtomicVectors(unittest.TestCase):
+    """``model.support`` / ``model.grid`` are geometry, not HPO choice lists."""
+
+    def test_atomic_vectors_survive_sanitisation(self):
+        from seahorse.config.schema import _has_search_space_syntax, _sanitize_search_space
+
+        raw = {
+            "model": {"support": [0.0, 1.0, 0.0, 1.0], "grid": [8, 8], "hidden_dim": [32, 64]},
+            "training": {"lr": {"min": 1e-4, "max": 1e-2}},
+        }
+        self.assertTrue(_has_search_space_syntax(raw))
+        out = _sanitize_search_space(raw)
+        self.assertEqual(out["model"]["support"], [0.0, 1.0, 0.0, 1.0])
+        self.assertEqual(out["model"]["grid"], [8, 8])
+        self.assertEqual(out["model"]["hidden_dim"], 32)
+        self.assertEqual(out["training"]["lr"], 1e-4)
+        self.assertFalse(
+            _has_search_space_syntax({"model": {"support": [0.0, 1.0, 0.0, 1.0]}})
+        )
+
+    def test_cli_overrides_accept_json_vectors(self):
+        from seahorse.utils import parse_overrides
+
+        out = parse_overrides(["model.support=[0,1,0,1]", "training.lr=0.5", "model.flag=true"])
+        self.assertEqual(out["model"]["support"], [0, 1, 0, 1])
+        self.assertEqual(out["training"]["lr"], 0.5)
+        self.assertIs(out["model"]["flag"], True)

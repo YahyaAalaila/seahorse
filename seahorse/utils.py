@@ -194,16 +194,25 @@ def parse_overrides(override_list: list[str]) -> dict:
             print(f"WARNING: ignoring malformed override {item!r} (expected key=value)", file=sys.stderr)
             continue
         key, _, raw_val = item.partition("=")
+        # CLI overrides accept JSON containers, so geometry such as
+        # ``model.support=[0,1,0,1]`` remains a vector rather than a string.
         try:
-            val = int(raw_val)
-        except ValueError:
+            val = json.loads(raw_val)
+        except (json.JSONDecodeError, TypeError):
+            val = raw_val
+        if val is not raw_val:
+            pass
+        else:
             try:
-                val = float(raw_val)
+                val = int(raw_val)
             except ValueError:
-                if raw_val.lower() in ("true", "false"):
-                    val = raw_val.lower() == "true"
-                else:
-                    val = raw_val
+                try:
+                    val = float(raw_val)
+                except ValueError:
+                    if raw_val.lower() in ("true", "false"):
+                        val = raw_val.lower() == "true"
+                    else:
+                        val = raw_val
         parts = key.split(".")
         node = result
         for part in parts[:-1]:

@@ -675,44 +675,50 @@ class STPPConfig(BaseModel):
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _has_search_space_syntax(d: dict) -> bool:
-    """Return True if *d* contains any HPO search-space syntax.
+_ATOMIC_LIST_PATHS = frozenset({("model", "support"), ("model", "grid")})
 
-    Detects ``{min: x, max: y}`` dicts and list-valued fields whose first
-    element is a scalar (discrete choice sets), both of which are collapsed
-    by :func:`_sanitize_search_space`.
+
+def _has_search_space_syntax(d: dict, path: tuple[str, ...] = ()) -> bool:
+    """Return whether *d* contains actual HPO syntax.
+
+    ``model.support`` and ``model.grid`` are geometric/model-shape vectors,
+    not Ray choice lists.  YAML must preserve them when a normal public config
+    is sanitised before validation.
     """
-    for v in d.values():
-        if isinstance(v, dict):
-            if "min" in v and "max" in v:
+    for key, value in d.items():
+        child_path = path + (str(key),)
+        if isinstance(value, dict):
+            if "min" in value and "max" in value:
                 return True
-            if _has_search_space_syntax(v):
+            if _has_search_space_syntax(value, child_path):
                 return True
-        elif isinstance(v, list) and v and not isinstance(v[0], (dict, list)):
+        elif (
+            child_path not in _ATOMIC_LIST_PATHS
+            and isinstance(value, list)
+            and value
+            and not isinstance(value[0], (dict, list))
+        ):
             return True
     return False
 
 
-def _sanitize_search_space(d: dict) -> dict:
-    """Replace search-space specs with scalar defaults so Pydantic can validate.
-
-    ``{min: x, max: y}``           →  ``x``        (lower bound)
-    ``{min: x, max: y, default: z}`` →  ``z``      (explicit default)
-    ``[a, b, c]``                  →  ``a``        (first choice)
-    """
+def _sanitize_search_space(d: dict, path: tuple[str, ...] = ()) -> dict:
+    """Collapse HPO syntax while retaining declared atomic vector fields."""
     out: dict = {}
-    for k, v in d.items():
-        if isinstance(v, dict):
-            if "min" in v and "max" in v:
-                out[k] = v.get("default", v["min"])
+    for key, value in d.items():
+        child_path = path + (str(key),)
+        if isinstance(value, dict):
+            if "min" in value and "max" in value:
+                out[key] = value.get("default", value["min"])
             else:
-                out[k] = _sanitize_search_space(v)
-        elif isinstance(v, list) and v and not isinstance(v[0], (dict, list)):
-            out[k] = v[0]
+                out[key] = _sanitize_search_space(value, child_path)
+        elif child_path in _ATOMIC_LIST_PATHS:
+            out[key] = value
+        elif isinstance(value, list) and value and not isinstance(value[0], (dict, list)):
+            out[key] = value[0]
         else:
-            out[k] = v
+            out[key] = value
     return out
-
 
 def _flatten(d: dict, prefix: str = "") -> dict[str, Any]:
     """Recursively flatten a nested dict to ``{a.b.c: value}`` form."""

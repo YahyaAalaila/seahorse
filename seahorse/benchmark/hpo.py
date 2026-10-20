@@ -15,6 +15,7 @@ import resource
 import subprocess
 import sys
 import csv
+import copy
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -395,7 +396,15 @@ def run_hpo(
         )
 
     _seed_hpo_driver(tuning.seed)
-    ray_space, fixed = tuning.build_ray_config(config_dict)
+    # A statistical support is declared experimental geometry, never a
+    # discrete HPO choice.  Tune uses lists as its choice syntax, whereas
+    # YAML/JSON serialisation naturally represents the four support bounds as
+    # a list.  Preserve it as an atomic tuple for the parser.
+    hpo_config = copy.deepcopy(config_dict)
+    model_spec = hpo_config.get("model") if isinstance(hpo_config, dict) else None
+    if isinstance(model_spec, dict) and isinstance(model_spec.get("support"), list):
+        model_spec["support"] = tuple(model_spec["support"])
+    ray_space, fixed = tuning.build_ray_config(hpo_config)
 
     if not ray_space:
         from seahorse.config import STPPConfig
