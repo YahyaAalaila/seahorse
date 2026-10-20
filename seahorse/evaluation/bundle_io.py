@@ -10,7 +10,6 @@ import numpy as np
 from seahorse.evaluation.artifacts import (
     ARTIFACT_MANIFEST_FILENAME,
     PREDICTIVE_SAMPLES,
-    PREDICTIVE_SAMPLES_SCHEMA_VERSION,
     ArtifactKey,
     ArtifactManifest,
     PredictiveSamples,
@@ -40,11 +39,11 @@ def write_predictive_samples_artifact(
     payload_path = predictive_samples_payload_path(artifact_root, key)
     np.savez_compressed(
         payload_path,
-        next_times=np.asarray(samples.next_times, dtype=np.float32),
-        next_locs=np.asarray(samples.next_locs, dtype=np.float32),
-        true_next_times=np.asarray(samples.true_next_times, dtype=np.float32),
-        true_next_locs=np.asarray(samples.true_next_locs, dtype=np.float32),
-        history_end_times=np.asarray(samples.history_end_times, dtype=np.float32),
+        next_times=np.asarray(samples.next_times),
+        next_locs=np.asarray(samples.next_locs),
+        true_next_times=np.asarray(samples.true_next_times),
+        true_next_locs=np.asarray(samples.true_next_locs),
+        history_end_times=np.asarray(samples.history_end_times),
         sequence_index=np.asarray(samples.sequence_index, dtype=np.int64),
         target_event_index=np.asarray(samples.target_event_index, dtype=np.int64),
         history_length=np.asarray(samples.history_length, dtype=np.int64),
@@ -127,8 +126,8 @@ def scan_and_load_predictive_samples(artifact_dir: str | Path) -> PredictiveSamp
 
 
 def _predictive_samples_from_payload(payload) -> PredictiveSamples:
-    next_times = np.asarray(payload["next_times"], dtype=np.float32)
-    true_next_times = np.asarray(payload["true_next_times"], dtype=np.float32)
+    next_times = np.asarray(payload["next_times"])
+    true_next_times = np.asarray(payload["true_next_times"])
     sequence_index = np.asarray(
         payload["sequence_index"] if "sequence_index" in payload else payload["seq_indices"],
         dtype=np.int64,
@@ -158,10 +157,10 @@ def _predictive_samples_from_payload(payload) -> PredictiveSamples:
     )
     return PredictiveSamples(
         next_times=next_times,
-        next_locs=np.asarray(payload["next_locs"], dtype=np.float32),
+        next_locs=np.asarray(payload["next_locs"]),
         true_next_times=true_next_times,
-        true_next_locs=np.asarray(payload["true_next_locs"], dtype=np.float32),
-        history_end_times=np.asarray(payload["history_end_times"], dtype=np.float32),
+        true_next_locs=np.asarray(payload["true_next_locs"]),
+        history_end_times=np.asarray(payload["history_end_times"]),
         sequence_index=sequence_index,
         target_event_index=target_event_index,
         history_length=history_length,

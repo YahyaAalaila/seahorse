@@ -158,7 +158,7 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
             def sample_native(self, *, state, batch_size=None, device=None, **kwargs):
                 del state, kwargs
                 samples = torch.zeros((int(batch_size), 1, 3), dtype=torch.float32, device=device)
-                samples[:, 0, 0] = 0.5
+                samples[:, 0, 0] = 0.25 + 0.5 * torch.rand(int(batch_size), device=device)
                 samples[:, 0, 1] = 0.25
                 samples[:, 0, 2] = 0.75
                 return {"samples": samples}
@@ -202,6 +202,18 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
         self.assertEqual(len(runner.model.state_model.calls), 20)
         self.assertEqual(runner.model.state_model.calls[0], 3)
         self.assertEqual(runner.model.state_model.calls[10], 3)
+
+        # Evaluation seeds must control the native sampler's Torch RNG even
+        # after unrelated draws, not only NumPy's proposal sampler.
+        torch.rand(17)
+        repeated = compute_generative_rollouts(
+            runner, [seq], k=2, device=torch.device("cpu"), seed=0, n_context_events=3,
+        )
+        changed = compute_generative_rollouts(
+            runner, [seq], k=2, device=torch.device("cpu"), seed=1, n_context_events=3,
+        )
+        np.testing.assert_array_equal(rollouts.rollout_times[0], repeated.rollout_times[0])
+        self.assertFalse(np.array_equal(rollouts.rollout_times[0], changed.rollout_times[0]))
 
     def test_summary_bundle_writes_context_and_last_context_outputs(self):
         samples = PredictiveSamples(
@@ -283,6 +295,7 @@ class TestPredictiveBenchmarkArtifacts(unittest.TestCase):
                         allowed_artifact_families={PREDICTIVE_SAMPLES},
                         artifact_dir=Path(tmpdir) / "artifacts",
                         k_pred=2,
+                        grid_spec={"x_range": [0., 1.], "y_range": [0., 1.], "initial_horizon": 1.},
                         seed=0,
                         device="cpu",
                     )

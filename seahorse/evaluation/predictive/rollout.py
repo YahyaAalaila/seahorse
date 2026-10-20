@@ -103,10 +103,11 @@ def normalize_history_for_runner(
     history: dict[str, np.ndarray],
     norm_stats: dict[str, Any],
 ) -> tuple[np.ndarray, np.ndarray]:
-    times = np.asarray(history["times"], dtype=np.float32)
+    from seahorse.data.dataset import _strict_float32_times
+    times = np.asarray(history["times"], dtype=np.float64)
     locs = np.asarray(history["locations"], dtype=np.float32)
     if not bool(norm_stats.get("normalize", False)):
-        return times, locs
+        return _strict_float32_times(times, context="sampling history"), locs
     t_mean = float(norm_stats.get("time_mean", 0.0))
     t_std = max(float(norm_stats.get("time_std", 1.0)), 1e-8)
     loc_mean = np.asarray(norm_stats.get("loc_mean", [0.0, 0.0]), dtype=np.float32)
@@ -114,7 +115,7 @@ def normalize_history_for_runner(
         np.asarray(norm_stats.get("loc_std", [1.0, 1.0]), dtype=np.float32),
         1e-8,
     )
-    return (times - t_mean) / t_std, (locs - loc_mean) / loc_std
+    return _strict_float32_times((times - t_mean) / t_std, context="normalized sampling history"), (locs - loc_mean) / loc_std
 
 
 def build_state_from_history(
@@ -213,10 +214,12 @@ def sample_next_event_smash(
             batch_size=1,
             device=device,
         )
-    flat = _flatten_sample_tensor(out["samples"])[:1].detach().cpu().numpy()
+    flat = _flatten_sample_tensor(out if isinstance(out, torch.Tensor) else out["samples"])[:1].detach().cpu().numpy()
     delta_t = float(_denormalize_time_samples(runner, flat)[0])
     loc = _denormalize_spatial_samples(runner, flat)[0]
-    next_time = float(history["times"][-1] + max(delta_t, 0.0))
+    # Preserve the sampled value.  A nonpositive/nonfinite draw is an invalid
+    # continuation, not evidence for a zero-wait event.
+    next_time = float(history["times"][-1] + delta_t)
     return next_time, np.asarray(loc, dtype=np.float32)
 
 
@@ -243,9 +246,7 @@ def sample_next_events_smash_batch(
     flat = _flatten_sample_tensor(out["samples"])[: int(n_samples)].detach().cpu().numpy()
     delta_t = _denormalize_time_samples(runner, flat)
     locs = _denormalize_spatial_samples(runner, flat).astype(np.float32, copy=False)
-    next_times = (
-        float(history["times"][-1]) + np.maximum(delta_t.astype(np.float32, copy=False), 0.0)
-    ).astype(np.float32, copy=False)
+    next_times = float(history["times"][-1]) + delta_t.astype(np.float64, copy=False)
     return next_times, locs
 
 
@@ -260,10 +261,10 @@ def sample_next_event_diffusion(
         batch_size=1,
         device=device,
     )
-    flat = _flatten_sample_tensor(out["samples"])[:1].detach().cpu().numpy()
+    flat = _flatten_sample_tensor(out if isinstance(out, torch.Tensor) else out["samples"])[:1].detach().cpu().numpy()
     delta_t = float(_denormalize_time_samples(runner, flat)[0])
     loc = _denormalize_spatial_samples(runner, flat)[0]
-    next_time = float(history["times"][-1] + max(delta_t, 0.0))
+    next_time = float(history["times"][-1] + delta_t)
     return next_time, np.asarray(loc, dtype=np.float32)
 
 
@@ -281,13 +282,31 @@ def sample_next_events_diffusion_batch(
         batch_size=int(n_samples),
         device=device,
     )
-    flat = _flatten_sample_tensor(out["samples"])[: int(n_samples)].detach().cpu().numpy()
+    flat = _flatten_sample_tensor(out if isinstance(out, torch.Tensor) else out["samples"])[: int(n_samples)].detach().cpu().numpy()
     delta_t = _denormalize_time_samples(runner, flat)
     locs = _denormalize_spatial_samples(runner, flat).astype(np.float32, copy=False)
-    next_times = (
-        float(history["times"][-1]) + np.maximum(delta_t.astype(np.float32, copy=False), 0.0)
-    ).astype(np.float32, copy=False)
+    next_times = float(history["times"][-1]) + delta_t.astype(np.float64, copy=False)
     return next_times, locs
+
+
+def _native_event_validity(history: dict[str, np.ndarray], time_value: float, location: np.ndarray) -> str | None:
+    """Validate an author/native sampled event before float32 history append.
+
+    The runner encodes histories as strict float32 times.  A draw may be
+    increasing in float64 yet collapse to the preceding float32 value.  It is
+    invalid for this rollout rather than a reason to perturb the draw.
+    """
+    location = np.asarray(location, dtype=np.float64).reshape(-1)
+    if not np.isfinite(time_value):
+        return "nonfinite_time"
+    if location.shape != (2,) or not np.isfinite(location).all():
+        return "nonfinite_or_malformed_location"
+    previous = float(np.asarray(history["times"], dtype=np.float32)[-1])
+    if time_value <= previous:
+        return "nonpositive_wait"
+    if float(np.float32(time_value)) <= previous:
+        return "float32_time_collapse"
+    return None
 
 
 def _rollout_one_sequence_native(
@@ -308,6 +327,10 @@ def _rollout_one_sequence_native(
             t_next, s_next = sample_next_event_smash(runner, h, device)
         else:
             t_next, s_next = sample_next_event_diffusion(runner, h, device)
+        if _native_event_validity(h, t_next, s_next) is not None:
+            # GenerativeRollouts has no per-draw diagnostic field.  Return a
+            # short continuation; teacher-forced paths record the reason.
+            break
         out_times.append(t_next)
         out_locs.append(s_next)
         h = append_events(
@@ -373,7 +396,7 @@ def compute_generative_rollouts(
     n_context_events = int(n_context_events)
     if n_context_events < 1:
         raise ValueError("n_context_events must be >= 1")
-    np.random.seed(seed)
+    seed_everything(seed)
     caps = runner.model.event_model.capabilities
     use_native = caps.has_native_sampler
     method = "native" if use_native else "thinning"
@@ -836,6 +859,9 @@ def rollout_window_native_sampler(
     sampled_locs: list[np.ndarray] = []
     bridge_rejects = 0
     bridge_exhausted = False
+    invalid_draws = 0
+    invalid_reasons: dict[str, int] = {}
+    failed_rollout = False
 
     def _append_one(t_evt: float, s_evt: np.ndarray) -> None:
         nonlocal history
@@ -847,11 +873,29 @@ def rollout_window_native_sampler(
         sampled_times.append(float(t_evt))
         sampled_locs.append(np.asarray(s_evt, dtype=np.float32).reshape(2))
 
+    def _invalid(reason: str) -> None:
+        nonlocal invalid_draws, failed_rollout
+        invalid_draws += 1
+        invalid_reasons[reason] = invalid_reasons.get(reason, 0) + 1
+        failed_rollout = True
+
+    def _meta() -> dict[str, Any]:
+        return {"bridge_rejects": bridge_rejects, "bridge_exhausted": bridge_exhausted,
+                "native_invalid_draws": invalid_draws,
+                "native_invalid_reasons": invalid_reasons,
+                "native_failed_rollout": failed_rollout,
+                "native_short_rollout": bool(failed_rollout and len(sampled_times) < int(max_events))}
+
     current_time = float(history["times"][-1])
     if current_time < float(window_start):
         accepted = False
         for _ in range(max(1, int(bridge_retries))):
             t_evt, s_evt = next_event_fn(runner, history, device)
+            reason = _native_event_validity(history, t_evt, s_evt)
+            if reason is not None:
+                _invalid(reason)
+                return (np.asarray(sampled_times, dtype=np.float32),
+                        np.asarray(sampled_locs, dtype=np.float32).reshape(-1, 2), history, _meta())
             if t_evt + 1e-8 >= float(window_start):
                 accepted = True
                 if t_evt < float(window_end):
@@ -864,14 +908,14 @@ def rollout_window_native_sampler(
                 np.zeros((0,), dtype=np.float32),
                 np.zeros((0, 2), dtype=np.float32),
                 history,
-                {"bridge_rejects": bridge_rejects, "bridge_exhausted": bridge_exhausted},
+                _meta(),
             )
         if sampled_times and sampled_times[-1] >= float(window_end):
             return (
                 np.asarray(sampled_times, dtype=np.float32),
                 np.asarray(sampled_locs, dtype=np.float32),
                 history,
-                {"bridge_rejects": bridge_rejects, "bridge_exhausted": bridge_exhausted},
+                _meta(),
             )
 
     while len(sampled_times) < int(max_events):
@@ -880,6 +924,10 @@ def rollout_window_native_sampler(
         if current_time >= float(window_end):
             break
         t_evt, s_evt = next_event_fn(runner, history, device)
+        reason = _native_event_validity(history, t_evt, s_evt)
+        if reason is not None:
+            _invalid(reason)
+            break
         if t_evt < float(window_end):
             _append_one(t_evt, s_evt)
             continue
@@ -889,7 +937,7 @@ def rollout_window_native_sampler(
         np.asarray(sampled_times, dtype=np.float32),
         np.asarray(sampled_locs, dtype=np.float32).reshape(-1, 2),
         history,
-        {"bridge_rejects": bridge_rejects, "bridge_exhausted": bridge_exhausted},
+        _meta(),
     )
 
 
@@ -938,6 +986,9 @@ def _teacher_forced_native_batched_rollouts(
             "native_bridge_redraw_batches": 0,
             "native_serial_fallback_rollouts": 0,
             "native_bridge_exhausted_rollouts": 0,
+            "native_invalid_draws": 0,
+            "native_invalid_rollouts": 0,
+            "native_invalid_reasons": {},
         }
 
     next_event_fn = _native_next_event_fn(loaded)
@@ -951,6 +1002,9 @@ def _teacher_forced_native_batched_rollouts(
     native_first_batch_calls = 0
     native_bridge_redraw_batches = 0
     native_serial_fallback_rollouts = 0
+    invalid_draws = 0
+    invalid_rollouts: set[int] = set()
+    invalid_reasons: dict[str, int] = {}
     attempt = 0
 
     while remaining.size > 0:
@@ -966,7 +1020,15 @@ def _teacher_forced_native_batched_rollouts(
             n_samples=int(remaining.size),
             device=device,
         )
-        accepted = batch_times + 1e-8 >= float(window_start) if needs_bridge else np.ones(batch_times.shape[0], dtype=bool)
+        valid = np.ones(batch_times.shape[0], dtype=bool)
+        for local_pos, rollout_idx in enumerate(remaining):
+            reason = _native_event_validity(base_history, float(batch_times[local_pos]), batch_locs[local_pos])
+            if reason is not None:
+                valid[local_pos] = False
+                invalid_draws += 1
+                invalid_rollouts.add(int(rollout_idx))
+                invalid_reasons[reason] = invalid_reasons.get(reason, 0) + 1
+        accepted = valid & (batch_times + 1e-8 >= float(window_start) if needs_bridge else np.ones(batch_times.shape[0], dtype=bool))
         if needs_bridge:
             bridge_rejects += int((~accepted).sum())
         accepted_indices = remaining[accepted]
@@ -986,7 +1048,10 @@ def _teacher_forced_native_batched_rollouts(
         if not needs_bridge:
             remaining = np.zeros((0,), dtype=np.int64)
             break
-        remaining = remaining[~accepted]
+        # Invalid native draws terminate their rollout; only valid bridge
+        # rejections are redrawn.  This prevents a bad sample becoming a
+        # fabricated zero-wait event through append/casting.
+        remaining = remaining[(~accepted) & valid]
         attempt += 1
 
     bridge_exhausted_rollouts = int(remaining.size)
@@ -1007,6 +1072,11 @@ def _teacher_forced_native_batched_rollouts(
                 device=device,
             )
             bridge_rejects += int(extra_meta.get("bridge_rejects", 0))
+            invalid_draws += int(extra_meta.get("native_invalid_draws", 0))
+            if extra_meta.get("native_failed_rollout", False):
+                invalid_rollouts.add(int(rollout_idx))
+            for reason, count in extra_meta.get("native_invalid_reasons", {}).items():
+                invalid_reasons[reason] = invalid_reasons.get(reason, 0) + int(count)
             if extra_times.size > 0:
                 rollout_times[rollout_idx].extend(extra_times.astype(np.float32, copy=False).tolist())
                 rollout_locs[rollout_idx].extend(np.asarray(extra_locs, dtype=np.float32).reshape(-1, 2))
@@ -1021,6 +1091,9 @@ def _teacher_forced_native_batched_rollouts(
             "native_bridge_redraw_batches": int(native_bridge_redraw_batches),
             "native_serial_fallback_rollouts": int(native_serial_fallback_rollouts),
             "native_bridge_exhausted_rollouts": int(bridge_exhausted_rollouts),
+            "native_invalid_draws": int(invalid_draws),
+            "native_invalid_rollouts": int(len(invalid_rollouts)),
+            "native_invalid_reasons": invalid_reasons,
         },
     )
 
@@ -1350,6 +1423,9 @@ def evaluate_frame_rollouts(
     native_bridge_redraw_batches = 0
     native_serial_fallback_rollouts = 0
     native_bridge_exhausted_rollouts = 0
+    native_invalid_draws = 0
+    native_invalid_rollouts = 0
+    native_invalid_reasons: dict[str, int] = {}
 
     if batch_teacher_forced_native_first and not model_is_exact:
         batched_times, batched_locs, native_meta = _teacher_forced_native_batched_rollouts(
@@ -1372,6 +1448,9 @@ def evaluate_frame_rollouts(
         native_bridge_redraw_batches = int(native_meta.get("native_bridge_redraw_batches", 0))
         native_serial_fallback_rollouts = int(native_meta.get("native_serial_fallback_rollouts", 0))
         native_bridge_exhausted_rollouts = int(native_meta.get("native_bridge_exhausted_rollouts", 0))
+        native_invalid_draws = int(native_meta.get("native_invalid_draws", 0))
+        native_invalid_rollouts = int(native_meta.get("native_invalid_rollouts", 0))
+        native_invalid_reasons = dict(native_meta.get("native_invalid_reasons", {}))
     else:
         for rollout_idx, (hist, state_ctx, proposal_cache) in enumerate(
             zip(histories_for_rollout, states_for_rollout, proposal_caches_for_rollout),
@@ -1406,6 +1485,10 @@ def evaluate_frame_rollouts(
             proposal_cache_builds_total += int(rollout_meta.get("proposal_cache_builds", 0))
             proposal_cache_query_batches_total += int(rollout_meta.get("proposal_cache_query_batches", 0))
             proposal_cache_query_points_total += int(rollout_meta.get("proposal_cache_query_points", 0))
+            native_invalid_draws += int(rollout_meta.get("native_invalid_draws", 0))
+            native_invalid_rollouts += int(rollout_meta.get("native_invalid_rollouts", 0))
+            for reason, count in rollout_meta.get("native_invalid_reasons", {}).items():
+                native_invalid_reasons[reason] = native_invalid_reasons.get(reason, 0) + int(count)
             if "thinning_final_lambda_bar" in rollout_meta:
                 thinning_final_lambda_bar_values.append(float(rollout_meta["thinning_final_lambda_bar"]))
             if carry_updates:
@@ -1450,6 +1533,9 @@ def evaluate_frame_rollouts(
         "native_bridge_redraw_batches": int(native_bridge_redraw_batches),
         "native_serial_fallback_rollouts": int(native_serial_fallback_rollouts),
         "native_bridge_exhausted_rollouts": int(native_bridge_exhausted_rollouts),
+        "native_invalid_draws": int(native_invalid_draws),
+        "native_invalid_rollouts": int(native_invalid_rollouts),
+        "native_invalid_reasons": native_invalid_reasons,
         "elapsed_sec": elapsed_sec,
     }
     return meta, updated_histories, updated_states

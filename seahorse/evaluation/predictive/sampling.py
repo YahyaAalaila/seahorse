@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import warnings
+
 import numpy as np
 import torch
 
@@ -51,7 +53,7 @@ def _spatial_bounds_from_seqs(
 
 def _coerce_sequence_arrays(seq: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
     return (
-        np.asarray(seq["times"], dtype=np.float32),
+        np.asarray(seq["times"], dtype=np.float64),
         np.asarray(seq["locations"], dtype=np.float32),
     )
 
@@ -212,7 +214,7 @@ def _batched_native_next_events_for_sequence(
     else:
         return None
 
-    samples = out.get("samples")
+    samples = out if isinstance(out, torch.Tensor) else out.get("samples")
     if not isinstance(samples, torch.Tensor):
         return None
     flat = _flatten_sample_tensor(samples)
@@ -222,13 +224,14 @@ def _batched_native_next_events_for_sequence(
     flat_np = flat[:total_samples].detach().cpu().numpy()
     sample_dt = _denormalize_time_samples(runner, flat_np).reshape(n_contexts, int(k))
     sample_locs = _denormalize_spatial_samples(runner, flat_np).reshape(n_contexts, int(k), -1)
-    history_end_times = times[prefix_lengths - 1].astype(np.float32, copy=False)
-    next_times = (
-        history_end_times[:, None]
-        + np.maximum(sample_dt.astype(np.float32, copy=False), 0.0)
-    ).astype(np.float32, copy=False)
+    history_end_times = times[prefix_lengths - 1].astype(np.float64, copy=False)
+    next_times = history_end_times[:, None] + sample_dt.astype(np.float64, copy=False)
     next_locs = sample_locs.astype(np.float32, copy=False)
-    success = np.isfinite(next_times).all(axis=1) & np.isfinite(next_locs).all(axis=(1, 2))
+    success = (np.isfinite(next_times).all(axis=1)
+               & (next_times > history_end_times[:, None]).all(axis=1)
+               & np.isfinite(next_locs).all(axis=(1, 2)))
+    next_times[~success] = np.nan
+    next_locs[~success] = np.nan
     return next_times, next_locs, success
 
 
@@ -241,21 +244,45 @@ def compute_predictive_samples(
     seed: int = 0,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    spatial_bounds: tuple[float, float, float, float] | None = None,
+    initial_horizon: float | None = None,
+    min_history: int = 1,
 ) -> PredictiveSamples:
     """Compute K next-event samples for every held-out next-event context."""
+    from seahorse.evaluation.backends import is_statistical_runner
+    if is_statistical_runner(runner):
+        from seahorse.evaluation.statistical import compute_statistical_predictive_samples
+        return compute_statistical_predictive_samples(
+            runner, test_seqs, k=k, seed=seed, min_history=min_history,
+        )
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     preset = runner.config.model.preset
     caps = runner.model.event_model.capabilities
-    use_native = caps.has_native_sampler
+    factorized_sampler = preset in {"poisson_gmm", "hawkes_gmm", "selfcorrecting_gmm", "rmtpp_gmm", "thp_gmm"}
+    use_native = caps.has_native_sampler or factorized_sampler
     sampling_backend = (
         "native_next_event_sampler" if use_native else "exact_intensity_thinning"
     )
+    if factorized_sampler:
+        sampling_backend = "inverse_temporal_hazard_full_plane_gmm"
 
-    xmin, xmax, ymin, ymax = _spatial_bounds_from_seqs(test_seqs)
-    initial_horizon = _adaptive_initial_horizon(test_seqs)
+    if not use_native and (spatial_bounds is None or initial_horizon is None):
+        raise ValueError("Intensity sampling requires declared spatial_bounds and a train-derived initial_horizon; test data cannot set the proposal.")
+    if not use_native:
+        warnings.warn(
+            "exact_intensity_thinning is deprecated for predictive metrics: its proposal "
+            "bound is not guaranteed to dominate the intensity. Use the exact inverse-transform "
+            "samplers in seahorse.evaluation.v1 for compensator-based presets.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    xmin, xmax, ymin, ymax = spatial_bounds or (0., 1., 0., 1.)
+    initial_horizon = 1. if initial_horizon is None else float(initial_horizon)
+    if min_history < 1 or initial_horizon <= 0:
+        raise ValueError("min_history and initial_horizon must be positive.")
     loc_dim = 2
 
     all_next_times: list[np.ndarray] = []
@@ -277,7 +304,7 @@ def compute_predictive_samples(
             if locs.ndim == 2 and locs.shape[1] > 0:
                 loc_dim = int(locs.shape[1])
             native_batch = None
-            if use_native:
+            if use_native and min_history == 1:
                 native_batch = _batched_native_next_events_for_sequence(
                     runner,
                     preset=preset,
@@ -300,7 +327,7 @@ def compute_predictive_samples(
                     all_is_last_context.append(i == (n - 1))
                     all_sampling_succeeded.append(bool(batch_success[row]))
                 continue
-            for i in range(1, n):
+            for i in range(min_history, n):
                 history = {
                     "times": times[:i].copy(),
                     "locations": locs[:i].copy(),
@@ -310,7 +337,11 @@ def compute_predictive_samples(
                 hist_end_t = float(times[i - 1])
 
                 if use_native:
-                    if preset == "smash":
+                    if factorized_sampler:
+                        from seahorse.experiments.factorized_sampling import sample_factorized
+                        sampled = sample_factorized(runner, history, k, device=device, seed=seed + seq_i * 1000003 + i)
+                        s_t, s_s = sampled["next_times"], sampled["next_locations"]
+                    elif preset == "smash":
                         s_t, s_s = sample_next_events_smash_batch(
                             runner, history, k, device
                         )
@@ -320,6 +351,7 @@ def compute_predictive_samples(
                         )
                     sampling_succeeded = bool(
                         np.isfinite(s_t).all() and np.isfinite(s_s).all()
+                        and (np.asarray(s_t) > hist_end_t).all()
                     )
                 else:
                     s_t, s_s, success_mask = _thinning_next_events_adaptive_batch(
@@ -353,17 +385,17 @@ def compute_predictive_samples(
                 all_sampling_succeeded.append(sampling_succeeded)
 
     if all_next_times:
-        next_times = np.stack(all_next_times, axis=0).astype(np.float32, copy=False)
+        next_times = np.stack(all_next_times, axis=0).astype(np.float64, copy=False)
         next_locs = np.stack(all_next_locs, axis=0).astype(np.float32, copy=False)
     else:
-        next_times = np.zeros((0, int(k)), dtype=np.float32)
+        next_times = np.zeros((0, int(k)), dtype=np.float64)
         next_locs = np.zeros((0, int(k), loc_dim), dtype=np.float32)
     return PredictiveSamples(
         next_times=next_times,
         next_locs=next_locs,
-        true_next_times=np.asarray(all_true_next_t, dtype=np.float32),
+        true_next_times=np.asarray(all_true_next_t, dtype=np.float64),
         true_next_locs=np.asarray(all_true_next_s, dtype=np.float32),
-        history_end_times=np.asarray(all_hist_end_t, dtype=np.float32),
+        history_end_times=np.asarray(all_hist_end_t, dtype=np.float64),
         sequence_index=np.asarray(all_seq_idx, dtype=np.int64),
         target_event_index=np.asarray(all_target_event_idx, dtype=np.int64),
         history_length=np.asarray(all_history_length, dtype=np.int64),

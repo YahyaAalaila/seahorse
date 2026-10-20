@@ -15,8 +15,9 @@ from typing import Any
 import numpy as np
 
 from seahorse.evaluation.profiles import PREDICTIVE_SAMPLES
+from seahorse.evaluation.backends import evaluation_capabilities
 
-PREDICTIVE_SAMPLES_SCHEMA_VERSION = 2
+PREDICTIVE_SAMPLES_SCHEMA_VERSION = 3
 ARTIFACT_MANIFEST_FILENAME = "manifest.json"
 PREDICTIVE_SAMPLES_PAYLOAD_FILENAME = "predictive_samples.npz"
 
@@ -27,11 +28,12 @@ class PredictiveSamples:
 
     Arrays are in raw coordinates.
 
-    next_times:          (N_contexts, K) float32 sampled next-event absolute times.
-    next_locs:           (N_contexts, K, d) float32 sampled next-event locations.
-    true_next_times:     (N_contexts,) float32 ground-truth next-event times.
-    true_next_locs:      (N_contexts, d) float32 ground-truth next-event locations.
-    history_end_times:   (N_contexts,) float32 conditioning-history end times.
+    next_times:          (N_contexts, K) sampled next-event absolute times.
+    next_locs:           (N_contexts, K, d) sampled next-event locations.
+    true_next_times:     (N_contexts,) ground-truth next-event times.
+    true_next_locs:      (N_contexts, d) ground-truth next-event locations.
+    history_end_times:   (N_contexts,) conditioning-history end times.
+    Floating arrays retain the backend's precision, including when cached.
     sequence_index:      (N_contexts,) int64 source sequence index per context.
     target_event_index:  (N_contexts,) int64 target-event index within the source sequence.
     history_length:      (N_contexts,) int64 number of events in the conditioning prefix.
@@ -141,10 +143,12 @@ def build_predictive_samples_key(
     device: str,
     exact_time_bins: int = 8,
     exact_spatial_bins: int = 8,
+    spatial_bounds: tuple[float, float, float, float] | None = None,
+    initial_horizon: float | None = None,
 ) -> ArtifactKey:
     run_dir = getattr(runner, "_run_dir", None)
     run_dir = None if run_dir is None else Path(run_dir).resolve()
-    caps = runner.model.event_model.capabilities
+    caps = evaluation_capabilities(runner)
     preset = getattr(getattr(runner, "config", None), "model", None)
     preset_id = None if preset is None else getattr(preset, "preset", None)
     metadata: dict[str, Any] = {
@@ -154,7 +158,7 @@ def build_predictive_samples_key(
         "conditioning_protocol": "teacher_forced_test_prefixes",
         "target_protocol": "immediate_next_observed_event",
         "context_selection": "all_valid_nonempty_test_prefixes",
-        "spatial_proposal_bounds": "test_sequence_bounds_pad_0.08",
+        "spatial_proposal_bounds": None if spatial_bounds is None else list(spatial_bounds),
         "run_dir": None if run_dir is None else str(run_dir),
         "run_id": None if run_dir is None else run_dir.name,
         "run_files": _run_file_fingerprints(run_dir),
@@ -171,7 +175,8 @@ def build_predictive_samples_key(
             "proposal_mode": "coarse",
             "proposal_time_bins": int(exact_time_bins),
             "proposal_spatial_bins": int(exact_spatial_bins),
-            "initial_time_window_policy": "max(4*median_inter_event_time,1e-3)",
+            "initial_time_window_policy": "explicit_or_training_data",
+            "initial_horizon": initial_horizon,
             "window_expansion_factor": 2.0,
             "max_window_expansions": 8,
         },
@@ -217,11 +222,16 @@ def _sequence_fingerprint(seqs: list[dict[str, np.ndarray]]) -> dict[str, Any]:
     h = hashlib.sha256()
     lengths: list[int] = []
     for seq in seqs:
-        times = np.asarray(seq["times"], dtype=np.float32)
-        locs = np.asarray(seq["locations"], dtype=np.float32)
+        times = np.asarray(seq["times"], dtype=np.float64)
+        locs = np.asarray(seq["locations"], dtype=np.float64)
         lengths.append(int(times.shape[0]))
         _hash_array(h, times)
         _hash_array(h, locs)
+        if seq.get("marks") is not None:
+            _hash_array(h, np.asarray(seq["marks"], dtype=np.int64))
+        for field in ("t0", "window_start", "calendar_window_start", "time_unit", "time_axis", "source_timezone"):
+            if field in seq:
+                h.update(_canonical_json({field: seq[field]}).encode("utf-8"))
     return {
         "n_sequences": int(len(seqs)),
         "n_events": int(sum(lengths)),

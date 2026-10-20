@@ -109,10 +109,11 @@ class TestEvaluateCLI(unittest.TestCase):
             with open(out_dir / "metrics.json") as f:
                 metrics = json.load(f)
             coherence = metrics["rollout_coherence"]
-            curve = coherence["curve"]
-            self.assertTrue(coherence["available"])
-            self.assertEqual(set(curve), {"1", "5", "10", "n_h_1", "n_h_5", "n_h_10"})
-            self.assertEqual(coherence["value"], curve["10"])
+            # Native diffusion may draw a nonpositive/collapsed wait.  That is
+            # a failed short rollout, never a fabricated zero-wait event.
+            self.assertFalse(coherence["available"])
+            self.assertIsNone(coherence["value"])
+            self.assertEqual(coherence["reason"], "no valid h=10 sequences")
             self.assertIn("ar_temporal_crps_h1", metrics)
             self.assertIn("ar_spatial_energy_score_h1", metrics)
 

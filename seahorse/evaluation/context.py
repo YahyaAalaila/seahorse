@@ -297,6 +297,7 @@ class EvalContext:
             device=str(self.device),
             exact_time_bins=self.exact_time_bins,
             exact_spatial_bins=self.exact_spatial_bins,
+            **self._predictive_sampling_options(),
         )
         loaded = load_predictive_samples_artifact(self.artifact_dir, key)
         if loaded is not None:
@@ -322,6 +323,17 @@ class EvalContext:
         }
         return samples
 
+    def _predictive_sampling_options(self) -> dict:
+        from .predictive.sampling import _adaptive_initial_horizon
+        proposal = {}
+        if self.grid_spec.get("x_range") is not None and self.grid_spec.get("y_range") is not None:
+            proposal["spatial_bounds"] = tuple(self.grid_spec["x_range"]) + tuple(self.grid_spec["y_range"])
+        if self.train_data:
+            proposal["initial_horizon"] = _adaptive_initial_horizon(self.train_data)
+        if self.grid_spec.get("initial_horizon") is not None:
+            proposal["initial_horizon"] = float(self.grid_spec["initial_horizon"])
+        return proposal
+
     def _compute_predictive_samples(self, *, memory_only: bool) -> PredictiveSamples:
         from .predictive.sampling import compute_predictive_samples
 
@@ -333,6 +345,7 @@ class EvalContext:
             seed=self.seed,
             exact_time_bins=self.exact_time_bins,
             exact_spatial_bins=self.exact_spatial_bins,
+            **self._predictive_sampling_options(),
         )
         if memory_only:
             self.artifact_events[PREDICTIVE_SAMPLES] = {
