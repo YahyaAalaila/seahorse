@@ -598,7 +598,7 @@ def _load_metric_sequences(
     max_events: int | None,
     seq_shard: tuple[int, int] | None = None,
     load_jsonl,
-) -> list[dict[str, np.ndarray]]:
+) -> list[dict[str, Any]]:
     if not path.exists():
         raise SystemExit(f"Evaluation data JSONL not found: {path}")
     seqs = load_jsonl(path)
@@ -612,15 +612,88 @@ def _load_metric_sequences(
                 f"--seq-shard {start}:{end} produced an empty sequence list "
                 f"(file has {len(load_jsonl(path))} sequences after max_seqs cap)."
             )
-    out: list[dict[str, np.ndarray]] = []
+    out: list[dict[str, Any]] = []
     for seq in seqs:
-        times = np.asarray(seq["times"], dtype=np.float32)
+        # Preserve float64 source precision until the canonical loader/model path
+        # performs its documented strict-order float32 repair.
+        times = np.asarray(seq["times"], dtype=np.float64)
         locs = np.asarray(seq["locations"], dtype=np.float32)
+        original_n_events = int(times.shape[0])
+        retained_n_events = original_n_events
         if max_events is not None and times.shape[0] > int(max_events):
-            times = times[: int(max_events)]
-            locs = locs[: int(max_events)]
-        out.append({"times": times, "locations": locs})
+            retained_n_events = int(max_events)
+            times = times[:retained_n_events]
+            locs = locs[:retained_n_events]
+
+        # Do not rebuild a two-field sequence here: that formerly dropped marks
+        # (and all provenance) from post-fit evaluation.  Event-aligned payloads
+        # are sliced with a capped prefix, while observation bounds stay raw
+        # metadata and are explicitly marked as no longer a complete exposure.
+        loaded = dict(seq)
+        loaded["times"] = times
+        loaded["locations"] = locs
+        if retained_n_events != original_n_events:
+            if isinstance(loaded.get("observation_metadata"), dict):
+                loaded["observation_metadata"] = _slice_event_aligned(
+                    loaded["observation_metadata"], original_n_events, retained_n_events
+                )
+            for key in ("marks", "event_covariates", "field_covariates", "event_ids"):
+                if key in loaded:
+                    loaded[key] = _slice_event_aligned(
+                        loaded[key], original_n_events, retained_n_events
+                    )
+            if "event_metadata" in loaded:
+                loaded["event_metadata"] = _slice_event_aligned(
+                    loaded["event_metadata"], original_n_events, retained_n_events
+                )
+
+        metadata = _observation_metadata_for_metric_sequence(loaded)
+        if retained_n_events != original_n_events:
+            metadata["event_truncation"] = {
+                "applied": True,
+                "original_event_count": original_n_events,
+                "retained_event_count": retained_n_events,
+                "max_events": int(max_events),
+                "original_observation_window_is_not_complete_for_loaded_prefix": True,
+            }
+        else:
+            metadata.setdefault("event_truncation", {"applied": False})
+        loaded["observation_metadata"] = metadata
+        out.append(loaded)
     return out
+
+
+def _slice_event_aligned(value: Any, original_n_events: int, retained_n_events: int) -> Any:
+    """Slice event-axis payloads while leaving scalar provenance untouched."""
+    if isinstance(value, np.ndarray):
+        return value[:retained_n_events].copy() if value.ndim and value.shape[0] == original_n_events else value
+    if isinstance(value, list):
+        return value[:retained_n_events] if len(value) == original_n_events else [
+            _slice_event_aligned(v, original_n_events, retained_n_events) for v in value
+        ]
+    if isinstance(value, tuple):
+        return value[:retained_n_events] if len(value) == original_n_events else tuple(
+            _slice_event_aligned(v, original_n_events, retained_n_events) for v in value
+        )
+    if isinstance(value, dict):
+        return {
+            key: _slice_event_aligned(item, original_n_events, retained_n_events)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _observation_metadata_for_metric_sequence(sequence: dict[str, Any]) -> dict[str, Any]:
+    """Keep source/window provenance CPU-side for post-fit metric code.
+
+    Existing metrics still consume event arrays only.  In particular, raw
+    ``t0``/``t1`` are not silently converted into model-coordinate bounds.
+    """
+    # Keep this import lazy: command help and non-metric CLI modes do not need
+    # torch/dataset imports.  Dataset and CLI now share exactly one convention.
+    from seahorse.data.dataset import observation_metadata_from_sequence
+
+    return observation_metadata_from_sequence(sequence)
 
 
 def _default_metrics_out_dir(

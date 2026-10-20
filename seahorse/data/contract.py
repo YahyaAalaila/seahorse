@@ -18,6 +18,8 @@ Optional (present in dict but may be None)
   event_covariates  (B, N, p)   float32 — per-event covariate features
   field_covariates  (B, N, r)   float32 — field covariates pre-evaluated at events
   coordinate_space  scalar str  — semantic coordinate space of times/locations
+  observation_metadata list[dict] — CPU-side per-item source/window provenance;
+                                   bounds remain in raw sequence coordinates
 
 Invariants checked by `validate_batch`
 ---------------------------------------
@@ -41,7 +43,7 @@ from torch import Tensor
 # ---------------------------------------------------------------------------
 
 REQUIRED_FIELDS = ("times", "locations", "lengths", "pad_mask", "txys")
-OPTIONAL_FIELDS = ("marks", "event_covariates", "field_covariates")
+OPTIONAL_FIELDS = ("marks", "event_covariates", "field_covariates", "observation_metadata")
 
 _REQUIRED_DTYPES: Dict[str, torch.dtype] = {
     "times":     torch.float32,
@@ -222,6 +224,18 @@ def validate_batch(batch: Dict[str, Any]) -> None:
         raise TypeError(
             f"validate_batch: 'coordinate_space' must be a str or None, got {type(coordinate_space).__name__}."
         )
+
+    observation_metadata = batch.get("observation_metadata")
+    if observation_metadata is not None:
+        if not isinstance(observation_metadata, list) or len(observation_metadata) != B:
+            raise ValueError(
+                "validate_batch: 'observation_metadata' must be a list aligned with "
+                f"the batch (expected length {B})."
+            )
+        if not all(isinstance(metadata, dict) for metadata in observation_metadata):
+            raise TypeError(
+                "validate_batch: every 'observation_metadata' entry must be a dict."
+            )
 
     if batch.get("marks") is not None:
         m = batch["marks"]

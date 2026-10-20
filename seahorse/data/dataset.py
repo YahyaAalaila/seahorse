@@ -10,6 +10,68 @@ from typing import List, Dict, Optional
 import numpy as np
 
 
+# These fields describe a recorded observation, rather than a model input.  They
+# intentionally remain Python objects in ``observation_metadata`` so collating a
+# batch never moves identifiers, source records, or observation bounds to a GPU.
+_OBSERVATION_METADATA_KEYS = (
+    "sequence_id",
+    "stream_id",
+    "window_start",
+    "window_end",
+    "time_axis",
+    "source_timezone",
+    "time_unit",
+    "t0",
+    "t1",
+)
+_TRACEABILITY_METADATA_KEYS = ("event_ids", "event_metadata")
+
+
+def observation_metadata_from_sequence(sequence: Dict) -> dict:
+    """Return CPU-side observation/provenance metadata for one raw sequence.
+
+    ``times`` passed to a model may be normalized or window-reencoded.  Bounds
+    here deliberately retain their raw JSONL-sequence coordinate convention and
+    must therefore not be treated as model-ready likelihood bounds.
+    """
+    existing = sequence.get("observation_metadata")
+    metadata = dict(existing) if isinstance(existing, dict) else {}
+    for key in (*_OBSERVATION_METADATA_KEYS, *_TRACEABILITY_METADATA_KEYS):
+        if key in sequence:
+            metadata[key] = sequence[key]
+    metadata.setdefault("event_time_coordinate", "raw_sequence_coordinates")
+    metadata.setdefault("observation_bounds_coordinate", "raw_sequence_coordinates")
+    # No current model path accepts these per-sequence bounds.
+    metadata["model_input_bounds_available"] = False
+    return metadata
+
+
+def _slice_event_trace(value, *, start: int, end: int, parent_n_events: int):
+    """Slice an event-aligned trace without mistaking scalar provenance for it."""
+    if isinstance(value, np.ndarray):
+        return value[start:end].copy() if value.ndim and value.shape[0] == parent_n_events else value
+    if isinstance(value, list):
+        if len(value) == parent_n_events:
+            return value[start:end]
+        return [
+            _slice_event_trace(item, start=start, end=end, parent_n_events=parent_n_events)
+            for item in value
+        ]
+    if isinstance(value, tuple):
+        if len(value) == parent_n_events:
+            return value[start:end]
+        return tuple(
+            _slice_event_trace(item, start=start, end=end, parent_n_events=parent_n_events)
+            for item in value
+        )
+    if isinstance(value, dict):
+        return {
+            key: _slice_event_trace(item, start=start, end=end, parent_n_events=parent_n_events)
+            for key, item in value.items()
+        }
+    return value
+
+
 def _strict_float32_times(times, *, context: str) -> np.ndarray:
     """Return float32 event times that remain strictly increasing.
 
@@ -87,8 +149,30 @@ class STPPDataset(Dataset):
                       to keep normalisation consistent across splits.
             cov_std:  matching std array (same contract as cov_mean)
         """
-        # Filter short sequences
-        self.sequences = [s for s in sequences if len(s["times"]) >= min_length]
+        self.min_length = int(min_length)
+        if self.min_length < 0:
+            raise ValueError(f"min_length must be non-negative, got {min_length!r}.")
+        # Keep raw records inspectable even when the existing training semantics
+        # exclude them.  Empty/short calendar windows are not silently erased from
+        # provenance, but they still do not enter current point-process training.
+        self.raw_sequences = list(sequences)
+        self.removed_by_min_length = [
+            s for s in self.raw_sequences if len(s["times"]) < self.min_length
+        ]
+        self.sequences = [
+            s for s in self.raw_sequences if len(s["times"]) >= self.min_length
+        ]
+        self.n_input_sequences = len(self.raw_sequences)
+        self.n_retained_sequences = len(self.sequences)
+        self.n_removed_by_min_length = len(self.removed_by_min_length)
+        self.n_empty_sequences = sum(len(s["times"]) == 0 for s in self.raw_sequences)
+        self.sequence_filter_counts = {
+            "input": self.n_input_sequences,
+            "retained": self.n_retained_sequences,
+            "removed_by_min_length": self.n_removed_by_min_length,
+            "empty_input": self.n_empty_sequences,
+            "min_length": self.min_length,
+        }
 
         self.normalize_time = normalize_time
         self.normalize_space = normalize_space
@@ -209,6 +293,7 @@ class STPPDataset(Dataset):
             "locations": torch.tensor(locs, dtype=torch.float32),
             "length": len(times),
             "coordinate_space": self.coordinate_space,
+            "observation_metadata": observation_metadata_from_sequence(seq),
         }
 
         if "event_covariates" in seq and seq["event_covariates"] is not None:
@@ -261,6 +346,11 @@ class SlidingWindowSTPPDataset(Dataset):
         self.cov_mean = None
         self.cov_std = None
 
+        self.raw_sequences = list(sequences)
+        self.n_input_sequences = len(self.raw_sequences)
+        self.n_empty_sequences = sum(len(s["times"]) == 0 for s in self.raw_sequences)
+        self.removed_by_window_length: list[Dict] = []
+
         self.stat_sequences = [
             {
                 "times": np.asarray(seq["times"], dtype=np.float32).copy(),
@@ -278,7 +368,7 @@ class SlidingWindowSTPPDataset(Dataset):
         self.loc_std = np.ones(spatial_dim, dtype=np.float32)
 
         self.sequences: list[Dict] = []
-        for seq_idx, seq in enumerate(sequences):
+        for seq_idx, seq in enumerate(self.raw_sequences):
             times = _strict_float32_times(
                 seq["times"],
                 context=f"SlidingWindowSTPPDataset[source_sequence_index={seq_idx}]",
@@ -286,6 +376,7 @@ class SlidingWindowSTPPDataset(Dataset):
             locs = np.asarray(seq["locations"], dtype=np.float32)
             n_events = int(times.shape[0])
             if n_events < self.window_length:
+                self.removed_by_window_length.append(seq)
                 continue
 
             delta_t = np.zeros(n_events, dtype=np.float32)
@@ -295,18 +386,45 @@ class SlidingWindowSTPPDataset(Dataset):
 
             for start in range(0, n_events - self.window_length + 1):
                 end = start + self.window_length
+                trace_metadata = observation_metadata_from_sequence(seq)
+                for key in _TRACEABILITY_METADATA_KEYS:
+                    if key in trace_metadata:
+                        trace_metadata[key] = _slice_event_trace(
+                            trace_metadata[key],
+                            start=start,
+                            end=end,
+                            parent_n_events=n_events,
+                        )
                 window = {
                     "times": np.cumsum(delta_t[start:end]).astype(np.float32, copy=False),
                     "locations": locs[start:end].astype(np.float32, copy=True),
                     "source_sequence_index": seq_idx,
                     "target_event_index": start + self.lookback,
                     "history_length": self.lookback,
+                    # The parent calendar/exposure interval remains provenance.
+                    # A fixed-event window is not asserted to be that interval.
+                    "observation_metadata": {
+                        **trace_metadata,
+                        "parent_source_sequence_index": seq_idx,
+                        "parent_window_event_start_index": start,
+                        "parent_window_event_end_index_exclusive": end,
+                        "window_is_not_parent_observation_exposure": True,
+                    },
                 }
                 for key in ("event_covariates", "field_covariates", "marks"):
                     value = seq.get(key)
                     if value is not None:
                         window[key] = np.asarray(value)[start:end].copy()
                 self.sequences.append(window)
+        self.n_retained_sequences = len(self.sequences)
+        self.n_removed_by_window_length = len(self.removed_by_window_length)
+        self.sequence_filter_counts = {
+            "input": self.n_input_sequences,
+            "generated_windows": self.n_retained_sequences,
+            "removed_by_window_length": self.n_removed_by_window_length,
+            "empty_input": self.n_empty_sequences,
+            "window_length": self.window_length,
+        }
 
     def __len__(self):
         return len(self.sequences)
@@ -325,6 +443,7 @@ class SlidingWindowSTPPDataset(Dataset):
             "locations": torch.tensor(seq["locations"], dtype=torch.float32),
             "length": len(seq["times"]),
             "coordinate_space": self.coordinate_space,
+            "observation_metadata": observation_metadata_from_sequence(seq),
         }
         if "event_covariates" in seq and seq["event_covariates"] is not None:
             item["event_covariates"] = torch.tensor(
@@ -468,6 +587,9 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Tensor]:
         "pad_mask": pad_mask,
         "txys": txys,
         "coordinate_space": coordinate_space,
+        "observation_metadata": [
+            observation_metadata_from_sequence(item) for item in batch
+        ],
         "event_covariates": event_covariates,
         "field_covariates": field_covariates,
         "marks": marks_out,
