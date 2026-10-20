@@ -1,0 +1,2 @@
+# Pinned worker torch build for the frozen campaign (CUDA 12.8 index).
+torch==2.8.0

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import argparse
 
-from seahorse.cli import fit, tune, evaluate, bench
+from seahorse.cli import fit, tune, evaluate, bench, campaign
 
 
 def main():
@@ -28,12 +28,14 @@ def main():
     tune.add_subparser(sub)
     evaluate.add_subparser(sub)
     bench.add_subparser(sub)
+    campaign.add_subparser(sub)
     args = parser.parse_args()
     {
         "fit":      fit.execute,
         "tune":     tune.execute,
         "evaluate": evaluate.execute,
         "bench":    bench.execute,
+        "campaign": campaign.execute,
     }[args.command](args)
 
 

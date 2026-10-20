@@ -204,6 +204,9 @@ class TrainingConfig(BaseModel):
     weight_decay: float = 1e-5
     grad_clip: float = 5.0
     n_epochs: int = 50
+    max_steps: int = -1
+    max_time_seconds: Optional[int] = None
+    val_check_interval_steps: Optional[int] = None
     batch_size: int = 64
     patience: Optional[int] = None
     """Early stopping patience (epochs). ``None`` disables early stopping."""
@@ -373,6 +376,7 @@ class TrainingConfig(BaseModel):
 
         trainer_kwargs = dict(
             max_epochs=self.n_epochs,
+            max_steps=self.max_steps,
             accelerator=accelerator,
             callbacks=callbacks,
             logger=loggers,
@@ -390,6 +394,15 @@ class TrainingConfig(BaseModel):
             trainer_kwargs["precision"] = self.precision
         if self.num_nodes != 1:
             trainer_kwargs["num_nodes"] = self.num_nodes
+        if self.max_time_seconds is not None:
+            if self.max_time_seconds <= 0:
+                raise ValueError("max_time_seconds must be positive.")
+            trainer_kwargs["max_time"] = {"seconds": self.max_time_seconds}
+        if self.val_check_interval_steps is not None:
+            if self.val_check_interval_steps <= 0:
+                raise ValueError("val_check_interval_steps must be positive.")
+            trainer_kwargs["val_check_interval"] = self.val_check_interval_steps
+            trainer_kwargs["check_val_every_n_epoch"] = None
         return pl.Trainer(**trainer_kwargs)
 
 class LoggingConfig(BaseModel):

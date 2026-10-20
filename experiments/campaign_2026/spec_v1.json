@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "campaign_id": "seahorse_iclr2027_v1",
+  "coordinate_artifact": "campaign_inputs/COORDINATE_TRANSFORMS_V2.json",
+  "seeds": [
+    11,
+    22,
+    33
+  ],
+  "protocol": {
+    "history_events": 20,
+    "loss_target_scope": "last",
+    "time_origin": "first_history_event",
+    "sequence_boundary": "carry_history_across_contiguous_observed_calendar_windows_including_empty_days; reset_at_true_gaps_and_split_boundaries",
+    "main_task": "next observed event conditional on exactly twenty observed history events",
+    "observation_model": "recorded coordinates; named jitter approximation for tied timestamps; no claim of exact latent event times",
+    "marks": "unmarked main comparison, original mark indices retained in provenance",
+    "coordinate_measure": "source time units times longitude-degree times latitude-degree; affine Jacobians restored once",
+    "validation_targets": 2048,
+    "validation_target_seed": 20260910,
+    "test_nll_targets": "all_eligible",
+    "predictive_targets": 256,
+    "predictive_target_seed": 20260911,
+    "predictive_samples": 64,
+    "predictive_metrics": [
+      "temporal_crps",
+      "spatial_energy_score",
+      "temporal_pit",
+      "temporal_mae",
+      "spatial_mae"
+    ],
+    "uncertainty": "paired seeds and circular moving blocks of seven observed calendar source records; synthetic independent windows use one-record blocks; dependence limitations reported",
+    "bootstrap_replicates": 2000,
+    "failure_policy": "retain every planned cell; nonfinite/failed targets invalidate aggregate NLL and remain in failure ledger; never select test-best checkpoint",
+    "bootstrap_block_records": 7,
+    "numerical_validation": {
+      "targets": 32,
+      "batch_size": 4,
+      "seed": 20260912,
+      "absolute_tolerance": 0.001,
+      "relative_tolerance": 0.01,
+      "acceptance": "every checked validation target passes default-vs-refined NLL; no test-based refinement selection"
+    }
+  },
+  "hpo": {
+    "seed": 20260910,
+    "lr_multipliers": [
+      1.0,
+      0.3,
+      3.0
+    ],
+    "max_seconds": 600,
+    "max_steps": 5000,
+    "selection": "minimum finite validation objective within family; trial0 wins ties; all trials must be attempted"
+  },
+  "fit": {
+    "max_seconds": 1800,
+    "max_steps": 20000,
+    "n_epochs": 100,
+    "patience": 16,
+    "validation_interval_steps": 32,
+    "batch_size": 64,
+    "checkpoint": "validation_best",
+    "precision": "32-true",
+    "validation_policy_rationale": "A common 2048-target validation sample and 32-step cadence limit validation cost and permit early checkpoints within the fixed time budget. The subset is chosen once independently of model and seed."
+  },
+  "compute": {
+    "host": "unicorn",
+    "gpu": "shared NVIDIA H100 PCIe",
+    "max_concurrent_gpu_jobs": 1,
+    "max_gpu_hours": 240,
+    "minimum_free_gpu_gib": 24,
+    "cpu_threads_per_job": 4,
+    "evaluation_max_seconds": 7200,
+    "stop_before_utc": "2026-09-24T18:00:00+00:00",
+    "on_budget_exhaustion": "stop launching; retain unrun cells; do not silently prune matrix",
+    "auxiliary_cpu_process_hours": 48
+  },
+  "datasets": [
+    {
+      "id": "comcat_california",
+      "route": "prepared:comcat_california:native",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "geonet_nz",
+      "route": "prepared:geonet_nz:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "citibike_nyc",
+      "route": "prepared:citibike_nyc:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 168
+    },
+    {
+      "id": "uber_nyc",
+      "route": "prepared:uber_nyc:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 168
+    },
+    {
+      "id": "austin311",
+      "route": "prepared:austin311:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "chicago_crime",
+      "route": "prepared:chicago_crime:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "la_crime",
+      "route": "prepared:la_crime:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "nyc311",
+      "route": "prepared:nyc311:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "nyc_collisions",
+      "route": "prepared:nyc_collisions:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "seattle_fire911",
+      "route": "prepared:seattle_fire911:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    }
+  ],
+  "models": [
+    {
+      "id": "auto_stpp",
+      "preset": "auto_stpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "AutoSTPP"
+    },
+    {
+      "id": "deep_stpp",
+      "preset": "deep_stpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "DeepSTPP"
+    },
+    {
+      "id": "nsmpp",
+      "preset": "nsmpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "quadrature",
+      "label": "NSMPP (corrected compensator)"
+    },
+    {
+      "id": "njsde",
+      "preset": "njsde",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + conditional GMM"
+    },
+    {
+      "id": "thp_gmm",
+      "preset": "thp_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "quadrature",
+      "label": "THP + shared spatial GMM (extension)",
+      "training_integrator": "monte_carlo"
+    },
+    {
+      "id": "rmtpp_gmm",
+      "preset": "rmtpp_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "RMTPP + shared spatial GMM (extension)"
+    },
+    {
+      "id": "poisson_gmm",
+      "preset": "poisson_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Poisson + shared spatial GMM"
+    },
+    {
+      "id": "hawkes_gmm",
+      "preset": "hawkes_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Hawkes + shared spatial GMM"
+    },
+    {
+      "id": "dnsk",
+      "preset": "dnsk",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "quadrature",
+      "label": "DNSK+Barrier (independent implementation)",
+      "required_checks": [
+        "positive_intensity",
+        "quadrature_refinement"
+      ]
+    },
+    {
+      "id": "neural_jumpcnf",
+      "preset": "neural_jumpcnf",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + JumpCNF"
+    },
+    {
+      "id": "neural_attncnf",
+      "preset": "neural_attncnf",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + attention CNF"
+    },
+    {
+      "id": "selfcorrecting_gmm",
+      "preset": "selfcorrecting_gmm",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Self-correcting + shared spatial GMM"
+    },
+    {
+      "id": "gaussian_poisson",
+      "preset": "gaussian_poisson",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Independent Gaussian Poisson"
+    },
+    {
+      "id": "static_hawkes",
+      "preset": "static_hawkes",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Static Gaussian Hawkes"
+    },
+    {
+      "id": "diffusion_stpp",
+      "preset": "diffusion_stpp",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "bound",
+      "label": "DSTPP (sampling metrics; bound reported separately)"
+    },
+    {
+      "id": "smash",
+      "preset": "smash",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "surrogate",
+      "label": "SMASH (sampling metrics)"
+    },
+    {
+      "id": "glide_causal",
+      "preset": "glide",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "none",
+      "label": "GLIDE (independent causal variant; sampling metrics)"
+    }
+  ],
+  "additional_tracks": {
+    "native_counts": {
+      "datasets": "all eleven recommended native datasets including FPA California",
+      "models": [
+        "constant_calendar_poisson",
+        "seasonal_calendar_poisson",
+        "spatial_cell_poisson_if_rectangle_declared"
+      ],
+      "include_empty_bins": true,
+      "likelihood": "discrete_count_only"
+    },
+    "author_fixed_window": {
+      "models": [
+        "tritpp_spatial",
+        "wsm_survival",
+        "wsm_same_backbone_mle"
+      ],
+      "datasets": [
+        "comcat_california",
+        "geonet_nz",
+        "austin311",
+        "chicago_crime",
+        "la_crime",
+        "nyc_collisions",
+        "seattle_fire911"
+      ],
+      "likelihood": "separate_fixed_horizon_with_survival_and_empty_windows",
+      "required_checks": [
+        "author_pin",
+        "checkpoint_reload",
+        "finite_domain",
+        "zero_event_windows"
+      ]
+    },
+    "earthquake_reference": {
+      "model": "author_etas",
+      "dataset": "comcat_california",
+      "required_checks": [
+        "author_environment",
+        "RELM_CSEP_polygon",
+        "magnitude_completeness",
+        "1971_1980_auxiliary_history"
+      ]
+    },
+    "non_hawkes_synthetic": {
+      "families": [
+        "homogeneous_poisson",
+        "moving_seasonal_poisson",
+        "gamma_renewal"
+      ],
+      "rate": 80,
+      "horizon": 1,
+      "split_windows": [
+        512,
+        128,
+        128
+      ],
+      "generator_seed": 20260910,
+      "include_empty_windows": true
+    },
+    "sensitivity": {
+      "history_events": [
+        64,
+        128
+      ],
+      "cohorts": [
+        "comcat_california",
+        "chicago_crime",
+        "nyc_collisions"
+      ],
+      "jitter_replicates": [
+        20260911,
+        20260912
+      ],
+      "status": "recipes_only_unmaterialized_jitter_views_not_executable"
+    }
+  },
+  "excluded_pending": [
+    {
+      "id": "gtd",
+      "reason": "No authorized accessible source; source acquisition blocked."
+    },
+    {
+      "id": "foursquare_nyc_tokyo",
+      "reason": "Integrated reserve datasets; unexplained shared collection gaps prevent calendar exposure claims."
+    },
+    {
+      "id": "fpa_us_scale",
+      "reason": "Integrated scale companion overlaps California and is not an independent dataset."
+    },
+    {
+      "id": "dmpp_dkmpp",
+      "reason": "Required forecast-available context field is not available in prepared corpus."
+    },
+    {
+      "id": "official_glide_replication",
+      "reason": "Independent causal variant integrated; pinned author feature/target alignment needs a separate protocol audit."
+    },
+    {
+      "id": "other_unpublished_models",
+      "reason": "Unpublished in-house methods are outside this campaign."
+    }
+  ],
+  "auxiliary_manifest": "campaign_inputs/auxiliary_v2/auxiliary_manifest.json",
+  "data_audit": "campaign_inputs/CONTINUOUS_CONTEXT_PREFLIGHT.json"
+}

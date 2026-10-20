@@ -1,0 +1,111 @@
+{
+  "kind": "etas",
+  "estimator": "author_etas_em",
+  "execution_gate": "blocked_author_score_contract",
+  "execution_gate_reason": "The pinned author's Lambda() evaluates the pre-test triggering primitive at the first test event, not the test-window start, and omits terminal survival. The current fit cutoff also merges the native training and validation periods. Resolve and regression-test the score and fitting contract before ETAS paper execution.",
+  "authorcheckout": "third_party/etas_author_097f08b",
+  "author_commit": "097f08b69a4f06f9c38d14799dedfbd4543144e3",
+  "catalog_csv": "campaign_inputs/earthquakenpp_comcat_california_native/etas_author_v1/comcat_relm_csep_mc2p5_1971_20200117.csv",
+  "catalog_sha256": "67e57a60f7c53f801df31c8ad0acb0098ab02a1c48b1442397bb31e5fbf6ccaf",
+  "catalog_manifest": "campaign_inputs/earthquakenpp_comcat_california_native/etas_author_v1/manifest.json",
+  "checkpoint": "campaign_outputs/etas_comcat_v1/parameters_etas_comcat_v1.json",
+  "seed": 20260910,
+  "contract": {
+    "auxiliary_start": "1971-01-01T00:00:00Z",
+    "timewindow_start": "1981-01-01T00:00:00Z",
+    "timewindow_end": "2007-01-01T00:00:00Z",
+    "testwindow_end": "2020-01-17T00:00:00Z",
+    "mc": 2.5,
+    "delta_m": 0.1,
+    "coppersmith_multiplier": 10.0,
+    "model_id": "etas_comcat_v1",
+    "shape_coords": [
+      [
+        43.5,
+        -125.7
+      ],
+      [
+        43.5,
+        -118.5
+      ],
+      [
+        39.7,
+        -118.5
+      ],
+      [
+        36.1,
+        -113.6
+      ],
+      [
+        34.6,
+        -112.6
+      ],
+      [
+        34.3,
+        -112.6
+      ],
+      [
+        32.7,
+        -113.1
+      ],
+      [
+        31.8,
+        -113.2
+      ],
+      [
+        31.2,
+        -114.5
+      ],
+      [
+        31.0,
+        -117.1
+      ],
+      [
+        31.1,
+        -117.4
+      ],
+      [
+        31.5,
+        -118.3
+      ],
+      [
+        32.4,
+        -118.8
+      ],
+      [
+        33.3,
+        -121.3
+      ],
+      [
+        34.0,
+        -122.0
+      ],
+      [
+        37.5,
+        -124.3
+      ],
+      [
+        40.0,
+        -125.9
+      ],
+      [
+        40.5,
+        -125.9
+      ],
+      [
+        43.0,
+        -125.7
+      ],
+      [
+        43.5,
+        -125.7
+      ]
+    ]
+  },
+  "protocol": {
+    "region": "EarthquakeNPP's RELM/CSEP polygon from Datasets/ComCat/california_shape.npy, coordinates [latitude, longitude]; it is not the [-130,-110] x [30.79,44.45] download bounding box.",
+    "auxiliary_history": "1971-01-01 through 1980-12-31 is source history only. It is supplied to the author estimator but excluded from fit selection, validation selection, and test scoring.",
+    "magnitude": "M >= 2.5 inclusive; the source README identifies 2.5 as Mcut after its 1971-1990 diagnostic. Magnitudes are rounded by the author ETAS code to delta_m=0.1.",
+    "completeness_gate": "Source-level Mcut rationale only; an independent completeness analysis has not been performed. This is a nonblocking documented limitation, not evidence of a new threshold."
+  }
+}

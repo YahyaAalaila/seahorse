@@ -1,0 +1,606 @@
+{
+  "schema_version": 1,
+  "campaign_id": "seahorse_iclr2027_nnstat_20260915",
+  "coordinate_artifact": "campaign_inputs/COORDINATE_TRANSFORMS_V2.json",
+  "seeds": [
+    11,
+    22,
+    33
+  ],
+  "protocol": {
+    "history_events": 20,
+    "loss_target_scope": "last",
+    "time_origin": "first_history_event",
+    "sequence_boundary": "carry_history_across_contiguous_observed_calendar_windows_including_empty_days; reset_at_true_gaps_and_split_boundaries",
+    "main_task": "next observed event conditional on exactly twenty observed history events",
+    "observation_model": "recorded coordinates; named jitter approximation for tied timestamps; no claim of exact latent event times",
+    "marks": "unmarked main comparison, original mark indices retained in provenance",
+    "coordinate_measure": "source time units times longitude-degree times latitude-degree; affine Jacobians restored once",
+    "spatial_boundary_policy": "Declared closed preprocessing rectangle; retain observations on its outer boundary and assign them to the final spatial count cell. Temporal observation windows remain half-open.",
+    "validation_targets": 2048,
+    "validation_target_seed": 20260910,
+    "test_nll_targets": "all_eligible",
+    "predictive_targets": 256,
+    "predictive_target_seed": 20260911,
+    "predictive_samples": 64,
+    "predictive_metrics": [
+      "temporal_crps",
+      "spatial_energy_score",
+      "temporal_pit",
+      "temporal_mae",
+      "spatial_mae",
+      "temporal_rmse",
+      "spatial_rmse"
+    ],
+    "uncertainty": "paired seeds and circular moving blocks of seven observed calendar source records; synthetic independent windows use one-record blocks; dependence limitations reported",
+    "bootstrap_replicates": 2000,
+    "failure_policy": "retain every planned cell; nonfinite/failed targets invalidate aggregate NLL and remain in failure ledger; never select test-best checkpoint",
+    "bootstrap_block_records": 7,
+    "numerical_validation": {
+      "targets": 32,
+      "batch_size": 4,
+      "seed": 20260912,
+      "absolute_tolerance": 0.001,
+      "relative_tolerance": 0.01,
+      "acceptance": "every checked validation target passes default-vs-refined NLL; no test-based refinement selection"
+    },
+    "count_forecast": {
+      "horizon_median_intervals": 20,
+      "horizon_policy": "20 times the train-fitted median positive raw inter-event interval, independent of coordinate normalization; synthetic identity transforms do not imply a whole-window forecast",
+      "candidate_origins": 256,
+      "origins": 32,
+      "samples": 32,
+      "seed": 20260915,
+      "time_bins": 4,
+      "spatial_grid": [
+        4,
+        4
+      ],
+      "event_cap": 1000,
+      "origin_policy": "event-triggered fixed horizon from the last of H observed events; fully observed coverage; no truth feedback",
+      "origin_selection": "seeded random order over the fixed candidate sample; take the first fully observed origins, then restore chronological output order",
+      "scope": "validated sampling routes only; unsupported models remain explicit unavailable cells"
+    },
+    "precision_policy": "Raw statistical histories/targets use float64 source units; neural histories use existing strict float32 context conversion; source event IDs match exactly.",
+    "information_policy": "Common H20 observed events and train-only fitted preprocessing. Seasonal Poisson additionally sees known calendar phase and is labelled a calendar-informed reference."
+  },
+  "hpo": {
+    "seed": 20260910,
+    "lr_multipliers": [
+      1.0,
+      0.3,
+      3.0
+    ],
+    "max_seconds": 600,
+    "max_steps": 5000,
+    "selection": "minimum finite validation objective within family; trial0 wins ties; all trials must be attempted",
+    "statistical_selection": "Model-specific explicit trials, same fixed validation targets; analytic/no-hyperparameter baselines have one trial, without duplicated learning-rate searches."
+  },
+  "fit": {
+    "max_seconds": 1800,
+    "max_steps": 20000,
+    "n_epochs": 100,
+    "patience": 16,
+    "validation_interval_steps": 32,
+    "batch_size": 64,
+    "checkpoint": "validation_best",
+    "precision": "32-true",
+    "validation_policy_rationale": "A common 2048-target validation sample and 32-step cadence limit validation cost and permit early checkpoints within the fixed time budget. The subset is chosen once independently of model and seed."
+  },
+  "compute": {
+    "host": "unicorn",
+    "gpu": "shared NVIDIA H100 PCIe",
+    "max_concurrent_gpu_jobs": 1,
+    "max_gpu_hours": 240,
+    "minimum_free_gpu_gib": 24,
+    "cpu_threads_per_job": 4,
+    "evaluation_max_seconds": 7200,
+    "stop_before_utc": "2026-09-24T18:00:00+00:00",
+    "on_budget_exhaustion": "stop launching; retain unrun cells; do not silently prune matrix",
+    "auxiliary_cpu_process_hours": 48,
+    "max_cpu_hours": 48,
+    "fit_overhead_seconds": 900,
+    "preflight_all_model_dataset_pairs": true
+  },
+  "datasets": [
+    {
+      "id": "comcat_california",
+      "route": "prepared:comcat_california:native",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "geonet_nz",
+      "route": "prepared:geonet_nz:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "citibike_nyc",
+      "route": "prepared:citibike_nyc:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 168
+    },
+    {
+      "id": "uber_nyc",
+      "route": "prepared:uber_nyc:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 168
+    },
+    {
+      "id": "austin311",
+      "route": "prepared:austin311:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "chicago_crime",
+      "route": "prepared:chicago_crime:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "la_crime",
+      "route": "prepared:la_crime:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "nyc311",
+      "route": "prepared:nyc311:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "nyc_collisions",
+      "route": "prepared:nyc_collisions:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    },
+    {
+      "id": "seattle_fire911",
+      "route": "prepared:seattle_fire911:jittered_seed20260910",
+      "stage": "core",
+      "bootstrap_block_records": 7
+    }
+  ],
+  "models": [
+    {
+      "id": "auto_stpp",
+      "preset": "auto_stpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "AutoSTPP",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "deep_stpp",
+      "preset": "deep_stpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "DeepSTPP",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "nsmpp",
+      "preset": "nsmpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "quadrature",
+      "label": "NSMPP (corrected compensator)",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "njsde",
+      "preset": "njsde",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + conditional GMM",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "thp_gmm",
+      "preset": "thp_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "quadrature",
+      "label": "THP + shared spatial GMM (extension)",
+      "training_integrator": "monte_carlo",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "rmtpp_gmm",
+      "preset": "rmtpp_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "RMTPP + shared spatial GMM (extension)",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "poisson_gmm",
+      "preset": "poisson_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Poisson + shared spatial GMM",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "hawkes_gmm",
+      "preset": "hawkes_gmm",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Hawkes + shared spatial GMM",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "neural_jumpcnf",
+      "preset": "neural_jumpcnf",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + JumpCNF",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "neural_attncnf",
+      "preset": "neural_attncnf",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "ode",
+      "label": "Neural-STPP + attention CNF",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "selfcorrecting_gmm",
+      "preset": "selfcorrecting_gmm",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Self-correcting + shared spatial GMM",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "gaussian_poisson",
+      "preset": "gaussian_poisson",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Independent Gaussian Poisson",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "static_hawkes",
+      "preset": "static_hawkes",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "label": "Static Gaussian Hawkes",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "diffusion_stpp",
+      "preset": "diffusion_stpp",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "bound",
+      "label": "DSTPP (sampling metrics; bound reported separately)",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "id": "smash",
+      "preset": "smash",
+      "stage": "expansion",
+      "track": "conditional_next_event",
+      "nll_path": "surrogate",
+      "label": "SMASH (sampling metrics)",
+      "runner": "nnstpp",
+      "implementation_status": "existing_native_seahorse_integration; not a newly verified author-output reproduction"
+    },
+    {
+      "runner": "statstpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "id": "homogeneous_poisson",
+      "preset": "homogeneous_poisson",
+      "label": "Homogeneous Poisson (analytic MLE)",
+      "trials": [
+        {
+          "config_overrides": {}
+        }
+      ],
+      "fit_objective": "complete observed-window exposure MLE"
+    },
+    {
+      "runner": "statstpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "id": "spatial_poisson",
+      "preset": "spatial_poisson",
+      "label": "Spatial histogram Poisson",
+      "trials": [
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                8,
+                8
+              ]
+            }
+          }
+        },
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                4,
+                4
+              ]
+            }
+          }
+        },
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                16,
+                16
+              ]
+            }
+          }
+        }
+      ],
+      "fit_objective": "exposure rate MLE plus declared Dirichlet spatial smoothing"
+    },
+    {
+      "runner": "statstpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "id": "seasonal_poisson",
+      "preset": "seasonal_poisson",
+      "label": "Weekly seasonal Poisson (calendar-informed reference)",
+      "dataset_config_overrides": {
+        "synthetic_homogeneous_poisson": {
+          "model": {
+            "period": 1.0,
+            "n_phases": 7
+          }
+        },
+        "synthetic_moving_seasonal_poisson": {
+          "model": {
+            "period": 1.0,
+            "n_phases": 7
+          }
+        },
+        "synthetic_gamma_renewal": {
+          "model": {
+            "period": 1.0,
+            "n_phases": 7
+          }
+        }
+      },
+      "synthetic_phase_policy": "Seven equal phases of the declared period-one simulation cycle; each independent realization starts at phase zero. Real data retain seven calendar-day phases. This known phase is additional information relative to rebased neural histories.",
+      "trials": [
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                8,
+                8
+              ]
+            }
+          }
+        },
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                4,
+                4
+              ]
+            }
+          }
+        },
+        {
+          "config_overrides": {
+            "model": {
+              "grid": [
+                16,
+                16
+              ]
+            }
+          }
+        }
+      ],
+      "fit_objective": "phase exposure MLE plus declared Dirichlet spatial smoothing",
+      "additional_information": "absolute calendar phase; neural presets consume relative H-event history only"
+    },
+    {
+      "runner": "statstpp",
+      "stage": "core",
+      "track": "conditional_next_event",
+      "nll_path": "closed_form",
+      "id": "hawkes_exp_gaussian",
+      "preset": "hawkes_exp_gaussian",
+      "label": "Exponential/Gaussian Hawkes (H=20 conditional fit)",
+      "conditional_fit": true,
+      "trials": [
+        {
+          "config_overrides": {}
+        }
+      ],
+      "config_overrides": {
+        "statistical": {
+          "method": "mle",
+          "optimizer": "Nelder-Mead",
+          "max_iterations": 1200,
+          "history_events": 20,
+          "conditional_chunk_size": 8192,
+          "conditional_cache_bytes": 17179869184
+        },
+        "model": {
+          "edge_correction": "renormalise",
+          "quadrature_order": 32,
+          "sampler_iterations": 2000
+        }
+      },
+      "fit_objective": "conditional composite next-event likelihood with exactly H=20 observed events",
+      "source_commit": "37e83bc30b3bd5781551ea1fc1e72ba657608ebb",
+      "sampling_qualification": "source Ogata time thinning with exact rectangle-truncated Gaussian spatial mixture; no finite MCMC",
+      "hpo_max_seconds": 7200,
+      "fit_max_seconds": 7200,
+      "compute_rationale": "Full-batch SciPy MLE uses four CPU threads and a declared two-hour ceiling to seek convergence, versus minibatch neural GPU training. Device-specific budgets and censored fits are reported; wall-clock caps are not equal-compute claims."
+    }
+  ],
+  "additional_tracks": {
+    "native_counts": {
+      "status": "separate prepared-data control recipe; not executable jobs in this mixed-runner campaign",
+      "datasets": "all eleven recommended native datasets including FPA California",
+      "models": [
+        "constant_calendar_poisson",
+        "seasonal_calendar_poisson",
+        "spatial_cell_poisson_if_rectangle_declared"
+      ],
+      "include_empty_bins": true,
+      "likelihood": "discrete_count_only"
+    },
+    "author_fixed_window": {
+      "status": "excluded from execution; retained as an unresolved native-port research track",
+      "models": [
+        "tritpp_spatial",
+        "wsm_survival",
+        "wsm_same_backbone_mle"
+      ],
+      "datasets": [
+        "comcat_california",
+        "geonet_nz",
+        "austin311",
+        "chicago_crime",
+        "la_crime",
+        "nyc_collisions",
+        "seattle_fire911"
+      ],
+      "likelihood": "separate_fixed_horizon_with_survival_and_empty_windows",
+      "required_checks": [
+        "author_pin",
+        "checkpoint_reload",
+        "finite_domain",
+        "zero_event_windows"
+      ]
+    },
+    "earthquake_reference": {
+      "status": "excluded from execution; author-wrapper route does not meet native integration criterion",
+      "model": "author_etas",
+      "dataset": "comcat_california",
+      "required_checks": [
+        "author_environment",
+        "RELM_CSEP_polygon",
+        "magnitude_completeness",
+        "1971_1980_auxiliary_history"
+      ]
+    },
+    "non_hawkes_synthetic": {
+      "families": [
+        "homogeneous_poisson",
+        "moving_seasonal_poisson",
+        "gamma_renewal"
+      ],
+      "rate": 80,
+      "horizon": 1,
+      "split_windows": [
+        512,
+        128,
+        128
+      ],
+      "generator_seed": 20260910,
+      "include_empty_windows": true
+    },
+    "sensitivity": {
+      "history_events": [
+        64,
+        128
+      ],
+      "cohorts": [
+        "comcat_california",
+        "chicago_crime",
+        "nyc_collisions"
+      ],
+      "jitter_replicates": [
+        20260911,
+        20260912
+      ],
+      "status": "recipes_only_unmaterialized_jitter_views_not_executable"
+    }
+  },
+  "excluded_pending": [
+    {
+      "id": "gtd",
+      "reason": "No authorized accessible source; source acquisition blocked."
+    },
+    {
+      "id": "foursquare_nyc_tokyo",
+      "reason": "Integrated reserve datasets; unexplained shared collection gaps prevent calendar exposure claims."
+    },
+    {
+      "id": "fpa_us_scale",
+      "reason": "Integrated scale companion overlaps California and is not an independent dataset."
+    },
+    {
+      "id": "dmpp_dkmpp",
+      "reason": "Required forecast-available context field is not available in prepared corpus."
+    },
+    {
+      "id": "official_glide_replication",
+      "reason": "Independent causal variant integrated; pinned author feature/target alignment needs a separate protocol audit."
+    },
+    {
+      "id": "other_unpublished_models",
+      "reason": "Unpublished in-house methods are outside this campaign."
+    },
+    {
+      "id": "dnsk",
+      "reason": "Independent paper reimplementation; does not satisfy copied author-code baseline criterion."
+    },
+    {
+      "id": "glide",
+      "reason": "Independent causal variant with architectural differences; not an author-code reproduction."
+    },
+    {
+      "id": "hawkes_omori_pareto",
+      "reason": "Native complete-window preset exists; common-H20 conditional fitting and numerical validation are not yet implemented."
+    },
+    {
+      "id": "lgcp_cox_hawkes",
+      "reason": "No native source-ported, validated preset available; excluded from executable matrix."
+    },
+    {
+      "id": "external_author_wrappers",
+      "reason": "Native source integration is required; TriTPP/WSM/ETAS wrapper jobs are excluded from this campaign."
+    }
+  ],
+  "data_audit": "campaign_inputs/DATA_AUDIT.json",
+  "synthetic_manifest": "campaign_inputs/auxiliary_v2/auxiliary_manifest.json",
+  "release_state": "unreleased workspace build; neither package release nor Hugging Face upload is performed by this recipe"
+}
