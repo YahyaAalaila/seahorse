@@ -1,13 +1,13 @@
 # End-to-End Case Study
 
 Real dataset, real numbers, one click. This is the fastest way to watch Seahorse
-do something real: it installs from PyPI, loads the **Citibike** spatio-temporal
+do something real: it installs from PyPI, loads the **NYC motor-vehicle collisions**
 dataset, explores it on a map, trains a baseline and a neural model, scores both
 under one metric, and visualizes the predictions — all on CPU, in a few minutes.
 
-<a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_citibike.ipynb" target="_blank" rel="noopener">
+<a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_nyc_collisions.ipynb" target="_blank" rel="noopener">
   <span class="sh-colab-badge" aria-hidden="true">▶</span>
-  <span class="sh-colab-text"><strong>Open the case study in Colab</strong><span>Citibike · CPU-only · no local setup</span></span>
+  <span class="sh-colab-text"><strong>Open the case study in Colab</strong><span>NYC collisions · CPU-only · no local setup</span></span>
   <span class="sh-colab-go" aria-hidden="true">↗</span>
 </a>
 
@@ -18,7 +18,7 @@ under one metric, and visualizes the predictions — all on CPU, in a few minute
     <span class="sh-ext-num">1</span>
     <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Install and load real data</span>
-      <p><code>pip install seahorse-stpp</code>, then <code>load_dataset("citibike")</code> pulls the Citibike splits straight from the Hugging Face hub — no manual download.</p>
+      <p><code>pip install seahorse-stpp</code>, then <code>load_dataset("nyc_collisions")</code> pulls the splits straight from the Hugging Face hub at their pinned release revision — no manual download.</p>
     </div>
   </li>
   <li class="sh-ext-step">
@@ -53,12 +53,12 @@ under one metric, and visualizes the predictions — all on CPU, in a few minute
 
 ## Why this dataset
 
-- **Real, not synthetic** — Citibike is the lightest real public dataset in the [catalog](../datasets/catalog.md), so it runs on a free CPU runtime.
+- **Real, not synthetic** — NYC collisions is one of the lightest real datasets in the [catalog](../datasets/catalog.md) (under 10 MB), so it runs on a free CPU runtime.
 - **Comparable by construction** — the baseline and the neural model share the same splits, normalization, and metric, so the numbers actually mean something.
 - **One click** — the notebook installs the published package; nothing to clone or configure.
 
 ## Then go deeper
 
-- [Dataset Catalog](../datasets/catalog.md) — swap Citibike for any of the 13 datasets.
+- [Dataset Catalog](../datasets/catalog.md) — swap NYC collisions for any released dataset.
 - [Run a Benchmark](run-a-small-benchmark.md) — compare many presets and seeds.
 - [Python API](../python-api.md) — the full programmatic surface behind the notebook.

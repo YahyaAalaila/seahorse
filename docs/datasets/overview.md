@@ -26,7 +26,7 @@ Each file is one JSON object per line. Each object is one event sequence.
 
 | Source | How to use |
 | --- | --- |
-| Curated `seahorse-stpp` datasets | `load_dataset("citibike")` or `--dataset citibike` (short name) |
+| Released `seahorse-stpp` datasets | `load_dataset("covid")` or `--dataset covid` (short name, pinned revision) |
 | Any Hugging Face repo | Pass `--dataset owner/repo[/subdir]` — Seahorse downloads and caches |
 | Local JSONL files | Pass `--train`, `--val`, `--test` flags or a directory with `--dataset` |
 | Local split collection | Point `--splits_dir` at a root with one subdirectory per dataset |
@@ -35,17 +35,24 @@ See [Data Format](../data-format.md) for the full contract and command support m
 
 ## Ready-to-use Datasets
 
-Seahorse curates **13 real-world STPP datasets** in the
+The datasets of the Seahorse benchmark are released in the
 [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) Hugging Face
-organization — spanning urban mobility, crime, natural hazards, public health,
-social check-ins, and even neuroimaging — all in the same JSONL split format.
-Load any of them by its short name:
+organization — urban service and incident records, bike-share and ride-hailing
+demand, earthquake catalogs, public health, synthetic controls, and a few
+supported datasets outside the paper — all in the same JSONL split format.
+Load any of them by its short name; every repository is pinned to its release
+revision and each split is verified against the hashes on the dataset card:
 
 ```python
-from seahorse.data import load_dataset
+from seahorse.data import load_dataset, load_released_dataset
 
-splits = load_dataset("citibike")  # downloads + caches
+splits = load_dataset("covid")                   # downloads + caches
+splits = load_released_dataset("austin311")      # same, with hash verification
 ```
+
+Two datasets (`citibike_nyc`, `seattle_fire911`) cannot be hosted under their
+source licences; their repositories ship a rebuild script and the expected
+hashes instead.
 
 Browse the full collection, with load snippets and each dataset's space/time
 axes, in the **[Dataset Catalog](catalog.md)**.

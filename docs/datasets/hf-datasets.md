@@ -33,13 +33,14 @@ python -m seahorse bench \
 
 ## Python API
 
-`load_dataset` resolves a HuggingFace repo id (or a curated `seahorse-stpp`
-name), downloads the splits, caches them, and returns parsed sequences:
+`load_dataset` resolves a HuggingFace repo id (or the short name of a released
+`seahorse-stpp` dataset, at its pinned revision), downloads the splits, caches
+them, and returns parsed sequences:
 
 ```python
 from seahorse.data import load_dataset
 
-splits = load_dataset("citibike")
+splits = load_dataset("covid")
 train, val, test = splits["train"], splits["val"], splits["test"]
 ```
 

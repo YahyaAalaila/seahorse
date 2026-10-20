@@ -74,6 +74,7 @@ nav:
       - Reproduce Paper Results: paper-reproduction.md
       - FAQ / Common Errors: learn/faq.md
       - Cite Seahorse: cite.md
+      - Changelog: changelog.md
 
 markdown_extensions:
   - attr_list

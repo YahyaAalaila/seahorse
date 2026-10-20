@@ -100,3 +100,14 @@ Keep the following with a paper reproduction bundle:
 For a runnable end-to-end walkthrough, use the Colab notebooks linked from
 [Tutorial Notebooks](examples/colabs.md). They generate demo JSONL data, execute
 the public API or CLI, and inspect the resulting artifacts on CPU.
+
+## Changes from 0.1.0 (camera-ready)
+
+Version 1.0.0 corrects the likelihood reporting of 0.1.0 (see the [changelog](changelog.md)):
+NSMPP's next-event NLL omitted the compensator term, THP-GMM and RMTPP-GMM reported only the spatial
+term, RMTPP's float32 compensator underflowed, and AutoSTPP/DeepSTPP averaged in zeros for targets
+their window cannot score. Numbers produced with 0.1.0 for these presets are superseded; the
+camera-ready tables were regenerated from run artefacts with `seahorse.evaluation.v1`, which also
+checks that the eventwise and prefix-difference scoring routes agree for every exact preset
+(`tests/test_nll_reporting_consistency.py`). Rollout coherence is a distance (lower is better), and
+intensity recovery is evaluated on all test sequences.
