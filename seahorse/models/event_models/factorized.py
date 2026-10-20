@@ -32,6 +32,37 @@ Time convention — sequence-relative shifting:
     Under the raw-first data path, any reversible coordinate transform is
     applied by the state model first; this event model then works entirely in
     that family-owned native space.
+
+Marks
+-----
+With ``n_marks > 0`` and a temporal model that implements ``marked_logprob``
+(THP and RMTPP; see seahorse/models/temporal_models/neural_temporal.py) the model
+emits a normalized categorical over mark types jointly with time and space:
+
+    λ(t, y, k | H) = λ(t | H) · p(k | t, H) · f(y | t, k, H)
+
+    NLL = -(tll + sll + mll) / n_events_total
+
+where mll = Σ_{b,i} log p(k_{b,i} | t_{b,i}, H) · mask[b,i] / n_events_total.
+
+Because p(k | ·) is a proper pmf, Σ_k λ(t, y, k) = λ(t) f(y | t), so the mark
+factor leaves the ground-process compensator untouched and the factorisation is
+exact. Whether the *joint* NLL is exact is then decided solely by the temporal
+model's compensator, which is what ``capabilities.nll_kind`` reports.
+
+Every mark branch is gated on ``n_marks > 0``: with ``n_marks=0`` — or with
+unmarked data — this module is byte-for-byte its pre-mark self.
+
+Keys added to the output dict when marked (nothing is added when unmarked), for
+downstream accuracy / macro-F1 / ECE metrics:
+
+    mark_logprob_matrix  (B, T, M)      log p(k | t_i, H_i)
+    mark_logprob_events  (n_events, M)  padding-free view of the above
+    mark_targets_events  (n_events,)    ground-truth mark per valid event
+    mark_pred_events     (n_events,)    argmax prediction
+    mark_nll_matrix      (B, T)         -log p(k_i), zero on padding
+    mark_ll / mark_nll                  mean mark log-prob / NLL per event
+    n_marks                             M
 """
 
 from __future__ import annotations
@@ -59,6 +90,7 @@ class FactorizedEventModel(EventModel):
         spatial_model  : parametric spatial density
         t0             : window start in sequence-relative (shifted) time (default 0.0 = first event)
         t1             : window end in shifted time; None → last-event convention (see module docstring)
+        n_marks        : number of discrete mark types; 0 (default) = unmarked (see below)
     """
 
     def __init__(
@@ -68,26 +100,84 @@ class FactorizedEventModel(EventModel):
         spatial_model: nn.Module,
         t0: float = 0.0,
         t1: Optional[float] = None,
+        n_marks: int = 0,
     ):
         super().__init__()
         self.temporal_model = temporal_model
         self.spatial_model = spatial_model
         self.t0 = t0
         self.t1 = t1
+        self.n_marks = int(n_marks)
+
+    @property
+    def _marked(self) -> bool:
+        """True when this instance is configured for marks AND the temporal model
+        can produce them. Every mark-related branch in this class is gated on this,
+        so an ``n_marks=0`` model is byte-for-byte the pre-mark implementation."""
+        return self.n_marks > 0 and callable(
+            getattr(self.temporal_model, "marked_logprob", None)
+        )
+
+    @property
+    def _temporal_event_logprob_fn(self):
+        """The temporal model's per-event log-prob hook, or ``None`` if unsupported.
+
+        A temporal process that only implements the sequence-level ``logprob`` cannot
+        contribute a per-event term. In that case this model must not advertise
+        eventwise terms — see ``capabilities`` and ``_compute``.
+        """
+        fn = getattr(self.temporal_model, "event_logprob_matrix", None)
+        return fn if callable(fn) else None
 
     @property
     def capabilities(self) -> EventCapabilities:
+        # Eventwise terms are only honest when the temporal process can supply a
+        # per-event log-prob. Declaring them unconditionally is what let the
+        # benchmark score a spatial-only quantity for the RMTPP/THP presets.
+        exposes_eventwise = self._temporal_event_logprob_fn is not None
+
+        if not self._marked:
+            return EventCapabilities(
+                training_objective="nll",
+                metric_key="nll",
+                objective_description="exact NLL",
+                nll_kind="exact",
+                nll_description="exact joint NLL/event (factorized temporal + spatial)",
+                supports_raw_reporting=True,
+                raw_nll_description="exact joint NLL/event (raw/original data space; factorized transform corrected)",
+                has_intensity=True,
+                has_density=True,
+                exposes_eventwise_terms=exposes_eventwise,
+            )
+
+        # Marked. The mark factor p(k|t,H) is an exactly normalised categorical in
+        # both supported parametrisations, so the *factorisation* is exact; whether
+        # the joint NLL is exact overall is decided by the temporal compensator.
+        closed_form = getattr(self.temporal_model, "COMPENSATOR", "closed_form") == "closed_form"
+        nll_kind = "exact" if closed_form else "approx"
+        note = (
+            ""
+            if closed_form
+            else " (compensator ∫λ estimated by Monte Carlo)"
+        )
         return EventCapabilities(
             training_objective="nll",
             metric_key="nll",
-            objective_description="exact NLL",
-            nll_kind="exact",
-            nll_description="exact joint NLL/event (factorized temporal + spatial)",
-            supports_raw_reporting=True,
-            raw_nll_description="exact joint NLL/event (raw/original data space; factorized transform corrected)",
+            objective_description=f"{'exact' if closed_form else 'approximate'} marked NLL",
+            nll_kind=nll_kind,
+            nll_description=(
+                f"{'exact' if closed_form else 'approximate'} joint marked NLL/event "
+                f"(factorized temporal x mark x spatial){note}"
+            ),
+            nll_footnote="" if closed_form else "‡ MC compensator",
+            supports_raw_reporting=closed_form,
+            raw_nll_description=(
+                "exact joint marked NLL/event (raw/original data space; factorized "
+                "transform corrected; the mark factor is a pmf and needs no Jacobian)"
+            ),
             has_intensity=True,
             has_density=True,
-            exposes_eventwise_terms=True,
+            exposes_eventwise_terms=exposes_eventwise,
         )
 
     def _extract_history(self, state: StateContext, device):
@@ -248,6 +338,7 @@ class FactorizedEventModel(EventModel):
         lengths: Tensor,
         state: StateContext,
         device,
+        marks: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         times = state.payload.get("times", times).to(device)
         locations = state.payload.get("locations", locations).to(device)
@@ -275,26 +366,50 @@ class FactorizedEventModel(EventModel):
             last_idx = (lengths - 1).clamp(min=0)
             t1_tensor = times_shifted[torch.arange(B, device=device), last_idx]  # (B,)
         # Temporal log-prob: (B,)
-        tll_seq = self.temporal_model.logprob(
-            times_shifted, locations, mask, t0_tensor, t1_tensor
-        )
-        event_logprob_fn = getattr(self.temporal_model, "event_logprob_matrix", None)
-        if callable(event_logprob_fn):
-            tll_mat = event_logprob_fn(
+        # Marked models return the *ground* process log-prob plus a per-event
+        # categorical over marks; unmarked models take the original path untouched.
+        mark_log_probs = None
+        if self._marked:
+            # Always take the marked path, even when the caller supplies no marks:
+            # for a marked model the ground process IS the marked one, so falling
+            # back to temporal_model.logprob() could report a likelihood from a head
+            # the model never trained. Mark-free callers exist in practice — the
+            # single-sequence eval batches built by seahorse/evaluation/likelihood.py
+            # carry no marks — and for those we report the ground-process NLL and
+            # simply omit the mark factor.
+            tll_seq, mark_log_probs = self.temporal_model.marked_logprob(
+                times_shifted, locations, mask, t0_tensor, t1_tensor
+            )
+            if marks is None:
+                mark_log_probs = None
+        else:
+            tll_seq = self.temporal_model.logprob(
+                times_shifted, locations, mask, t0_tensor, t1_tensor
+            )
+        event_logprob_fn = self._temporal_event_logprob_fn
+        tll_mat = (
+            None
+            if event_logprob_fn is None
+            else event_logprob_fn(
                 times_shifted,
                 locations,
                 mask,
                 t0_tensor,
                 t1_tensor,
             )
-        else:
-            tll_mat = torch.zeros_like(mask)
+        )
 
         # Spatial log-prob: (B, T) — uses shifted times (time diffs are shift-invariant)
         sll_mat = self.spatial_model.logprob(times_shifted, locations, mask)
-        temporal_nll_matrix = -tll_mat
         spatial_nll_matrix = -sll_mat
-        nll_matrix = temporal_nll_matrix + spatial_nll_matrix
+        # A missing per-event temporal term used to be replaced by zeros here. That is
+        # not a degraded eventwise NLL, it is a different statistic: nll_matrix became
+        # the spatial NLL alone, silently dropping the entire temporal log-likelihood
+        # from every benchmark number scored off this matrix. Emit nothing instead, so
+        # eventwise consumers either fall back to the (correct) prefix-difference path
+        # or fail loudly, rather than reporting a spatial-only quantity as a joint NLL.
+        temporal_nll_matrix = None if tll_mat is None else -tll_mat
+        nll_matrix = None if temporal_nll_matrix is None else temporal_nll_matrix + spatial_nll_matrix
         next_event_mask = mask.clone()
         if T > 0:
             next_event_mask[:, 0] = 0.0
@@ -302,12 +417,41 @@ class FactorizedEventModel(EventModel):
         n_events_total = mask.sum().clamp(min=1)
         tll = tll_seq.sum() / n_events_total
         sll = (sll_mat * mask).sum() / n_events_total
-        mean_nll = -(tll + sll)
+
+        # Mark log-prob: (B, T) — log p(k_i | t_i, H_i) gathered at the observed mark.
+        # Zero for every branch below when unmarked, so nothing here can perturb the
+        # unmarked NLL.
+        mark_ll_mat = None
+        if mark_log_probs is not None:
+            marks_t = marks.to(device).long()
+            if marks_t.shape[:2] != (B, T):
+                raise ValueError(
+                    f"marks shape {tuple(marks_t.shape)} incompatible with times ({B}, {T})."
+                )
+            valid_marks = marks_t * mask.long()  # padding slots → index 0, masked out below
+            if int(valid_marks.max().item() if valid_marks.numel() else 0) >= self.n_marks:
+                raise ValueError(
+                    f"mark index {int(valid_marks.max().item())} out of range for "
+                    f"n_marks={self.n_marks}."
+                )
+            mark_ll_mat = mark_log_probs.gather(
+                -1, valid_marks.unsqueeze(-1)
+            ).squeeze(-1) * mask  # (B, T)
+
+        mll = (
+            mark_ll_mat.sum() / n_events_total
+            if mark_ll_mat is not None
+            else tll.new_zeros(())
+        )
+        mean_nll = -(tll + sll + mll)
 
         n_per_seq = mask.sum(dim=-1).clamp(min=1)
         nll_per_event = -(tll_seq / n_per_seq + (sll_mat * mask).sum(dim=-1) / n_per_seq)
+        if mark_ll_mat is not None:
+            nll_per_event = nll_per_event - mark_ll_mat.sum(dim=-1) / n_per_seq
+            nll_matrix = nll_matrix - mark_ll_mat
 
-        return {
+        out = {
             "loss": mean_nll,
             "nll": mean_nll,
             "temporal_nll": float((-tll).item()),   # mean temporal NLL/event
@@ -316,13 +460,9 @@ class FactorizedEventModel(EventModel):
             "total_events": mask.sum(),
             "tll": tll,
             "sll": sll,
-            "tll_matrix": tll_mat,
             "sll_matrix": sll_mat,
-            "temporal_nll_matrix": temporal_nll_matrix,
             "spatial_nll_matrix": spatial_nll_matrix,
-            "nll_matrix": nll_matrix,
             "mask": mask,
-            "next_event_mask": next_event_mask,
             "extra_metrics": self.raw_reporting_metrics(
                 state=state,
                 nll=mean_nll,
@@ -330,6 +470,35 @@ class FactorizedEventModel(EventModel):
                 spatial_nll=-sll,
             ),
         }
+        if nll_matrix is not None:
+            out["tll_matrix"] = tll_mat
+            out["temporal_nll_matrix"] = temporal_nll_matrix
+            out["nll_matrix"] = nll_matrix
+            out["next_event_mask"] = next_event_mask
+
+        if mark_ll_mat is not None:
+            # Everything a downstream accuracy / macro-F1 / ECE metric needs. The
+            # flattened *_events views drop padding, so they line up row-for-row
+            # and can be concatenated straight across batches.
+            valid = mask.bool()
+            marks_t = marks.to(device).long()
+            out.update({
+                # (B, T, M) log p(k | t_i, H_i) — rows sum to 1 in probability space
+                "mark_logprob_matrix": mark_log_probs,
+                # (n_events, M) — the padding-free view; the ideal metric input
+                "mark_logprob_events": mark_log_probs[valid],
+                # (n_events,) int64 ground-truth mark per valid event
+                "mark_targets_events": marks_t[valid],
+                # (n_events,) int64 argmax prediction — accuracy / macro-F1
+                "mark_pred_events": mark_log_probs[valid].argmax(dim=-1),
+                # (B, T) −log p(k_i), zero on padding
+                "mark_nll_matrix": -mark_ll_mat,
+                "mark_ll": mll,
+                "mark_nll": float((-mll).item()),   # mean mark NLL/event
+                "n_marks": self.n_marks,
+            })
+
+        return out
 
     def training_loss(
         self,
@@ -343,10 +512,11 @@ class FactorizedEventModel(EventModel):
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        del state_regularization_terms, x_field_at_events, marks
+        del state_regularization_terms, x_field_at_events
         if device is None:
             device = times.device
         return self._compute(
+            marks=marks,
             times=times,
             locations=locations,
             lengths=lengths,

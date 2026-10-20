@@ -114,6 +114,7 @@ class FactorizedConfig(BaseModelConfig):
             spatial_model=spatial_model,
             t0=self.t0,
             t1=self.t1,
+            **self._event_kwargs(),
         )
         return UnifiedSTPP(
             state_model=state_model,
@@ -127,6 +128,13 @@ class FactorizedConfig(BaseModelConfig):
         Parametric processes (Poisson, Hawkes, SelfCorrecting) take no arguments,
         so the base implementation returns an empty dict. Subclasses with learnable
         neural temporal models override this to pass their hyperparameters.
+        """
+        return {}
+
+    def _event_kwargs(self) -> dict:
+        """Extra kwargs forwarded to ``FactorizedEventModel``.
+
+        Empty for the shipped presets; subclasses may pass ``n_marks``.
         """
         return {}
 
@@ -437,3 +445,4 @@ class THPGMMConfig(FactorizedConfig):
             "n_layers":    self.n_layers,
             "dropout":     self.dropout,
         }
+
