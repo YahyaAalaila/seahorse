@@ -68,6 +68,7 @@ class AutoSTPPEventModel(EventModel):
             metric_key="nll",
             objective_description="exact NLL",
             nll_kind="exact",
+            nll_path="closed_form",
             nll_description="exact joint NLL/event (AutoSTPP Cuboid, normalized space)",
             supports_raw_reporting=True,
             raw_nll_description="exact joint NLL/event (raw/original data space; AutoSTPP paper transform corrected)",

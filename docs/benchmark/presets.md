@@ -16,15 +16,15 @@ A **preset** is a named model configuration that works immediately with `fit`, `
 | Hawkes + TVCNF | `hawkes_tvcnf` | `HawkesTVCNF` | Exact (factorized) |
 | Self-correcting + TVCNF | `selfcorrecting_tvcnf` | `SelfCorrectingTVCNF` | Exact (factorized) |
 | RMTPP + GMM | `rmtpp_gmm` | `RMTPPGMM` | Exact (factorized) |
-| THP + GMM | `thp_gmm` | `THPGMM` | Exact (factorized) |
+| THP + GMM | `thp_gmm` | `THPGMM` | Quadrature (factorized) |
 | AutoSTPP | `auto_stpp` | `AutoSTPP` | Exact |
 | DeepSTPP | `deep_stpp` | `DeepSTPP` | Exact |
-| NSMPP DeepBasis | `nsmpp` | `NSMPP` | Exact |
+| NSMPP | `nsmpp` | `NSMPP` | Quadrature |
 | NJSDE | `njsde` | `NJSDE` | Exact |
 | Neural JumpCNF | `neural_jumpcnf` | `NeuralJumpCNF` | Exact |
 | Neural AttnCNF | `neural_attncnf` | `NeuralAttnCNF` | Exact |
 | SMASH | `smash` | `SMASH` | Approximate |
-| Diffusion STPP | `diffusion_stpp` | `DiffusionSTPP` | Approx (ELBO) |
+| Diffusion STPP | `diffusion_stpp` | `DiffusionSTPP` | Approximate (sample KDE) |
 
 Discover all registered presets at runtime:
 

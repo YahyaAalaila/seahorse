@@ -58,9 +58,17 @@ class EventCapabilities:
 
     # ── Layer 2: NLL ───────────────────────────────────────────────────
     nll_kind: Literal["exact", "approx", "none"] = "exact"
-    # "exact"  — eval_nll() = training_loss() = exact NLL; no separate path needed.
-    # "approx" — model has a separate eval_nll() returning an approximation.
+    # "exact"  — the density is evaluated directly (eventwise terms available);
+    #            eval_nll() = training_loss(); no sampling involved.
+    # "approx" — model has a separate eval_nll() returning an approximation; the
+    #            benchmark next-event NLL is a sample-based (joint KDE) estimate.
     # "none"   — model has no NLL eval capability.
+
+    nll_path: Literal["unspecified", "closed_form", "quadrature", "monte_carlo", "ode", "controlled_series", "bound", "surrogate", "none"] = "unspecified"
+    # Computation route of the compensator/likelihood, distinct from nll_kind:
+    # "closed_form" analytic; "quadrature" deterministic numerical integration;
+    # "ode" adaptive ODE solve; "monte_carlo" sampled; "bound"/"surrogate" not a
+    # likelihood. A numerical compensator is not a closed-form calculation.
 
     nll_description: str = "exact NLL/event (normalized space)"
     # Describes what test/nll measures (shown in benchmark reports).
@@ -90,6 +98,20 @@ class EventCapabilities:
     def has_eval_nll(self) -> bool:
         """True when the model can compute an NLL (exact or approx)."""
         return self.nll_kind != "none"
+
+    @property
+    def nll_label(self) -> str:
+        """Reporting label for the likelihood: exact | quadrature | approximate | none.
+
+        ``quadrature`` marks a directly evaluated density whose compensator is
+        integrated numerically (NSMPP, THP-GMM); ``approximate`` marks sample-
+        based or surrogate values (DSTPP sample KDE, SMASH).
+        """
+        if self.nll_kind == "none":
+            return "none"
+        if self.nll_kind == "approx":
+            return "approximate"
+        return "quadrature" if self.nll_path == "quadrature" else "exact"
 
 
 @dataclass

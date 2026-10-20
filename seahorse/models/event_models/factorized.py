@@ -135,16 +135,26 @@ class FactorizedEventModel(EventModel):
         # per-event log-prob. Declaring them unconditionally is what let the
         # benchmark score a spatial-only quantity for the RMTPP/THP presets.
         exposes_eventwise = self._temporal_event_logprob_fn is not None
+        # The compensator route is decided by the temporal process: analytic for
+        # the parametric processes and RMTPP, numerical quadrature for THP (whose
+        # evaluation uses deterministic midpoint nodes; training draws Monte Carlo).
+        closed_form = getattr(self.temporal_model, "COMPENSATOR", "closed_form") == "closed_form"
+        route = "closed-form" if closed_form else "numerical-quadrature"
+        route_footnote = "" if closed_form else "§ numerical-quadrature compensator"
 
         if not self._marked:
             return EventCapabilities(
                 training_objective="nll",
                 metric_key="nll",
-                objective_description="exact NLL",
+                objective_description="exact NLL" if closed_form else "NLL (quadrature compensator)",
                 nll_kind="exact",
-                nll_description="exact joint NLL/event (factorized temporal + spatial)",
+                nll_path="closed_form" if closed_form else "quadrature",
+                nll_description=f"joint NLL/event (factorized temporal + spatial; {route} compensator)",
+                nll_footnote=route_footnote,
                 supports_raw_reporting=True,
-                raw_nll_description="exact joint NLL/event (raw/original data space; factorized transform corrected)",
+                raw_nll_description=(
+                    f"joint NLL/event (raw/original data space; factorized transform corrected; {route} compensator)"
+                ),
                 has_intensity=True,
                 has_density=True,
                 exposes_eventwise_terms=exposes_eventwise,
@@ -153,7 +163,6 @@ class FactorizedEventModel(EventModel):
         # Marked. The mark factor p(k|t,H) is an exactly normalised categorical in
         # both supported parametrisations, so the *factorisation* is exact; whether
         # the joint NLL is exact overall is decided by the temporal compensator.
-        closed_form = getattr(self.temporal_model, "COMPENSATOR", "closed_form") == "closed_form"
         nll_kind = "exact" if closed_form else "approx"
         note = (
             ""
@@ -165,6 +174,7 @@ class FactorizedEventModel(EventModel):
             metric_key="nll",
             objective_description=f"{'exact' if closed_form else 'approximate'} marked NLL",
             nll_kind=nll_kind,
+            nll_path="closed_form" if closed_form else "monte_carlo",
             nll_description=(
                 f"{'exact' if closed_form else 'approximate'} joint marked NLL/event "
                 f"(factorized temporal x mark x spatial){note}"

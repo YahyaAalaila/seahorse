@@ -20,9 +20,10 @@ This is the value stored in `RunResult.test_nll` and reported in benchmark table
 
 | NLL type | What it means | Families |
 | --- | --- | --- |
-| **Exact** | True log-likelihood of the point process | `auto_stpp`, `deep_stpp`, `nsmpp`, `njsde`, `neural_*`, factorized families |
+| **Exact** | Log-likelihood of the point process with a closed-form or ODE-integrated compensator | `auto_stpp`, `deep_stpp`, `njsde`, `neural_*`, parametric factorized families, `rmtpp_gmm` |
+| **Quadrature** | Density evaluated directly; the compensator is integrated by deterministic numerical quadrature | `nsmpp`, `thp_gmm` |
 | **Approximate (score-matching)** | Score-matching surrogate for the log-likelihood | `smash` |
-| **Approximate (ELBO)** | Evidence lower bound on the log-likelihood | `diffusion_stpp` |
+| **Approximate (sample KDE)** | Benchmark next-event NLL from a joint sample-KDE predictive density; the DSTPP variational bound is a diagnostic only | `diffusion_stpp` |
 
 Exact and approximate NLL measure likelihood differently; the [Model Capability Matrix](../model-capability-matrix.md) lists which kind each preset reports.
 

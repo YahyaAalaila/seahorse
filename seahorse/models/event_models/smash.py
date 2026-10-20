@@ -560,6 +560,7 @@ class SMASHEventModel(EventModel):
             metric_key="sm",
             objective_description="denoising score matching",
             nll_kind="approx",
+            nll_path="surrogate",
             nll_description=(
                 "framework-added approx NLL: exact temporal "
                 "(intensity quadrature) + Tweedie spatial at fixed σ_s"

@@ -56,6 +56,7 @@ class DeepSTPPEventModel(EventModel):
             metric_key="nll",
             objective_description="exact NLL",
             nll_kind="exact",
+            nll_path="closed_form",
             nll_description="exact joint NLL/event (paper DeepSTPP window semantics)",
             supports_raw_reporting=True,
             raw_nll_description="exact joint NLL/event (raw/original data space; DeepSTPP paper transform corrected)",

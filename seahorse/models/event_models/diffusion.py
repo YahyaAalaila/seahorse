@@ -752,11 +752,13 @@ class DiffusionEventModel(EventModel):
             metric_key="elbo",
             objective_description="variational ELBO (1-step)",
             nll_kind="approx",
+            nll_path="monte_carlo",
             nll_description=(
-                "full DSTPP variational bound; benchmark-facing test_nll is approximate "
-                "nats/event-token, with per-dim diagnostics saved in extra_metrics"
+                "approximate NLL: the benchmark-facing test_nll is a joint sample-KDE "
+                "estimate of the next-event density (not a bound); eval_nll returns the "
+                "DSTPP variational bound as a diagnostic, with per-dim terms in extra_metrics"
             ),
-            nll_footnote="‡ approx NLL (full VB)",
+            nll_footnote="‡ approx NLL (sample KDE)",
             has_native_sampler=True,
         )
 

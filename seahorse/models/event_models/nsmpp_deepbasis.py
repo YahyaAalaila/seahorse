@@ -123,9 +123,14 @@ class NSMPPDeepBasisEventModel(EventModel):
             ),
             objective_includes_regularization=False,
             nll_kind="exact",
-            nll_description="exact joint NLL/event (direct DeepBasis conditional intensity)",
+            nll_path="quadrature",
+            nll_description=(
+                "joint next-event NLL/event from the direct DeepBasis conditional "
+                "intensity; compensator by numerical quadrature over the support grid"
+            ),
+            nll_footnote="§ numerical-quadrature compensator",
             supports_raw_reporting=True,
-            raw_nll_description="exact joint NLL/event (raw/original data space; NSMPP direct intensity)",
+            raw_nll_description="joint next-event NLL/event (raw/original data space; NSMPP direct intensity, quadrature compensator)",
             has_intensity=True,
             exposes_eventwise_terms=True,
         )
