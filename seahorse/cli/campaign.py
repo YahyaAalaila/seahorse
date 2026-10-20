@@ -17,6 +17,8 @@ def add_subparser(sub) -> None:
     add_slurm_subparser(commands)
     from seahorse.experiments.campaign_rehearse import add_subparser as add_rehearsal_subparser
     add_rehearsal_subparser(commands)
+    from seahorse.experiments.campaign_calibration import add_subparser as add_calibration_subparser
+    add_calibration_subparser(commands)
 
     prepare = commands.add_parser("prepare", help="Compile a new immutable campaign manifest")
     prepare.add_argument("--spec", required=True); prepare.add_argument("--out", required=True)
@@ -161,6 +163,9 @@ def execute(args) -> None:
     elif command == "slurm":
         from seahorse.experiments.campaign_slurm import handle
         print(json.dumps(handle(args), indent=2))
+    elif command == "calibrate":
+        from seahorse.experiments.campaign_calibration import execute as calibrate
+        calibrate(args)
     elif command == "prepare":
         from seahorse.experiments.campaign import prepare
         print(json.dumps(prepare(args.spec, args.out, repo=args.repo, verify_data=not args.skip_data_verification), indent=2))

@@ -184,3 +184,20 @@ The legacy `rollout_coherence` (median $W_1$ between pooled generated points and
 - **Cells.** Mean ± sd over seeds, always with $n$ seeds.
 - **Paired comparisons of two presets A, B on one level.** Per-target NLL (or CRPS) is first averaged over each preset's seeds. The difference $d=\bar\ell_A-\bar\ell_B$ is then averaged over $\mathcal C_{20}$. A 95% interval comes from a cluster bootstrap over the 10 test sequences (5,000 resamples).
 - A comparison is called **resolved** only if the interval excludes 0.
+
+## 10. Calibration from the NLL compensator (`seahorse campaign calibrate`)
+
+For the frozen fixed-history campaign cells, `seahorse.evaluation.v1.calibration` computes the
+temporal PIT (Section 2), the threshold-weighted CRPS and predictive quantiles (Section 3) and the
+spatial HPD-PIT (Section 4a) **without any sampler**, from the same forward pass that produces the
+reported NLL: $\Delta\Lambda_i$ is read from the model's own likelihood module (AutoSTPP exposes it
+directly; DeepSTPP, the Neural-STPP ODE family, the factorized GMM baselines, NSMPP, the parametric
+Hawkes/Poisson baselines and the statistical presets recover it from their compensators), and the
+cumulative hazard $\Lambda_i(\tau)$ on a raw-unit waiting-time grid gives $F_i(\tau)=1-\exp(-\Lambda_i(\tau))$.
+Per-cell identity checks against the NLL matrices and a reproduction of the stored per-target NLL are
+written to `summary.json`; `per_target.npz` holds the per-target arrays. CNF spatial decoders are not
+covered by the spatial route. The threshold $c$ is the maximum training inter-event time, rounded up.
+
+```bash
+seahorse campaign calibrate --manifest <campaign>/manifest.json --job <job_id> --out <dir>
+```
