@@ -148,7 +148,7 @@ Our package includes the following state-of-the-art STPP models:
 | 1 | NeurIPS'23 | `auto_stpp`                           | [Automatic Integration for Spatiotemporal Neural Point Processes](https://arxiv.org/abs/2310.01179) |    PyTorch    |
 | 2 | L4DC'22    | `deep_stpp`                           | [Deep Spatiotemporal Point Process](https://proceedings.mlr.press/v168/lin22a.html)                 |    PyTorch    |
 | 3 | ICLR'21    | `neural_jumpcnf` / `neural_attncnf` | [Neural Spatio-Temporal Point Processes](https://openreview.net/forum?id=XQQA6-So14)                |    PyTorch    |
-| 4 | NeurIPS'19 | `njsde`                               | [Neural Jump Stochastic Differential Equations](https://arxiv.org/abs/1905.10403)                   |    PyTorch    |
+| 4 | ICLR'21    | `njsde` (alias `neural_stpp_gmm`)     | Neural Spatio-Temporal Point Processes, jump-ODE state model with the conditional-GMM spatial decoder (the preset id is historical; this is not Jia & Benson's Neural Jump SDE) |    PyTorch    |
 | 5 | ACM KDD'23 | `diffusion_stpp`                      | [Spatio-temporal Diffusion Point Processes](https://dl.acm.org/doi/10.1145/3580305.3599511)         |    PyTorch    |
 | 6 | ICLR'22    | `nsmpp`                               | [Neural Spectral Marked Point Processes](https://openreview.net/forum?id=0rcbOaoBXbg)               |    PyTorch    |
 | 7 | Arxiv      | `smash`                               | [Embedding Event History to Vector](https://arxiv.org/abs/2310.19324)                               |    PyTorch    |
@@ -274,4 +274,4 @@ Seahorse is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE)
 
 **Contributors.** Beyond the authors, we thank Ismail Drief and Raphael Sonabend-Friend for their contributions to the codebase and its early design.
 
-**Upstream implementations.** Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, NeuralSTPP, NJSDE, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.
+**Upstream implementations.** Seahorse builds on the original implementations of the paper families it wraps. We thank the authors of AutoSTPP, DeepSTPP, Neural STPP, DiffusionSTPP, NSMPP, SMASH, THP, and RMTPP for releasing their code.

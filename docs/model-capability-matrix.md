@@ -24,7 +24,7 @@ Use this table to choose a metric profile and evaluation path for each preset.
 | NSMPP | `NSMPP` | `nsmpp` | Quadrature | Yes | — |
 | SMASH | `SMASH` | `smash` | Approximate | Native | — |
 | Diffusion STPP | `DiffusionSTPP` | `diffusion_stpp` | Approximate (sample KDE) | Native | — |
-| NJSDE | `STPPEstimator("njsde")` | `njsde` | Exact | Yes | `future_exact` |
+| Neural-STPP GMM (jump-ODE state, conditional-GMM decoder) | `STPPEstimator("njsde")` | `njsde` (alias `neural_stpp_gmm`) | Exact | Yes | `future_exact` |
 | Neural JumpCNF | `NeuralJumpCNF` | `neural_jumpcnf` | Exact | Yes | `future_exact` |
 | Neural AttnCNF | `NeuralAttnCNF` | `neural_attncnf` | Exact | Yes | `future_exact` |
 | RMTPP + GMM | `RMTPPGMM` | `rmtpp_gmm` | Exact (factorized) | Yes | — |

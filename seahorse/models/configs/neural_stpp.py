@@ -249,6 +249,14 @@ class NeuralSTPPAttnSCConfig(NeuralSTPPConfig):
 @ConfigRegistry.register("njsde", status="canonical")
 @dataclasses.dataclass
 class NeuralSTPPSharedCondGMMConfig(NeuralSTPPConfig):
+    """Neural-STPP jump-ODE state model with a conditional-GMM spatial decoder.
+
+    This is the GMM variant of Chen, Amos and Nickel (ICLR 2021), i.e. the
+    Neural-STPP backbone whose spatial decoder is a conditional Gaussian mixture.
+    The preset id ``njsde`` is historical; ``neural_stpp_gmm`` is an alias. It is
+    not the Neural Jump SDE model of Jia and Benson (NeurIPS 2019).
+    """
+
     _BACKBONE_DEFAULTS: ClassVar[dict] = _NEURAL_STPP_BACKBONE_DEFAULTS
     _SPATIAL_DEFAULTS: ClassVar[dict] = {
         "type": "conditional_gmm",
@@ -307,6 +315,7 @@ class NeuralSTPPSharedAttnCNFConfig(NeuralSTPPConfig):
         return _neural_stpp_resolve_accelerator(requested)
 
 
+ConfigRegistry.register_alias("neural_stpp_gmm", "njsde", status="canonical")
 ConfigRegistry.register_alias("neural_cond_gmm", "njsde", status="deprecated")
 ConfigRegistry.register_alias("neural_stpp_shared_cond_gmm", "njsde", status="deprecated")
 ConfigRegistry.register_alias("neural_stpp_shared_jumpcnf", "neural_jumpcnf", status="deprecated")

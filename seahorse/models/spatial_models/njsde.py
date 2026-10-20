@@ -1,4 +1,8 @@
-"""Conditional-GMM spatial decoder for the canonical NJSDE preset."""
+"""Conditional-GMM spatial decoder of the Neural-STPP GMM variant (preset ``njsde``).
+
+The decoder follows the conditional Gaussian mixture of Chen, Amos and Nickel
+(ICLR 2021); the module name keeps the historical preset id.
+"""
 
 from __future__ import annotations
 

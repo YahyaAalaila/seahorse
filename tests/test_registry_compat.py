@@ -72,3 +72,10 @@ class TestRegistryCompat(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_neural_stpp_gmm_alias_resolves_to_njsde():
+    from seahorse.models.configs import ConfigRegistry
+
+    assert ConfigRegistry.resolve_name("neural_stpp_gmm") == "njsde"
+    assert ConfigRegistry.preset_status("neural_stpp_gmm") == "canonical"
