@@ -83,7 +83,7 @@
 : Check normalization. Published results may use z-scored time and space (normalized NLL) or raw-coordinate NLL. See [Evaluation Semantics](evaluation-semantics.md) for the conversion formula.
 
 **SMASH or Diffusion STPP NLL looks unexpectedly low**
-: These families optimize surrogate objectives (score-matching, ELBO), not exact log-likelihood. Their `test_nll` values are not directly comparable to exact-NLL families. See [Model Capability Matrix](../model-capability-matrix.md).
+: These families do not expose an exact point-process likelihood; their benchmark `test_nll` is a sample-based estimate (a KDE on native samples), not a bound, and is not directly comparable to exact-NLL families. See [Model Capability Matrix](../model-capability-matrix.md).
 
 **`predict_next` raises `NotImplementedError`**
 : The fitted model does not support next-event sampling. Check the Sampling column in the [Model Capability Matrix](../model-capability-matrix.md).

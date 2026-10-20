@@ -20,8 +20,9 @@ native = load_released_dataset("austin311", config="native")
 
 …or from the command line with `--dataset covid`. The full `seahorse-stpp/<id>`
 reference still works everywhere a short name does. Cards marked **paper** are the
-thirteen datasets of the Seahorse benchmark; **legacy** marks the three
-Neural-STPP benchmark splits kept for comparison with earlier work. Two
+ten real-data corpora and the synthetic controls of the Seahorse benchmark;
+**legacy** marks the three Neural-STPP benchmark splits kept for comparison with
+earlier work; **not benchmarked** marks released datasets outside the paper. Three
 repositories are **script-only**: their source licences do not permit hosting the
 data, so they ship a rebuild script and the expected hashes instead.
 
@@ -172,7 +173,7 @@ data, so they ship a rebuild script and the expected hashes instead.
 </a>
 <div class="sh-ds-aside">
   <span class="sh-ds-aside-title">Supported — but not in the benchmark</span>
-  <p>BOLD5000, US wildfires and US traffic accidents ship as fully supported datasets. The paper's comparison covers the thirteen <strong>paper</strong> datasets above and the three <strong>legacy</strong> Neural-STPP splits, under one evaluation protocol.</p>
+  <p>BOLD5000, US wildfires and US traffic accidents are released and load like every other dataset. The paper's comparison covers the ten real-data <strong>paper</strong> datasets above, the synthetic controls, and the three <strong>legacy</strong> Neural-STPP splits, under one evaluation protocol.</p>
 </div>
 </div>
 

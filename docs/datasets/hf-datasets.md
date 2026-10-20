@@ -97,6 +97,10 @@ splits = load_released_dataset("seattle_fire911", config="native", local_root="d
 The legacy cards (`covid`, `earthquakes`) declare no split hashes; they load with `verified=False`
 in `__provenance__` at the pinned revision.
 
+**Released, not benchmarked in the paper.** `bold5000` (`bold5000-stpp`), `us_wildfires`
+(`us_wildfires_stpp`) and `us_accidents` (`us_accidents_stpp`) load the same way
+(`list_released_datasets(in_paper=False)`); they are not part of the paper's comparison.
+
 ## Hosting Your Own Dataset on HuggingFace
 
 To make a dataset work with `--dataset`, the repository must:
@@ -108,8 +112,8 @@ See [Conversion Standard](conversion.md) for format details and [Add Your Datase
 
 ## Dataset Catalog
 
-Seahorse curates **13 ready-to-use datasets** in the
-[`seahorse-stpp`](https://huggingface.co/seahorse-stpp) organization, spanning
-urban mobility, crime, natural hazards, public health, social check-ins, and
-neuroimaging. Browse them — with load snippets and per-dataset space/time axes —
-in the **[Dataset Catalog](catalog.md)**.
+The [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) organization holds
+**17 repositories** — 16 real datasets (13 hosted, 3 script-only) and the synthetic
+controls — spanning urban mobility, city services and crime, earthquakes, wildfires,
+traffic accidents, public health, and neuroimaging. Browse them — with load snippets
+and per-dataset space/time axes — in the **[Dataset Catalog](catalog.md)**.

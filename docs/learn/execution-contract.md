@@ -26,8 +26,8 @@ This runs in `Benchmark._apply_data_contract()`, called in both `tune_all()` and
 
 The family-owned layer runs **after** the contract is applied. It is the only place where model-specific behavior is permitted:
 
-- `PresetDescriptor.data_init_overrides(dm)` — compute training-data-dependent quantities (bounding box, float64 ODE fallback). This is called after the data module is initialized but before `build_model()`.
-- `ModelFamilyConfig.from_dict()` and `build_model()` — construct the model from the fully resolved config.
+- `<Config>.data_init_overrides(dm)` (via `ConfigRegistry.data_init_overrides`) — compute training-data-dependent quantities (bounding box, float64 ODE fallback). This is called after the data module is initialized but before `build_model()`.
+- `<Config>.from_dict()` and `build_model()` — construct the model from the fully resolved config.
 
 Critically, `data_init_overrides` has access to **training partition statistics only** — never validation or test data.
 

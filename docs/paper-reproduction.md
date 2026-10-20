@@ -95,11 +95,37 @@ Keep the following with a paper reproduction bundle:
 - predictive, generative, or surface artifacts used in tables and figures
 - exact command lines and git commit
 
+## Paper Campaigns
+
+The tables of the NeurIPS 2026 paper come from frozen campaigns, not from ad-hoc
+`bench` runs. The campaign specifications are in `experiments/campaign_2026/`
+(`spec_v1.json` for the neural roster, `spec_nnstat_v2.json` and
+`spec_nnstat_pegasus_v1.json` for the neural + statistical rosters as run on the
+worker clusters, `etas_spec_v1.json` for the author-ETAS adapter). A campaign is
+compiled into an immutable manifest, verified, executed cell by cell, calibrated
+and reported:
+
+```bash
+python -m seahorse campaign prepare   --spec experiments/campaign_2026/spec_v1.json --out campaigns/v1
+python -m seahorse campaign verify    --manifest campaigns/v1/manifest.json
+python -m seahorse campaign run       --manifest campaigns/v1/manifest.json --job <job_id>
+python -m seahorse campaign calibrate --manifest campaigns/v1/manifest.json --job <job_id> --out campaigns/v1/calib/<job_id>
+python -m seahorse campaign report    --manifest campaigns/v1/manifest.json --out campaigns/v1/report
+```
+
+Prepared-data and campaign roots are read from `SEAHORSE_*` environment variables.
+The datasets load by short name at their pinned revisions
+([Ready-to-use HF Datasets](datasets/hf-datasets.md)); the script-only datasets
+(`citibike_nyc`, `seattle_fire911`, `citibike_legacy`) must be rebuilt locally first.
+The exact-evaluation layer behind the reported NLL and calibration metrics is
+documented in [Exact Evaluation Metrics](reference/exact-evaluation.md).
+
 ## Public Tutorials
 
 For a runnable end-to-end walkthrough, use the Colab notebooks linked from
-[Tutorial Notebooks](examples/colabs.md). They generate demo JSONL data, execute
-the public API or CLI, and inspect the resulting artifacts on CPU.
+[Tutorial Notebooks](examples/colabs.md). Notebooks 01 and 02 generate demo JSONL
+data and exercise the public API or CLI on CPU; the case study loads the released
+NYC collisions dataset from the Hub.
 
 ## Changes from 0.1.0 (camera-ready)
 

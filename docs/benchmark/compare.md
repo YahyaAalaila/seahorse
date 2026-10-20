@@ -8,13 +8,13 @@ NLL is only comparable across presets that compute it the same way, so the table
   <div class="sh-tier-row sh-tier-row--exact">
     <div class="sh-tier-label"><span class="sh-tier-name">Exact</span><span class="sh-tier-sub">directly comparable</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">nsmpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">thp_gmm</span>
+      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">selfcorrecting_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">nsmpp <em>· quadrature</em></span><span class="sh-fam">thp_gmm <em>· quadrature</em></span>
     </div>
   </div>
   <div class="sh-tier-row sh-tier-row--approx">
-    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">a bound on the likelihood</span></div>
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">sample-based estimate, not a bound</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
+      <span class="sh-fam">smash <em>· sample KDE</em></span><span class="sh-fam">diffusion_stpp <em>· sample KDE</em></span>
     </div>
   </div>
 </div>
@@ -84,7 +84,7 @@ Then read `metrics.json` from each output directory to compare CRPS, energy scor
 ## Interpreting NLL Differences
 
 - NLL values are only directly comparable across presets that share the **same dataset, normalization policy, and metric definition** — which `bench` enforces via the [benchmark contract](../learn/execution-contract.md).
-- Stay within a tier (above): exact families are read directly against each other; approximate families report a bound (score-matching or ELBO), so present them on those terms rather than ranking them against exact NLL.
+- Stay within a tier (above): exact families are read directly against each other; quadrature presets (`nsmpp`, `thp_gmm`) carry a numerical-integration error; approximate families (`smash`, `diffusion_stpp`) report a sample-based estimate that is not a likelihood bound, so present them on those terms rather than ranking them against exact NLL.
 - See the [Model Capability Matrix](../model-capability-matrix.md) for the NLL type of each preset.
 
 ## Common Pitfalls

@@ -3,7 +3,7 @@
 Have a PyTorch STPP model already? You expose it to Seahorse by splitting it into
 two `nn.Module` adapters — a **StateModel** and an **EventModel** — that
 `UnifiedSTPP` drives. This page shows how a batch of events flows through them,
-what each part owns, and where an optional **PresetDescriptor** fits.
+what each part owns, and where optional **data-dependent initialization** fits.
 
 ## How a batch flows through your model
 
@@ -61,12 +61,12 @@ times, and **H** = `hidden_dim`.
   </div>
   <div class="sh-comp sh-comp--descriptor">
     <span class="sh-comp-tag sh-comp-tag--opt">optional</span>
-    <span class="sh-comp-name">PresetDescriptor</span>
+    <span class="sh-comp-name">Config.data_init_overrides</span>
     <span class="sh-comp-role">Injects data-derived setup before the model is built — bounding box, coordinate stats, device fallback.</span>
     <div class="sh-comp-methods">
       <div class="sh-comp-m"><code>data_init_overrides(dm)</code><span>→ dict merged into the build</span></div>
     </div>
-    <span class="sh-comp-where">runs once before <code>build_model()</code>, given the fitted data module</span>
+    <span class="sh-comp-where">classmethod on your config class; runs once before <code>build_model()</code>, given the fitted data module</span>
   </div>
 </div>
 

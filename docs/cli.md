@@ -13,8 +13,8 @@ The public CLI is the module entrypoint:
 python -m seahorse --help
 ```
 
-It exposes four modes: `fit`, `tune`, `bench`, `evaluate`. Use `--help` on each
-for exact arguments supported by the installed version.
+It exposes five modes: `fit`, `tune`, `bench`, `evaluate`, `campaign`. Use `--help`
+on each for exact arguments supported by the installed version.
 
 ## fit: Train One Reproducible Run
 
@@ -125,3 +125,22 @@ python -m seahorse evaluate metrics \
 Supported modes: `metrics`, `predictive-compare`, `surface`, `merge-artifacts`.
 
 Continue with [Evaluation And Visualization](evaluation.md).
+
+## campaign: Frozen Multi-Seed Campaigns
+
+`campaign` is the path behind the paper's tables: a JSON spec is compiled into an
+immutable manifest, verified, executed cell by cell, and reported.
+
+```bash
+python -m seahorse campaign prepare --spec experiments/campaign_2026/spec_v1.json --out campaigns/v1
+python -m seahorse campaign verify  --manifest campaigns/v1/manifest.json
+python -m seahorse campaign run     --manifest campaigns/v1/manifest.json --job <job_id>
+python -m seahorse campaign report  --manifest campaigns/v1/manifest.json --out campaigns/v1/report
+```
+
+Subcommands: `prepare`, `verify`, `preflight`, `run`, `evaluate`, `calibrate`
+(temporal PIT/CRPS and spatial HPD-PIT from the NLL compensator), `report`, `queue`,
+`rehearse`, and `slurm` (dispatch and reconcile cluster tasks). Prepared-data and
+campaign roots come from `SEAHORSE_*` environment variables. The specs used for the
+paper are in `experiments/campaign_2026/`; see
+[Reproduce Paper Results](paper-reproduction.md).

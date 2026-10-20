@@ -15,8 +15,8 @@ Skip it → those metrics report a clean skip, never a wrong number.
     <div class="sh-cap-chips"><span class="sh-cap-chip">core</span><span class="sh-cap-chip">nll</span><span class="sh-cap-chip">benchmark NLL tables</span></div>
   </div>
   <div class="sh-cap sh-cap--approx">
-    <div class="sh-cap-top"><span class="sh-cap-name">Bounded NLL</span><span class="sh-cap-tag">bound</span></div>
-    <span class="sh-cap-by">declared by <code>log_prob()</code> returning a surrogate (score-matching, ELBO)</span>
+    <div class="sh-cap-top"><span class="sh-cap-name">Approximate NLL</span><span class="sh-cap-tag">approx</span></div>
+    <span class="sh-cap-by">declared by <code>nll_path</code> = <code>surrogate</code> or <code>monte_carlo</code> (sample-based estimate, not a bound)</span>
     <span class="sh-cap-unlocks">unlocks</span>
     <div class="sh-cap-chips"><span class="sh-cap-chip">nll tables · non-exact</span></div>
   </div>
@@ -68,19 +68,21 @@ When a method raises `NotImplementedError`, the corresponding metric is marked `
 ## Exact vs approximate NLL
 
 NLL is only comparable across families that compute it the same way. Seahorse
-keeps the two tiers visibly separate in benchmark tables.
+labels every preset's likelihood path (`EventCapabilities.nll_path`: closed form,
+ODE-integrated, numerical quadrature, or a sample-based approximation) and keeps
+the exact and approximate tiers visibly separate in benchmark tables.
 
 <div class="sh-tier" markdown="0">
   <div class="sh-tier-row sh-tier-row--exact">
     <div class="sh-tier-label"><span class="sh-tier-name">Exact</span><span class="sh-tier-sub">directly comparable</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">nsmpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">thp_gmm</span>
+      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">selfcorrecting_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">nsmpp <em>· quadrature</em></span><span class="sh-fam">thp_gmm <em>· quadrature</em></span>
     </div>
   </div>
   <div class="sh-tier-row sh-tier-row--approx">
-    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">a bound on the likelihood</span></div>
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">sample-based estimate, not a bound</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
+      <span class="sh-fam">smash <em>· sample KDE</em></span><span class="sh-fam">diffusion_stpp <em>· sample KDE</em></span>
     </div>
   </div>
 </div>

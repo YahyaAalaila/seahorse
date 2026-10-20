@@ -1,18 +1,21 @@
 cff-version: 1.2.0
 message: "If you use Seahorse in your research, please cite the paper (preferred-citation) and the software release."
 title: "Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes"
-abstract: "A modular, research-grade framework for end-to-end development, training, and evaluation of spatio-temporal point-process (STPP) models."
+abstract: "A benchmark and library for spatio-temporal point-process (STPP) models: released datasets, model presets, and one evaluation protocol with exact likelihoods and calibration."
 type: software
 authors:
   - family-names: Aalaila
     given-names: Yahya
     orcid: "https://orcid.org/0000-0002-0661-317X"
+    affiliation: "German Research Center for Artificial Intelligence (DFKI)"
   - family-names: Großmann
     given-names: Gerrit
     orcid: "https://orcid.org/0000-0002-4933-447X"
+    affiliation: "German Research Center for Artificial Intelligence (DFKI)"
   - family-names: Vollmer
     given-names: Sebastian
     orcid: "https://orcid.org/0000-0003-2831-1401"
+    affiliation: "German Research Center for Artificial Intelligence (DFKI); RPTU Kaiserslautern-Landau"
 version: 1.0.0
 license: Apache-2.0
 repository-code: "https://github.com/YahyaAalaila/seahorse"
@@ -33,18 +36,27 @@ identifiers:
     value: "10.5281/zenodo.21078078"
     description: "Version DOI (v0.1.0)"
 preferred-citation:
-  type: article
+  type: conference-paper
   title: "Seahorse: A Unified Benchmarking Framework for Spatiotemporal Event Modeling"
   authors:
     - family-names: Aalaila
       given-names: Yahya
       orcid: "https://orcid.org/0000-0002-0661-317X"
-    - family-names: Großmann
-      given-names: Gerrit
-      orcid: "https://orcid.org/0000-0002-4933-447X"
+      affiliation: "German Research Center for Artificial Intelligence (DFKI)"
     - family-names: Vollmer
       given-names: Sebastian
       orcid: "https://orcid.org/0000-0003-2831-1401"
+      affiliation: "German Research Center for Artificial Intelligence (DFKI); RPTU Kaiserslautern-Landau"
+    - family-names: Großmann
+      given-names: Gerrit
+      orcid: "https://orcid.org/0000-0002-4933-447X"
+      affiliation: "German Research Center for Artificial Intelligence (DFKI)"
   year: 2026
-  journal: "arXiv preprint arXiv:2607.01022"
+  collection-title: "Advances in Neural Information Processing Systems (NeurIPS 2026)"
+  conference:
+    name: "NeurIPS 2026, Track on Evaluations and Datasets"
+  identifiers:
+    - type: other
+      value: "arXiv:2607.01022"
+      description: "Preprint"
   url: "https://arxiv.org/abs/2607.01022"

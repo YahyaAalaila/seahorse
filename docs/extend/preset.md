@@ -101,20 +101,23 @@ python -m seahorse fit \
   --override training.n_epochs=1 training.batch_size=4 data.num_workers=0
 ```
 
-## Optional: PresetDescriptor
+## Optional: Data-Dependent Initialization
 
-If your preset needs training-data-dependent initialization (bounding box, coordinate statistics, device fallback), implement a `PresetDescriptor`:
+If your preset needs training-data-dependent initialization (bounding box, coordinate statistics, device fallback), override the `data_init_overrides` classmethod on the config class:
 
 ```python
-from seahorse.presets.base import PresetDescriptor
+@ConfigRegistry.register("my_preset")
+@dataclass
+class MyPresetConfig(BaseModelConfig):
+    ...
 
-class MyDescriptor(PresetDescriptor):
-    def data_init_overrides(self, dm) -> dict:
-        # dm is the fitted STPPDataModule; access dm._train_dataset
+    @classmethod
+    def data_init_overrides(cls, dm) -> dict:
+        # dm is the fitted STPPDataModule; use its training partition only
         bbox = compute_bbox(dm._train_dataset)
         return {"bbox": bbox}
 ```
 
-The runner calls `descriptor.data_init_overrides(dm)` before `build_model()` and merges the result into `build_overrides`.
+The runner calls `ConfigRegistry.data_init_overrides(preset, dm)` before `build_model()` and merges the result into `build_overrides`; it is computed from the training partition only.
 
-See [existing descriptors](https://github.com/YahyaAalaila/seahorse/tree/main/seahorse/presets) for reference implementations.
+See the [existing config classes](https://github.com/YahyaAalaila/seahorse/tree/main/seahorse/models/configs) (`auto_stpp.py`, `deep_stpp.py`, `nsmpp_deepbasis.py`) for reference implementations.

@@ -6,14 +6,14 @@ hide:
 # Seahorse
 
 <p class="hero-tagline">
-A modular, research-grade framework for end-to-end development, training, and evaluation of<br>
-spatio-temporal point-process (STPP) models.
+A benchmark and library for spatio-temporal point processes:<br>
+13 datasets, 28 model presets, one evaluation protocol with exact likelihoods and calibration.
 </p>
 
 Seahorse couples declarative YAML configuration with PyTorch Lightning
-execution, Ray Tune hyper-parameter optimisation, and version-controlled run
-artifacts to support rapid prototyping and reproducible benchmarking on
-streaming event data.
+execution, Ray Tune hyper-parameter optimisation, and versioned run artifacts
+for reproducible benchmarking of event data. The Seahorse paper is accepted at
+NeurIPS 2026 (Track on Evaluations and Datasets); see [Cite Seahorse](cite.md).
 
 <div class="sh-home-grid" markdown="0">
 <a class="sh-home-card sh-home-card--primary" href="python-api/">

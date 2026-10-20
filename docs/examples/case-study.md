@@ -1,9 +1,9 @@
 # End-to-End Case Study
 
-Real dataset, real numbers, one click. This is the fastest way to watch Seahorse
-do something real: it installs from PyPI, loads the **NYC motor-vehicle collisions**
-dataset, explores it on a map, trains a baseline and a neural model, scores both
-under one metric, and visualizes the predictions — all on CPU, in a few minutes.
+A short end-to-end example on real data. The notebook installs Seahorse from PyPI,
+loads the **NYC motor-vehicle collisions** dataset, explores it on a map, trains a
+baseline and a neural model, scores both under one metric, and visualizes the
+predictions — on CPU, in a few minutes.
 
 <a class="sh-colab-cta" href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_nyc_collisions.ipynb" target="_blank" rel="noopener">
   <span class="sh-colab-badge" aria-hidden="true">▶</span>
@@ -25,7 +25,7 @@ under one metric, and visualizes the predictions — all on CPU, in a few minute
     <span class="sh-ext-num">2</span>
     <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Explore it like a practitioner</span>
-      <p>Inspect events per sequence, the daily ride rhythm, and a map of ride density across New York City — the spatial pattern a model has to capture.</p>
+      <p>Inspect events per sequence, the daily rhythm of collisions, and a map of collision density across New York City — the spatial pattern a model has to capture.</p>
     </div>
   </li>
   <li class="sh-ext-step">
@@ -46,16 +46,16 @@ under one metric, and visualizes the predictions — all on CPU, in a few minute
     <span class="sh-ext-num">5</span>
     <div class="sh-ext-step-body">
       <span class="sh-ext-step-title">Visualize on the map</span>
-      <p>Sample next events with <code>predict_next</code> and plot the model's predicted ride locations against the true next event, over the NYC map.</p>
+      <p>Sample next events with <code>predict_next</code> and plot the model's predicted collision locations against the true next event, over the NYC map.</p>
     </div>
   </li>
 </ol>
 
 ## Why this dataset
 
-- **Real, not synthetic** — NYC collisions is one of the lightest real datasets in the [catalog](../datasets/catalog.md) (under 10 MB), so it runs on a free CPU runtime.
-- **Comparable by construction** — the baseline and the neural model share the same splits, normalization, and metric, so the numbers actually mean something.
-- **One click** — the notebook installs the published package; nothing to clone or configure.
+- **Real data** — NYC collisions is one of the lightest real datasets in the [catalog](../datasets/catalog.md) (under 10 MB), so it runs on a free CPU runtime.
+- **Comparable by construction** — the baseline and the neural model share the same splits, normalization, and metric definition.
+- **No local setup** — the notebook installs the published package; nothing to clone or configure.
 
 ## Then go deeper
 

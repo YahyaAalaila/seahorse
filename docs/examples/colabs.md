@@ -11,7 +11,7 @@ case study loads a real dataset from the Hub.
 | --- | --- | --- |
 | <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/01_run_one_model_python_api.ipynb">01 Run One Model With The Python API</a> | Generate demo JSONL data, fit `AutoSTPP` and `PoissonGMM`, evaluate, call `predict_next`, and plot sampled next locations. | CPU-only, no Hugging Face dependency. |
 | <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/02_benchmark_models_cli.ipynb">02 Benchmark Models With The CLI</a> | Generate demo JSONL data, run `python -m seahorse bench` with `poisson_gmm`, `hawkes_gmm`, `auto_stpp`, and `deep_stpp`, then inspect benchmark tables. | CPU-only, uses one seed and one epoch. |
-| <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_nyc_collisions.ipynb">03 Case Study: NYC collisions</a> | Load the real **NYC collisions** dataset from the Hub, explore it on a map, fit `PoissonGMM` and `DeepSTPP`, compare them, and visualize predictions. | CPU-only; downloads Citibike from Hugging Face. |
+| <a href="https://colab.research.google.com/github/YahyaAalaila/seahorse/blob/main/docs/notebooks/03_case_study_nyc_collisions.ipynb">03 Case Study: NYC collisions</a> | Load the real **NYC collisions** dataset from the Hub, explore it on a map, fit `PoissonGMM` and `DeepSTPP`, compare them, and visualize predictions. | CPU-only; downloads NYC collisions from Hugging Face. |
 
 ## Running Locally
 

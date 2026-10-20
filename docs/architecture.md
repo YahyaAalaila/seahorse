@@ -28,24 +28,27 @@ The shared layer runs **identically** for every model family. It fixes the bench
 
 ## Family-Owned Layer
 
-Each model family registers a `ModelFamilyConfig` subclass and an optional `PresetDescriptor`. This is where family-specific behaviour lives.
+Each model family registers a config class (a `BaseModelConfig` subclass under `seahorse/models/configs/`) with `ConfigRegistry`. This is where family-specific behaviour lives.
 
 ### Preset registry
 
 ```python
-# config/schema.py — how presets are resolved
-PRESET_SPECS  = { preset_name: {"family": ..., "defaults": {...}} }
-FAMILY_CONFIGS = { family_name: ModelFamilyConfig subclass }
+# seahorse/models/configs/base.py
+@ConfigRegistry.register("auto_stpp")          # preset name → config class
+class AutoSTPPConfig(BaseModelConfig): ...
+
+ConfigRegistry.register_alias("neural_stpp_gmm", "njsde")   # accepted alias
+ConfigRegistry.describe("njsde")               # PresetDescriptor: name, status, config class
 ```
 
-`build_model(config, preset, ...)` merges resolved defaults, looks up the family config class, calls `from_dict()`, then calls `build_model()` on the resulting config object. No assembly logic lives in the registry itself.
+`build_model(config, preset, ...)` merges resolved defaults, looks up the config class, calls `from_dict()`, then calls `build_model()` on the resulting config object. No assembly logic lives in the registry itself.
 
-### PresetDescriptor
+### Data-dependent initialisation
 
-`presets/auto_stpp.py`, `presets/neural_stpp.py`, etc. each define a `PresetDescriptor` that the runner calls **before** `build_model()`:
+Config classes may override the classmethod `data_init_overrides(dm)`; the runner calls `ConfigRegistry.data_init_overrides(preset, dm)` **before** `build_model()`:
 
-- `descriptor.data_init_overrides(dm)` — computes training-data-dependent quantities (e.g., bounding box for `auto_stpp`, float64 / MPS fallback for Neural STPP ODE solver).
-- Results are merged into `build_overrides` and passed to `ModelFamilyConfig.from_dict()`.
+- it computes training-data-dependent quantities (e.g., the bounding box for `auto_stpp`, support statistics for `nsmpp`, float64 / MPS fallback for the Neural-STPP ODE solver), together with any fitted coordinate transform (`fit_transform_artifact`);
+- the result is merged into `build_overrides` and passed to the config class's `from_dict()`.
 
 This is the only point where training-data statistics can enter model construction — they are computed from the training partition only and are never derived from validation or test data.
 
@@ -82,23 +85,24 @@ Event history → StateModel.encode() → StateModel.evolve() → EventModel.log
 | **State evolution** | `StateModel.evolve()` — piecewise-constant or ODE | `JumpOdeIntensityProcess` (neural ODE + Euler solver) |
 | **Decoder / event law** | `EventModel` owns spatial and temporal decoders | `MonotoneIntegralDecoder`, `HawkesGaussianDecoder`, `JumpCNFSpatial` |
 
-The `EventModel.log_prob()` return value determines both the training objective **and** the available evaluation queries. Families that return an exact point-process log-likelihood support NLL metrics; families that return a surrogate (score-matching, ELBO) do not.
+The `EventModel.log_prob()` return value determines both the training objective **and** the available evaluation queries. Families that return a point-process log-likelihood (closed form, ODE-integrated, or with a numerically integrated compensator) support the exact NLL metrics; families that train on a surrogate objective (SMASH: score matching; DSTPP: a diffusion objective) only report a sample-based NLL estimate.
 
 !!! warning "Exact vs approximate NLL"
-    `SMASH` and `DiffusionSTPP` optimise surrogate objectives. Their `test_nll` values are not directly comparable to exact-NLL families. The [Model Capability Matrix](model-capability-matrix.md) flags this.
+    `SMASH` and `DiffusionSTPP` optimise surrogate objectives; their benchmark `test_nll` is a sample-KDE estimate, not a likelihood bound, and is not directly comparable to exact-NLL families. The [Model Capability Matrix](model-capability-matrix.md) flags this.
 
 ---
 
 ## Execution Modes
 
-All four modes go through the same shared layer, then differ in what they do with the model and outputs.
+All modes go through the same shared layer, then differ in what they do with the model and outputs.
 
 | Mode | Entry point | What it does |
 | --- | --- | --- |
 | `fit` | `runner/runner.py` → `STPPRunner.fit()` | Train one config, checkpoint, write `RunResult` |
 | `tune` | `benchmark/hpo.py` | Wrap `fit` in a Ray Tune loop; write `{preset}_best.yaml` |
 | `bench` | `benchmark/benchmark.py` → `Benchmark.run()` | Grid over presets × datasets × seeds; apply benchmark policy; collect `RunResult` objects |
-| `evaluate` | `__main__.py` `evaluate` subcommand | Load a saved run directory; compute metric profiles and visual artifacts |
+| `evaluate` | `cli/` `evaluate` subcommand | Load a saved run directory; compute metric profiles and visual artifacts |
+| `campaign` | `cli/` `campaign` subcommand → `seahorse/experiments/` | Compile a frozen manifest from a spec; verify, run, evaluate, calibrate and report its cells (optionally via Slurm) |
 
 `bench` calls `_apply_data_contract()` in both `tune_all()` and `run()`, which forces `protocol="unified"` and a single `normalize` setting on every config. This runs before any preset-specific code, so no preset can silently change the benchmark policy.
 

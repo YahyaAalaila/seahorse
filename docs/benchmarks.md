@@ -13,9 +13,9 @@ writes a comparable table.
   <div class="sh-bench-matrix">
     <div class="sh-bench-row sh-bench-row--head">
       <span class="sh-bench-model sh-bench-model--head">preset</span>
-      <span class="sh-bench-col">COVID</span>
-      <span class="sh-bench-col">Earthquakes</span>
-      <span class="sh-bench-col">Citibike</span>
+      <span class="sh-bench-col">ComCat</span>
+      <span class="sh-bench-col">Austin 311</span>
+      <span class="sh-bench-col">NYC collisions</span>
     </div>
     <div class="sh-bench-row sh-bench-row--you">
       <span class="sh-bench-model"><span class="sh-bench-newchip">your model</span>my_preset</span>
@@ -56,7 +56,7 @@ writes a comparable table.
   </div>
   <div class="sh-bench-legend">
     <span><span class="sh-bench-rail sh-bench-rail--exact"></span>exact NLL · directly comparable</span>
-    <span><span class="sh-bench-rail sh-bench-rail--bound"></span>approximate NLL · a bound (ELBO, score-matching)</span>
+    <span><span class="sh-bench-rail sh-bench-rail--bound"></span>approximate NLL · sample-based estimate, not a bound</span>
     <span><span class="sh-bench-keydot"></span>your model</span>
   </div>
 </div>
@@ -71,8 +71,8 @@ python -m seahorse bench \
   --out runs/bench
 ```
 
-Replace `my_preset` with your registered name, and point `--splits_dir` at the
-core benchmark datasets (COVID, Earthquakes, Citibike). For a first run, the
+Replace `my_preset` with your registered name, and point `--splits_dir` at a
+directory of released benchmark datasets (see the [dataset catalog](datasets/catalog.md)). For a first run, the
 [small benchmark walkthrough](examples/run-a-small-benchmark.md) is a good place
 to start.
 
@@ -118,10 +118,11 @@ models rather than the experimental setup. The
 [execution contract](learn/execution-contract.md) records exactly what is held fixed.
 
 Models differ in how they express likelihood. Likelihood-based models report an
-exact NLL; generative families such as score-matching and diffusion models report
-an approximation, typically a bound on the log-likelihood (for example an ELBO).
-Both are informative once the distinction is kept in view, and they remain
-comparable when read in that light. Beyond NLL, the predictive and distributional
+exact NLL (closed-form or ODE-integrated compensator); NSMPP and THP-GMM evaluate
+their density directly and integrate the compensator by numerical quadrature; the
+generative families SMASH and DSTPP report a sample-based approximation (a KDE on
+their native samples), which is not a likelihood bound. The three labels are kept
+visible in every table. Beyond NLL, the predictive and distributional
 [metric profiles](evaluation.md) give a fuller account of model quality, which is
 especially useful for models whose likelihood is only approximate.
 
@@ -129,13 +130,13 @@ especially useful for models whose likelihood is only approximate.
   <div class="sh-tier-row sh-tier-row--exact">
     <div class="sh-tier-label"><span class="sh-tier-name">Exact</span><span class="sh-tier-sub">directly comparable</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">nsmpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">thp_gmm</span>
+      <span class="sh-fam">auto_stpp</span><span class="sh-fam">deep_stpp</span><span class="sh-fam">njsde</span><span class="sh-fam">neural_*</span><span class="sh-fam">poisson_*</span><span class="sh-fam">hawkes_*</span><span class="sh-fam">selfcorrecting_*</span><span class="sh-fam">rmtpp_gmm</span><span class="sh-fam">nsmpp <em>· quadrature</em></span><span class="sh-fam">thp_gmm <em>· quadrature</em></span>
     </div>
   </div>
   <div class="sh-tier-row sh-tier-row--approx">
-    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">a bound on the likelihood</span></div>
+    <div class="sh-tier-label"><span class="sh-tier-name">Approximate</span><span class="sh-tier-sub">sample-based estimate, not a bound</span></div>
     <div class="sh-tier-chips">
-      <span class="sh-fam">smash <em>· score-matching</em></span><span class="sh-fam">diffusion_stpp <em>· ELBO</em></span>
+      <span class="sh-fam">smash <em>· sample KDE</em></span><span class="sh-fam">diffusion_stpp <em>· sample KDE</em></span>
     </div>
   </div>
 </div>

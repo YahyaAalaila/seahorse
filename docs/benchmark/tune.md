@@ -27,7 +27,7 @@ python -m seahorse tune \
 | --- | --- | --- |
 | `--preset` / `--config` | required | Config source to tune |
 | `--dataset` / `--train --val` | required | Data source |
-| `--n_trials` | 10 | Maximum HPO trials |
+| `--n_trials` | 50 (from `tuning.n_trials`) | Maximum HPO trials |
 | `--search-alg` | `random` | `random` or `bayesian` |
 | `--scheduler` | `asha` | `asha` or `none` |
 | `--seed` | — | HPO seed |

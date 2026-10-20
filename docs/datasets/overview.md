@@ -61,11 +61,11 @@ Need controlled ground truth? Seahorse's synthetic benchmark sequences are
 generated with [HawkesNest](https://github.com/YahyaAalaila/HawkesNest) — its
 **entanglement suite** produces spatio-temporal data with tunable space–time
 coupling for stress-testing models. See
-[Synthetic benchmark suites](catalog.md#synthetic-benchmark-suites).
+[Synthetic controls](catalog.md#synthetic-controls).
 
 ## Next Steps
 
-- [Dataset Catalog](catalog.md) — browse the 13 ready-to-use datasets.
+- [Dataset Catalog](catalog.md) — browse the 17 released repositories (16 real datasets and the synthetic controls).
 - [Data Format](../data-format.md) — detailed format specification and command matrix.
 - [Ready-to-use HF Datasets](hf-datasets.md) — load by repo id, or host your own.
 - [Add Your Dataset](add-dataset.md) — how to prepare your own data.

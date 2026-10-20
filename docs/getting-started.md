@@ -75,9 +75,11 @@ python -m seahorse fit --help
 python -m seahorse tune --help
 python -m seahorse bench --help
 python -m seahorse evaluate --help
+python -m seahorse campaign --help
 ```
 
-The top-level CLI exposes four modes: `fit`, `tune`, `bench`, and `evaluate`.
+The top-level CLI exposes five modes: `fit`, `tune`, `bench`, `evaluate`, and
+`campaign` (frozen multi-seed campaigns; see [CLI Workflows](cli.md)).
 
 ## Train A Local CLI Run
 
