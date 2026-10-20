@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 from inspect import signature
-from typing import Iterable, Optional, Sequence
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn

@@ -162,7 +162,7 @@ def forecast_horizon(runner: Any, history: Mapping[str, Any], *, t_end: float, n
             except RuntimeError as exc:
                 # The statistical implementation deliberately raises, rather
                 # than truncates, when its cap is reached.
-                draws_t.append(np.empty(0)); draws_s.append(np.empty((0, 2)));
+                draws_t.append(np.empty(0)); draws_s.append(np.empty((0, 2)))
                 statuses.append("event_cap_exceeded" if "max_events" in str(exc) else "invalid_draw")
             continue
         h_t, h_s = times.copy(), locations.copy(); out_t, out_s = [], []; status = "complete"

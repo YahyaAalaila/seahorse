@@ -6,7 +6,11 @@ We deliberately invoke that implementation rather than reimplement its loss.
 """
 from __future__ import annotations
 
-import copy, math, pickle, sys, time
+import copy
+import math
+import pickle
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -100,7 +104,6 @@ class WSMAuthorAdapter:
             o[i,:len(t)]=torch.tensor(np.r_[0.,t[:-1]]); gap[i,:len(t)]=torch.tensor(np.diff(np.r_[0.,t])); x[i,:len(t)]=torch.tensor(z[:,0]); y[i,:len(t)]=torch.tensor(z[:,1])
         return o,gap,x,y
     def _model(self, estimator):
-        import torch
         if estimator == "wsm_survival": estimator = "wsm"
         if estimator not in ("wsm", "mle"): raise ValueError("estimator must be wsm_survival or mle")
         Transformer_ST,SMSTPP,score_cls=self._imports(); c=self.contract; kind={"SMASH":"vanilla","SMASH_decouple":"decouple","SMASH_GMM":"GMM"}[c.backbone]

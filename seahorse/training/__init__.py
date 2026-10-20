@@ -4,3 +4,5 @@ try:
     HAS_LIGHTNING = True
 except ImportError:
     HAS_LIGHTNING = False
+
+__all__ = ["STPPLightningModule", "STPPDataModule"]

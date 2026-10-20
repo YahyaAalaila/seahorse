@@ -116,7 +116,6 @@ class NeuralAdapter(FamilyAdapter):
     def extend(self, prep, t_new, s_new):
         """Incremental update: integrate the hidden ODE to t_new, jump with s_new."""
         c = prep.cache
-        B = prep.B
         t_new = np.asarray(t_new, float)
         last = c["t_raw"][:, -1]
         tn = self.t(t_new)

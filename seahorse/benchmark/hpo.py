@@ -374,7 +374,6 @@ def run_hpo(
             "HPO requires Ray Tune: pip install 'seahorse-stpp[hpo]'"
         ) from exc
 
-    from seahorse.runner import STPPRunner
     from seahorse.training.data_module import STPPDataModule
     from seahorse.utils import load_jsonl
 

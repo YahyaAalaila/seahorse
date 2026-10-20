@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import platform
 import subprocess
 import time
@@ -477,7 +476,6 @@ class Evaluator:
         slice_r = []
         for si, seq in enumerate(self.test):
             t = seq["times"]
-            n = len(t)
             lo = t[max(self.ad.min_history - 1, 0)]
             ts = np.linspace(lo, t[-1], n_slices + 2)[1:-1]
             k = np.searchsorted(t, ts, side="left") - 1  # last event strictly before ts

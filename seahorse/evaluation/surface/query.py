@@ -429,7 +429,6 @@ class SurfaceEvaluator:
         spec: SurfaceEvalSpec,
     ) -> list[float]:
         """Resolve t_query list from spec."""
-        import warnings as _warnings
 
         n = spec.n_time_steps
 

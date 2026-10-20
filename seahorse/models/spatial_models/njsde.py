@@ -11,7 +11,6 @@ from typing import Callable, Optional, Sequence
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 
 from ..base import Decoder

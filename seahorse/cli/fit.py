@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 import sys
 
 from seahorse.cli._args import add_config_source_args, add_data_args

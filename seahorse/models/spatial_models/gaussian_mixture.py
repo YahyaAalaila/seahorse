@@ -171,7 +171,6 @@ class GaussianMixtureSpatialModel(nn.Module):
         tau          = F.softplus(self.log_tau)
 
         M, D = s_query.shape
-        device = s_query.device
 
         # dt[m, j] = t_query[m] - history_times[m, j] (non-negative)
         dt = (t_query.unsqueeze(1) - history_times).clamp(min=0.0)  # (M, T)

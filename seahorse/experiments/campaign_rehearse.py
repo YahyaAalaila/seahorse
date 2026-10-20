@@ -6,7 +6,6 @@ batch size, precision, model dimensions and numerical tolerances.
 """
 from __future__ import annotations
 
-import argparse
 import gc
 import time
 import traceback

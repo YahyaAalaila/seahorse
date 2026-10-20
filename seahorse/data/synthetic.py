@@ -711,6 +711,7 @@ def _generate_mhp_sequence(
     data.append((s, n0))
 
     lastrates = mu.copy()
+    rates = lastrates
     dec_Istar = False
 
     while True:

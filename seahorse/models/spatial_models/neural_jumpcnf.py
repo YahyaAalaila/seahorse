@@ -605,7 +605,6 @@ class NeuralJumpCNFSpatial(Decoder):
 
         self.cnf.nfe = 0
         self._energy_reg = spatial_locations.new_tensor(0.0)
-        input_mask_bool = input_mask.bool()
 
         shifted_event_times = self.time_offset + event_times
         shifted_event_times = torch.cat(

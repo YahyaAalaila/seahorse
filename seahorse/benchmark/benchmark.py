@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from seahorse.config import BenchmarkConfig, STPPConfig
-from seahorse.runner import STPPRunner, RunnerRegistry, RunResult
+from seahorse.runner import RunnerRegistry, RunResult
 from seahorse.utils import deep_update
 
 from .results import BenchmarkTable
@@ -450,7 +450,7 @@ class Benchmark:
         if backend == "ray":
             try:
                 import ray
-                from ray.remote_function import RemoteFunction as _
+                from ray.remote_function import RemoteFunction as _  # noqa: F401  (availability check)
             except ImportError as exc:
                 raise ImportError(
                     "backend='ray' requires Ray: pip install 'seahorse-stpp[hpo]'"

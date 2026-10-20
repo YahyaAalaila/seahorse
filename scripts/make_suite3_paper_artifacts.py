@@ -168,7 +168,6 @@ def make_budget_recovery(curves: pd.DataFrame) -> None:
     plotted: list[dict] = []
 
     for preset in ALL_BUDGET_PRESETS:
-        label = PRESET_LABELS.get(preset, preset)
         stem = f"suite3_budget_{PRESET_OUTPUT_SLUGS.get(preset, preset)}"
 
         square_external_legend = preset == "auto_stpp"

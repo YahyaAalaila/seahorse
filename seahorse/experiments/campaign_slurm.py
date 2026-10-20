@@ -204,7 +204,7 @@ def _sbatch(plan: Mapping[str, Any], task: Mapping[str, Any]) -> list[str]:
     if resource["partitions"]: cmd += ["--partition", ",".join(resource["partitions"])]
     if resource.get("account"): cmd += ["--account", str(resource["account"])]
     if task["runner"] == "nnstpp": cmd += ["--gpus", "1"]
-    exports = plan["environment"].get("exports", {});
+    exports = plan["environment"].get("exports", {})
     if exports: cmd += ["--export", "ALL," + ",".join(f"{key}={value}" for key, value in sorted(exports.items()))]
     return cmd + ["--wrap", shlex.join(task["command"])]
 
@@ -232,7 +232,7 @@ def dispatch(plan_path: str | Path, *, execute: bool = False, watch: bool = Fals
             if execute:
                 _recover_submission_intents(plan, runner)
                 reconcile(plan_path, execute=True, runner=runner)
-            active = _active(plan); progressed = False
+            active = _active(plan)
             for task in plan["tasks"]:
                 receipt = _receipt(plan, task)
                 if receipt.exists(): continue
@@ -263,7 +263,7 @@ def dispatch(plan_path: str | Path, *, execute: bool = False, watch: bool = Fals
                 answer = runner(command, check=True, text=True, capture_output=True).stdout.strip().split(";", 1)[0]
                 if not answer.isdigit(): raise RuntimeError(f"sbatch did not return numeric job ID: {answer!r}")
                 value = json.loads(receipt.read_text()); value.update(submitted_utc=_utc(), slurm_job_id=answer, scheduler_state="PENDING"); write_json(receipt, value)
-                launched.append({"task_id": task["task_id"], "state": "submitted", "slurm_job_id": answer}); active[group] += 1; progressed = True
+                launched.append({"task_id": task["task_id"], "state": "submitted", "slurm_job_id": answer}); active[group] += 1
             if execute:
                 write_json(root / "slurm" / "dispatch_state.json", {"utc": _utc(), "plan_sha256": plan["sha256"], "active": active, "launched": launched[-20:]})
             if not (watch and execute): break

@@ -257,7 +257,6 @@ class FactorizedEventModel(EventModel):
             query_times.to(device),
             query_locations.to(device),
         )
-        B = times_shifted.shape[0]
 
         # Shift query times by the same offset used for history
         t_q_shifted = (query_times.squeeze(-1) - t_shift.squeeze()).clamp(min=0.0)  # (M,)

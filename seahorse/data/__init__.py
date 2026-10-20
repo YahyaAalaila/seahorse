@@ -9,8 +9,6 @@ loaded lazily because they are not needed on every CLI path.
 
 from __future__ import annotations
 
-from importlib import import_module
-
 from .contract import (
     fingerprint_batch,
     validate_batch,

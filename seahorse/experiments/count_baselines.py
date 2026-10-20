@@ -11,7 +11,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Sequence
 from datetime import datetime, timedelta
 
 import numpy as np

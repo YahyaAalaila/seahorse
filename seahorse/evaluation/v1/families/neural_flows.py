@@ -388,8 +388,6 @@ def _jumpcnf_logpdf_rows(ad, hist_tau, hist_s, n_hist, tau_q, h_q, x_q, tol):
     dev = ad.device
     R = x_q.shape[0]
     dim = dec.spatial_dim
-    aux_f = dec._aux_odefunc_ref
-    hdyn = lambda t, h: aux_f(t - dec.time_offset, h)  # noqa: E731
     n_hist_t = torch.as_tensor(n_hist, device=dev)
     x = x_q.clone()
     dlogp = torch.zeros(R, device=dev)
@@ -460,7 +458,6 @@ def cnf_logpdf_points(ad, prep, b_idx, k_idx, t_query, points, *, tol=None, attn
             h_q = ad.hidden_at(prep, np.array([b]), np.array([k]), np.array([t_query[r]]))
             for sl in chunked(M, attn_chunk):
                 m = sl.stop - sl.start
-                S = k + 2
                 times = torch.cat([c["t_raw"][b, : k + 1], torch.as_tensor([t_query[r]], device=ad.device, dtype=torch.float32)])
                 xq = torch.as_tensor(ad._norm_locs(pts[r, sl]), device=ad.device, dtype=torch.float32)  # (m,2)
                 locs = torch.cat([c["s_norm"][b, : k + 1][None].expand(m, -1, -1), xq[:, None, :]], 1)

@@ -1,6 +1,4 @@
 """A conditional experiment must count and optimize each target exactly once."""
-from types import SimpleNamespace
-import numpy as np
 import pytest
 import torch
 

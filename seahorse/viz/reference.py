@@ -27,7 +27,7 @@ contain any model- or provider-specific logic; all metadata lives in the result.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np

@@ -1,6 +1,10 @@
 """External baseline runner; no registry or campaign side effects."""
 from __future__ import annotations
-import argparse, json, math, subprocess, sys
+import argparse
+import json
+import math
+import subprocess
+import sys
 from pathlib import Path
 import numpy as np
 
@@ -129,7 +133,7 @@ def main():
         import torch
         from .tritpp import TriTPPAdapter, TriTPPContract
         if "seed" in s: np.random.seed(int(s["seed"])); torch.manual_seed(int(s["seed"]))
-        ad=TriTPPAdapter(TriTPPContract(**s["contract"]));
+        ad=TriTPPAdapter(TriTPPContract(**s["contract"]))
         if a.stage=="fit":
             splits={k:_read_route(v) if isinstance(v,str) else v for k,v in s["splits"].items() if k in {"train","val"}}
             metrics=ad.fit(splits["train"],validation_sequences=splits["val"],epochs=s.get("epochs",1),lr=s.get("lr",1e-3),batch_size=s.get("batch",64),max_steps=s.get("max_steps"),max_time_seconds=s.get("max_time_seconds")); ckpt=ad.save(out); (out/"metrics.json").write_text(json.dumps({**metrics,"checkpoint":str(ckpt)},indent=2))

@@ -8,7 +8,6 @@ a grid check does not prove positivity between grid nodes.
 from __future__ import annotations
 
 import math
-from typing import Any
 
 import torch
 from torch import Tensor, nn

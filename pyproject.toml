@@ -99,4 +99,4 @@ extend-exclude = ["runs", "artifacts", ".venv", "seahorse/data_cache"]
 
 [tool.ruff.lint]
 select = ["E", "F"]
-ignore = ["E501"]
+ignore = ["E501", "E731", "E741"]

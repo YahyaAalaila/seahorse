@@ -1,8 +1,7 @@
-import math
 
 import numpy as np
 
-from seahorse.experiments.count_baselines import CalendarMonthPoisson, CalendarPoisson, SeasonalCalendarPoisson, SpatialCellPoisson, prepared_windows, select_spatial_grid
+from seahorse.experiments.count_baselines import CalendarPoisson, SeasonalCalendarPoisson, SpatialCellPoisson, prepared_windows, select_spatial_grid
 
 
 def _windows():

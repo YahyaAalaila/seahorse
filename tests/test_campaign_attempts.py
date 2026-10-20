@@ -19,7 +19,7 @@ def test_failure_taxonomy_and_no_watchdog_none():
 
 
 def test_claim_is_nonblocking_and_checks_existing_receipt(tmp_path):
-    started = threading.Event(); release = threading.Event(); errors = []
+    started = threading.Event(); release = threading.Event()
     def owner():
         with claim_job_phase(tmp_path, phase="fit"):
             started.set(); release.wait(timeout=2)

@@ -8,9 +8,10 @@ head separately.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import copy, time
+import copy
+import time
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Iterable
 
 import numpy as np
 import torch
