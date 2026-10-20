@@ -201,6 +201,7 @@ class AutoSTPPEventModel(EventModel):
             log_t = torch.log(paper_dt_range.reshape(-1)[0])
             raw_metrics = {
                 "raw_space_nll": float((mean_nll + log_s + log_t).item()),
+                "raw_reporting_correction": float((log_s + log_t).item()),
                 "raw_space_spatial_nll": float((-sll + log_s).item()),
                 "raw_space_temporal_nll": float((-tll + log_t).item()),
             }
@@ -258,6 +259,7 @@ class AutoSTPPEventModel(EventModel):
                 "sll": zero_scalar,
                 "tll": zero_scalar,
                 "nll_matrix": torch.zeros(bsz, 0, device=device),
+                "eventwise_target_indices": torch.empty(bsz, 0, dtype=torch.long, device=device),
                 "sll_matrix": torch.zeros(bsz, 0, device=device),
                 "tll_matrix": torch.zeros(bsz, 0, device=device),
                 "mask": torch.zeros(bsz, 0, device=device),
@@ -315,6 +317,11 @@ class AutoSTPPEventModel(EventModel):
         nll_flat = -ll_flat
 
         nll_matrix, mask = self._pad_by_sequence(nll_flat, seq_ids, counts, bsz)
+        # Packed column j scores original event lookback+j, not original event j.
+        target_indices = (
+            torch.arange(nll_matrix.shape[1], device=mask.device).expand_as(mask)
+            + self.lookback
+        ).masked_fill(mask <= 0, -1)
         sll_matrix, _ = self._pad_by_sequence(sll_flat, seq_ids, counts, bsz)
         tll_matrix, _ = self._pad_by_sequence(tll_flat, seq_ids, counts, bsz)
         lambs_sum_matrix, _ = self._pad_by_sequence(lambs_sum, seq_ids, counts, bsz)
@@ -340,6 +347,7 @@ class AutoSTPPEventModel(EventModel):
             "sll": sll,
             "tll": tll,
             "nll_matrix": nll_matrix,
+            "eventwise_target_indices": target_indices,
             "sll_matrix": sll_matrix,
             "tll_matrix": tll_matrix,
             "mask": mask,

@@ -378,6 +378,16 @@ class EvalContext:
         )
 
     @cached_property
+    def next_event_nll(self) -> dict[str, Any]:
+        """Benchmark NLL over the same walk-forward targets as RunResult."""
+        from .likelihood import compute_next_event_test_nll
+
+        return compute_next_event_test_nll(
+            self.runner, self.test_seqs, device=self.device,
+            predictive_samples=self.k_pred, seed=self.seed,
+        )
+
+    @cached_property
     def seq_nlls(self) -> np.ndarray:
         """Per-sequence mean NLL values (one float per test sequence).
 

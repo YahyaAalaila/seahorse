@@ -1,7 +1,7 @@
 """NLL-family metrics (M1–M5, M28).
 
 Registers:
-  nll                  — Raw-space NLL (catalog M1), exact / VB
+  nll                  — Raw-space conditional next-event NLL (catalog M1)
   temporal_nll         — Temporal marginal NLL (catalog M2)
   spatial_nll          — Spatial conditional NLL (catalog M3)
   train_test_nll_gap   — NLL train/test gap (catalog M4)
@@ -36,11 +36,12 @@ if TYPE_CHECKING:
 
 @register_metric
 class NLL(Metric):
-    """M1: Overall raw-space per-event NLL.
+    """M1: Raw-space conditional next-event NLL, pooled over scored targets.
 
-    Uses exact log-likelihood for AutoSTPP/DeepSTPP/NeuralSTPP,
-    and the ELBO bound for DSTPP.  SMASH (nll_kind="none") is
-    recorded as unavailable.
+    Uses the same walk-forward density target as the runner's test NLL.
+    Training bounds and complete-window likelihoods are not substituted.
+    Models requiring sample-based density estimation need a separate explicit
+    sampling evaluation; this report metric does not trigger it implicitly.
     """
 
     name = "nll"
@@ -57,15 +58,23 @@ class NLL(Metric):
                 available=False,
                 reason="nll_kind is 'none' — model has no density",
             )
-        nlls = ctx.seq_nlls  # (n_seqs,) mean NLL per event per sequence
-        valid = nlls[np.isfinite(nlls)]
-        if valid.size == 0:
-            return MetricResult(value=None, available=False, reason="all NLL values are NaN")
-        method = "exact" if "nll_exact" in caps else "vb"
+        from seahorse.evaluation.backends import is_statistical_runner
+        if "nll_approx" in caps and not is_statistical_runner(ctx.runner):
+            return MetricResult(
+                value=None, available=False,
+                reason="Approximate neural next-event NLL requires an explicit sampling evaluation; native training bounds are not substituted for predictive density.",
+            )
+        # Use RunResult's target/weighting, rather than averaging native
+        # sequence objectives with different denominators or likelihood targets.
+        score = ctx.next_event_nll
+        if not score["n_scored_contexts"]:
+            return MetricResult(value=None, available=False, reason="no eligible next-event targets")
+        if math.isnan(float(score["mean_nll"])):
+            return MetricResult(value=None, available=False, reason="next-event NLL is undefined; inspect failed contexts")
         return MetricResult(
-            value=float(valid.mean()),
-            per_event=nlls.astype(np.float64),
-            method=method,
+            value=float(score["mean_nll"]),
+            per_event=np.asarray(score["per_context_nll"], dtype=np.float64),
+            method=score["method"],
         )
 
 
@@ -95,7 +104,7 @@ class TemporalNLL(Metric):
     def compute(self, ctx: "EvalContext") -> MetricResult:
         # For factorized models with exact NLL, we can split temporal/spatial
         # if the model exposes event-wise terms.
-        model_caps = ctx.runner.model.event_model.capabilities
+        model_caps = ctx.caps
         if model_caps.nll_kind == "exact" and model_caps.has_density:
             # Factorized model — try to compute temporal NLL directly.
             return self._compute_factorized(ctx)
@@ -222,7 +231,7 @@ class SpatialNLL(Metric):
     cost_class = "report"
 
     def compute(self, ctx: "EvalContext") -> MetricResult:
-        model_caps = ctx.runner.model.event_model.capabilities
+        model_caps = ctx.caps
         if model_caps.nll_kind == "exact" and model_caps.has_density:
             return self._compute_factorized(ctx)
         return MetricResult(
@@ -476,8 +485,6 @@ class ContextSensitivity(Metric):
         curve["full"] = float(np.nanmean(full_nlls))
 
         # Capped variants
-        from seahorse.evaluation.runtime import cap_history
-
         for k in self._K_VALUES:
             capped_seqs = [
                 {

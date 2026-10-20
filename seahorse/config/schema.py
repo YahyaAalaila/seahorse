@@ -233,6 +233,8 @@ class TrainingConfig(BaseModel):
     resume_from_checkpoint: Optional[str] = None
     """Optional Lightning checkpoint path for resuming fit() with optimizer/epoch state."""
     test_nll_space: Literal["native", "raw"] = "raw"
+    loss_target_scope: Literal["all", "last"] = "all"
+    """Use last for fixed-context conditional training: one target per input window."""
     """Reporting space for test NLL: native/model space or raw/original data space when supported."""
     predictive_test_nll_samples: int = 128
     """Monte Carlo sample count for sample-based held-out next-event test NLL reporting."""

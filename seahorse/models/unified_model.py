@@ -13,6 +13,7 @@ import torch.nn as nn
 from torch import Tensor
 
 from .abstractions import EventModel, StateModel
+from .targets import last_target_output, last_target_state
 
 
 @dataclasses.dataclass
@@ -78,6 +79,7 @@ class UnifiedSTPP(nn.Module):
         x_event: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
         x_field_fn=None,
+        target_scope: str = "all",
     ) -> Dict[str, Tensor]:
         """Compute NLL for a batch of sequences."""
         del x_field_fn
@@ -89,6 +91,7 @@ class UnifiedSTPP(nn.Module):
             x_event=x_event,
             x_field_at_events=x_field_at_events,
             device=times.device,
+            target_scope=target_scope,
         )
 
     def _forward_state_event(
@@ -101,6 +104,7 @@ class UnifiedSTPP(nn.Module):
         x_event: Optional[Tensor],
         x_field_at_events: Optional[Tensor],
         device,
+        target_scope: str = "all",
     ) -> Dict[str, Any]:
         state_ctx = self.state_model.encode_history(
             times=times,
@@ -118,6 +122,10 @@ class UnifiedSTPP(nn.Module):
             lengths=lengths,
             x_field_at_events=x_field_at_events,
         )
+        if target_scope not in {"all", "last"}:
+            raise ValueError(f"Unknown target_scope {target_scope!r}.")
+        if target_scope == "last":
+            state_for_event = last_target_state(state_for_event, lengths)
         state_regularization_terms = self.state_model.regularization_terms(
             state_ctx,
             times=times,
@@ -143,6 +151,9 @@ class UnifiedSTPP(nn.Module):
         debug_this_call = (
             self._debug_nstpp and self._debug_nstpp_calls < self._debug_nstpp_max_calls
         )
+        if target_scope == "last":
+            result = last_target_output(result, lengths, target_selected=bool(
+                getattr(state_for_event, "payload", {}).get("last_target_selected", False)))
         if debug_this_call:
             mask = result.get("mask")
             temporal_nll = result.get("temporal_nll_matrix")
@@ -193,12 +204,16 @@ class UnifiedSTPP(nn.Module):
         marks: Optional[Tensor] = None,
         x_event: Optional[Tensor] = None,
         x_field_at_events: Optional[Tensor] = None,
+        target_scope: str = "all",
     ) -> Dict[str, Any]:
         """Like forward(), but routes through event_model.eval_nll() for test reporting.
 
         For exact models, eval_nll() defaults to training_loss() — identical to forward().
         For SMASH and Diffusion, this runs the respective approximate NLL eval path.
         """
+        if self.event_model.capabilities.nll_kind == "none":
+            return self.forward(times, locations, lengths, marks, x_event,
+                                x_field_at_events, target_scope=target_scope)
         state_ctx = self.state_model.encode_history(
             times=times,
             locations=locations,
@@ -215,6 +230,10 @@ class UnifiedSTPP(nn.Module):
             lengths=lengths,
             x_field_at_events=x_field_at_events,
         )
+        if target_scope not in {"all", "last"}:
+            raise ValueError(f"Unknown target_scope {target_scope!r}.")
+        if target_scope == "last":
+            state_for_event = last_target_state(state_for_event, lengths)
         state_regularization_terms = self.state_model.regularization_terms(
             state_ctx,
             times=times,
@@ -236,6 +255,10 @@ class UnifiedSTPP(nn.Module):
 
         if "nll" not in result and "loss" in result:
             result["nll"] = result["loss"]
+
+        if target_scope == "last":
+            result = last_target_output(result, lengths, target_selected=bool(
+                getattr(state_for_event, "payload", {}).get("last_target_selected", False)))
 
         kl_loss = getattr(state_ctx, "kl_loss", None)
         if kl_loss is not None and "kl_loss" not in result:

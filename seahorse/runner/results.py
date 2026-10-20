@@ -158,7 +158,7 @@ class RunResult:
     # ^ total held-out next-event contexts considered across the test split.
 
     test_nll_scored_contexts: int = 0
-    # ^ number of contexts that contributed finite values to ``test_nll``.
+    # ^ scored contexts; exact NLL retains scored nonfinite values in the aggregate.
 
     test_nll_missing_contexts: int = 0
     # ^ contexts skipped or unresolved during ``test_nll`` computation.

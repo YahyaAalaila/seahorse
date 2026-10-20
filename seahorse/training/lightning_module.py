@@ -38,6 +38,7 @@ class STPPLightningModule(pl.LightningModule):
             marks=batch.get("marks"),
             x_event=batch.get("event_covariates"),
             x_field_at_events=batch.get("field_covariates"),
+            target_scope=self.tc.loss_target_scope,
         )
 
     def eval_forward(self, batch):
@@ -54,6 +55,7 @@ class STPPLightningModule(pl.LightningModule):
             marks=batch.get("marks"),
             x_event=batch.get("event_covariates"),
             x_field_at_events=batch.get("field_covariates"),
+            target_scope=self.tc.loss_target_scope,
         )
 
     def _log_state_regularization_terms(self, stage: str, aux_terms: dict, n_ev: int):
