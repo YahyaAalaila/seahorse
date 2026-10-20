@@ -68,8 +68,9 @@ def _git_head(path: Path) -> str | None:
     if marker.exists():
         return marker.read_text().strip()
     try:
-        return subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True,
-                                       stderr=subprocess.DEVNULL).strip()
+        return subprocess.check_output(
+            ["git", "-C", str(path), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
     except Exception:
         return None
 
@@ -87,7 +88,9 @@ def _load_jsonl(path):
 
     out = []
     for s in load_jsonl(str(path)):
-        t = _strict_float32_times(np.asarray(s["times"], float), context=str(path)).astype(np.float64)
+        t = _strict_float32_times(np.asarray(s["times"], float), context=str(path)).astype(
+            np.float64
+        )
         out.append({"times": t, "locations": np.asarray(s["locations"], float)})
     return out
 
@@ -118,16 +121,45 @@ class _NLLOnly:
         self.preset = runner.config.model.preset
 
     def describe(self):
-        return {"family": "nll_only", "preset": self.preset, "nll_kind": self.nll_kind,
-                "has_intensity": False, "reason": self.reason, "min_history": 1,
-                "spatial_sampler": "none", "spatial_domain": "n/a"}
+        return {
+            "family": "nll_only",
+            "preset": self.preset,
+            "nll_kind": self.nll_kind,
+            "has_intensity": False,
+            "reason": self.reason,
+            "min_history": 1,
+            "spatial_sampler": "none",
+            "spatial_domain": "n/a",
+        }
 
 
 class Evaluator:
-    def __init__(self, run_dir, test_path, train_path, out_dir, *, device, seed=0, K=200, K_flow=None,
-                 ctx_stride=1, ctx_stride_flow=None, c=None, tau_grid_n=1024, tau_factor=4.0,
-                 gt_params=None, roll_starts_stride=40, roll_first=50, roll_M=50, roll_H=10,
-                 intensity_slices=50, intensity_grid=32, max_seqs=None, pkg_check_seqs=2):
+    def __init__(
+        self,
+        run_dir,
+        test_path,
+        train_path,
+        out_dir,
+        *,
+        device,
+        seed=0,
+        K=200,
+        K_flow=None,
+        ctx_stride=1,
+        ctx_stride_flow=None,
+        c=None,
+        tau_grid_n=1024,
+        tau_factor=4.0,
+        gt_params=None,
+        roll_starts_stride=40,
+        roll_first=50,
+        roll_M=50,
+        roll_H=10,
+        intensity_slices=50,
+        intensity_grid=32,
+        max_seqs=None,
+        pkg_check_seqs=2,
+    ):
         self.t_start = time.time()
         self.pkg_check_seqs = int(pkg_check_seqs)
         self.run_dir = Path(run_dir)
@@ -179,9 +211,14 @@ class Evaluator:
             },
             "adapter": self.ad.describe(),
             "config": {
-                "c": self.c, "tau_max": self.tau_max, "tau_grid_n": int(tau_grid_n), "K": self.K,
-                "ctx_stride": self.ctx_stride, "common_min_target": COMMON_MIN_TARGET,
-                "rollout": self.roll, "intensity": self.int_cfg,
+                "c": self.c,
+                "tau_max": self.tau_max,
+                "tau_grid_n": int(tau_grid_n),
+                "K": self.K,
+                "ctx_stride": self.ctx_stride,
+                "common_min_target": COMMON_MIN_TARGET,
+                "rollout": self.roll,
+                "intensity": self.int_cfg,
             },
             "timings_sec": {},
             "diagnostics": {},
@@ -221,8 +258,10 @@ class Evaluator:
         pkg = None
         if caps.nll_kind == "exact" and n_chk > 0:
             pkg = compute_next_event_test_nll(
-                self.runner, [dict(times=s["times"], locations=s["locations"]) for s in self.test[:n_chk]],
-                device=self.device)
+                self.runner,
+                [dict(times=s["times"], locations=s["locations"]) for s in self.test[:n_chk]],
+                device=self.device,
+            )
             per = np.asarray(pkg["per_context_nll"], float)
         consist = []
         offs = 0
@@ -232,7 +271,11 @@ class Evaluator:
             tgt = k + 1
             self._put("seq", np.full(len(k), si))
             self._put("target", tgt)
-            pk = per[offs : offs + len(k)] if (pkg is not None and si < n_chk) else np.full(len(k), np.nan)
+            pk = (
+                per[offs : offs + len(k)]
+                if (pkg is not None and si < n_chk)
+                else np.full(len(k), np.nan)
+            )
             if nll_only:
                 self._put("defined", np.ones(len(k), bool))
                 if pkg is not None:
@@ -259,32 +302,49 @@ class Evaluator:
                 offs += len(k)
         self._cat()
         A = self.arrays
-        res = {"nll_kind_preset": self.ad.nll_kind, "capabilities_nll_kind": caps.nll_kind,
-               "pkg_check_seqs": int(n_chk)}
+        res = {
+            "nll_kind_preset": self.ad.nll_kind,
+            "capabilities_nll_kind": caps.nll_kind,
+            "pkg_check_seqs": int(n_chk),
+        }
         if "nll_v1" in A:
             dfn = A["defined"].astype(bool)
             common = dfn & (A["target"] >= COMMON_MIN_TARGET)
-            legacy = np.where(dfn, A["nll_v1"], 0.0)  # paper-era protocol: undefined targets scored 0
-            res.update({
-                "nll_defined_mean": float(np.mean(A["nll_v1"][dfn])),
-                "nll_defined_n": int(dfn.sum()),
-                "nll_common_mean": float(np.mean(A["nll_v1"][common])),
-                "nll_common_n": int(common.sum()),
-                "n_undefined_targets": int((~dfn).sum()),
-                "legacy_protocol_mean": float(np.nanmean(legacy)),
-                "legacy_protocol_n": int(len(legacy)),
-            })
+            legacy = np.where(
+                dfn, A["nll_v1"], 0.0
+            )  # paper-era protocol: undefined targets scored 0
+            res.update(
+                {
+                    "nll_defined_mean": float(np.mean(A["nll_v1"][dfn])),
+                    "nll_defined_n": int(dfn.sum()),
+                    "nll_common_mean": float(np.mean(A["nll_v1"][common])),
+                    "nll_common_n": int(common.sum()),
+                    "n_undefined_targets": int((~dfn).sum()),
+                    "legacy_protocol_mean": float(np.nanmean(legacy)),
+                    "legacy_protocol_n": int(len(legacy)),
+                }
+            )
         if pkg is not None:
             chk = np.isfinite(A["nll_pkg"])
-            res.update({
-                "legacy_protocol_method": pkg["method"],
-                "pkg_mean_on_checked": float(np.mean(A["nll_pkg"][chk])),
-                "v1_legacy_mean_on_checked": float(np.mean(np.where(A["defined"], A["nll_v1"], 0.0)[chk])),
-                "max_abs_diff_pkg_vs_v1_defined": float(np.max(np.concatenate(consist))) if consist else None,
-                "mean_abs_diff_pkg_vs_v1_defined": float(np.mean(np.concatenate(consist))) if consist else None,
-            })
+            res.update(
+                {
+                    "legacy_protocol_method": pkg["method"],
+                    "pkg_mean_on_checked": float(np.mean(A["nll_pkg"][chk])),
+                    "v1_legacy_mean_on_checked": float(
+                        np.mean(np.where(A["defined"], A["nll_v1"], 0.0)[chk])
+                    ),
+                    "max_abs_diff_pkg_vs_v1_defined": float(np.max(np.concatenate(consist)))
+                    if consist
+                    else None,
+                    "mean_abs_diff_pkg_vs_v1_defined": float(np.mean(np.concatenate(consist)))
+                    if consist
+                    else None,
+                }
+            )
             undefined = chk & ~A["defined"].astype(bool)
-            res["legacy_undefined_scored_as"] = float(np.mean(A["nll_pkg"][undefined])) if undefined.any() else None
+            res["legacy_undefined_scored_as"] = (
+                float(np.mean(A["nll_pkg"][undefined])) if undefined.any() else None
+            )
         self.summary["nll"] = res
         self.summary["timings_sec"]["nll"] = time.time() - t0
 
@@ -318,9 +378,15 @@ class Evaluator:
                 ly = np.array([np.interp(y[i], self.tau_grid, L[i]) for i in range(len(k))])
                 out_ly[ok] = ly
                 out_pg[ok] = -np.expm1(-ly)
-                out_sc[ok] = np.exp(-np.array([np.interp(self.c, self.tau_grid, L[i]) for i in range(len(k))]))
+                out_sc[ok] = np.exp(
+                    -np.array([np.interp(self.c, self.tau_grid, L[i]) for i in range(len(k))])
+                )
                 out_sm[ok] = np.exp(-L[:, -1])
-            crps.append(out_crps); pit_grid.append(out_pg); s_c.append(out_sc); s_max.append(out_sm); lam_y.append(out_ly)
+            crps.append(out_crps)
+            pit_grid.append(out_pg)
+            s_c.append(out_sc)
+            s_max.append(out_sm)
+            lam_y.append(out_ly)
         A = self.arrays
         A["crps_exact"] = np.concatenate(crps)
         A["pit_grid"] = np.concatenate(pit_grid)
@@ -348,8 +414,12 @@ class Evaluator:
         }
         if "d_lambda_nll_path" in A:
             res["thp_nll_path_vs_gauss_legendre"] = {
-                "median_abs_diff": float(np.nanmedian(np.abs(A["d_lambda_nll_path"] - A["d_lambda"])[dfn])),
-                "pit_ks_nll_path": S.ks_uniform(S.pit_from_compensator(A["d_lambda_nll_path"])[common]),
+                "median_abs_diff": float(
+                    np.nanmedian(np.abs(A["d_lambda_nll_path"] - A["d_lambda"])[dfn])
+                ),
+                "pit_ks_nll_path": S.ks_uniform(
+                    S.pit_from_compensator(A["d_lambda_nll_path"])[common]
+                ),
             }
         self.summary["temporal"] = res
         self.summary["timings_sec"]["temporal"] = time.time() - t0
@@ -363,8 +433,18 @@ class Evaluator:
         sel = np.zeros(n_ctx, bool)
         sel[:: self.ctx_stride] = True
         sel &= A["defined"].astype(bool) | (not self.ad.has_intensity)
-        keys = ["t_crps_fair", "t_pit_rand", "s_es_marg", "s_pit_x", "s_pit_y", "s_hpd_cond", "s_es_cond",
-                "frac_invalid_time", "kde_nll", "legacy_frac_pit"]
+        keys = [
+            "t_crps_fair",
+            "t_pit_rand",
+            "s_es_marg",
+            "s_pit_x",
+            "s_pit_y",
+            "s_hpd_cond",
+            "s_es_cond",
+            "frac_invalid_time",
+            "kde_nll",
+            "legacy_frac_pit",
+        ]
         out = {k_: np.full(n_ctx, np.nan) for k_ in keys}
         offs = 0
         rt = self._rng("samples")
@@ -388,13 +468,19 @@ class Evaluator:
                     locs = np.full((len(k), K, 2), np.nan)
                     if len(rr):
                         tq = seq["times"][k[rr]] + tau[rr, cc]
-                        kw = {"grid_n": 64} if getattr(self.ad, "spatial_sampler", "") == "fine_grid" else {}
+                        kw = (
+                            {"grid_n": 64}
+                            if getattr(self.ad, "spatial_sampler", "") == "fine_grid"
+                            else {}
+                        )
                         xs, _ = self.ad.sample_space(prep, b[rr], k[rr], tq, rt, **kw)
                         locs[rr, cc] = xs
                     # conditional spatial at the true time (HPD rank PIT)
                     xs_c, lp_c = self.ad.sample_space_k(prep, b, k, seq["times"][k + 1], K, rt)
                     if hasattr(self.ad, "sampling_logpdf"):
-                        lp_true = self.ad.sampling_logpdf(prep, b, k, seq["times"][k + 1], s_true[:, None, :])[:, 0]
+                        lp_true = self.ad.sampling_logpdf(
+                            prep, b, k, seq["times"][k + 1], s_true[:, None, :]
+                        )[:, 0]
                     else:
                         lp_true = A["log_ps"][gi]
                     out["s_hpd_cond"][gi] = S.hpd_rank_pit(lp_c, lp_true, rt)
@@ -407,7 +493,9 @@ class Evaluator:
                     locs = np.where(valid_t[..., None], locs, np.nan)
                     for i, gix in enumerate(gi):
                         if valid_t[i].sum() >= 8:
-                            from seahorse.evaluation.likelihood import _joint_sample_kde_next_event_nll
+                            from seahorse.evaluation.likelihood import (
+                                _joint_sample_kde_next_event_nll,
+                            )
 
                             out["kde_nll"][gix] = _joint_sample_kde_next_event_nll(
                                 next_times=seq["times"][k[i]] + dt[i][valid_t[i]],
@@ -418,7 +506,9 @@ class Evaluator:
                             )
                 tau_f = np.where(valid_t, tau, np.nan)
                 out["frac_invalid_time"][gi] = 1.0 - valid_t.mean(1)
-                out["t_crps_fair"][gi] = S.crps_fair_censored(np.where(valid_t, tau, np.nan), y, self.c, valid=valid_t)
+                out["t_crps_fair"][gi] = S.crps_fair_censored(
+                    np.where(valid_t, tau, np.nan), y, self.c, valid=valid_t
+                )
                 out["t_pit_rand"][gi] = S.randomized_rank_pit(tau_f, y, rt, valid=valid_t)
                 out["legacy_frac_pit"][gi] = S.deterministic_fraction_pit(tau_f, y)
                 vs = np.isfinite(locs).all(-1)
@@ -438,17 +528,20 @@ class Evaluator:
                 "s_es_marg_mean": float(np.nanmean(out["s_es_marg"][m])),
                 "s_pit_x_ks": S.ks_uniform(out["s_pit_x"][m]),
                 "s_pit_y_ks": S.ks_uniform(out["s_pit_y"][m]),
-                "s_pit_marg_ks_mean": 0.5 * (S.ks_uniform(out["s_pit_x"][m])["ks"] + S.ks_uniform(out["s_pit_y"][m])["ks"]),
+                "s_pit_marg_ks_mean": 0.5
+                * (S.ks_uniform(out["s_pit_x"][m])["ks"] + S.ks_uniform(out["s_pit_y"][m])["ks"]),
                 "frac_invalid_time_mean": float(np.nanmean(out["frac_invalid_time"][m])),
             }
             if self.ad.has_intensity:
-                r.update({
-                    "s_hpd_cond_ks": S.ks_uniform(out["s_hpd_cond"][m]),
-                    "s_hpd_cond_hist": S.pit_histogram(out["s_hpd_cond"][m]),
-                    "s_es_cond_mean": float(np.nanmean(out["s_es_cond"][m])),
-                    "crps_exact_mean_same_contexts": float(np.nanmean(A["crps_exact"][m])),
-                    "pit_exact_ks_same_contexts": S.ks_uniform(A["pit_exact"][m]),
-                })
+                r.update(
+                    {
+                        "s_hpd_cond_ks": S.ks_uniform(out["s_hpd_cond"][m]),
+                        "s_hpd_cond_hist": S.pit_histogram(out["s_hpd_cond"][m]),
+                        "s_es_cond_mean": float(np.nanmean(out["s_es_cond"][m])),
+                        "crps_exact_mean_same_contexts": float(np.nanmean(A["crps_exact"][m])),
+                        "pit_exact_ks_same_contexts": S.ks_uniform(A["pit_exact"][m]),
+                    }
+                )
             else:
                 r["kde_nll_mean"] = float(np.nanmean(out["kde_nll"][m]))
             r["t_pit_rand_hist"] = S.pit_histogram(out["t_pit_rand"][m])
@@ -467,10 +560,17 @@ class Evaluator:
             # joint attentive ODE per density evaluation: coarser grid (documented in METRICS_SPEC §5)
             g, n_slices = 16, 25
         cc = (np.arange(g) + 0.5) / g
-        X, Y = np.meshgrid(self.gt.x_range[0] + cc * (self.gt.x_range[1] - self.gt.x_range[0]),
-                           self.gt.y_range[0] + cc * (self.gt.y_range[1] - self.gt.y_range[0]), indexing="ij")
+        X, Y = np.meshgrid(
+            self.gt.x_range[0] + cc * (self.gt.x_range[1] - self.gt.x_range[0]),
+            self.gt.y_range[0] + cc * (self.gt.y_range[1] - self.gt.y_range[0]),
+            indexing="ij",
+        )
         pts = np.stack([X.ravel(), Y.ravel()], -1)
-        cell = (self.gt.x_range[1] - self.gt.x_range[0]) * (self.gt.y_range[1] - self.gt.y_range[0]) / (g * g)
+        cell = (
+            (self.gt.x_range[1] - self.gt.x_range[0])
+            * (self.gt.y_range[1] - self.gt.y_range[0])
+            / (g * g)
+        )
         per_seq = []
         all_m, all_t = [], []
         slice_r = []
@@ -482,21 +582,27 @@ class Evaluator:
             ok = k >= self.ad.min_history - 1
             ts, k = ts[ok], k[ok]
             prep = self.ad.prepare(t, seq["locations"])
-            lam_m = self.ad.intensity(prep, np.zeros_like(k), k, ts, np.broadcast_to(pts, (len(k),) + pts.shape))
+            lam_m = self.ad.intensity(
+                prep, np.zeros_like(k), k, ts, np.broadcast_to(pts, (len(k),) + pts.shape)
+            )
             lam_t = np.stack([self.gt.intensity(tt, pts, t, seq["locations"]) for tt in ts])
             sr = [S.pearson(lam_m[i], lam_t[i]) for i in range(len(ts))]
             slice_r.extend(sr)
             dt_slice = (t[-1] - lo) / (len(ts) + 1)
-            per_seq.append({
-                "seq": si,
-                "slice_pearson_mean": float(np.nanmean(sr)),
-                "pooled_pearson": S.pearson(lam_m, lam_t),
-                "spearman": S.spearman(lam_m, lam_t),
-                "log_rmse": float(np.sqrt(np.nanmean((np.log(np.maximum(lam_m, 1e-12)) - np.log(lam_t)) ** 2))),
-                "mass_model": float(lam_m.sum() * cell * dt_slice),
-                "mass_true": float(lam_t.sum() * cell * dt_slice),
-                "n_events_window": int(((t > lo) & (t <= t[-1])).sum()),
-            })
+            per_seq.append(
+                {
+                    "seq": si,
+                    "slice_pearson_mean": float(np.nanmean(sr)),
+                    "pooled_pearson": S.pearson(lam_m, lam_t),
+                    "spearman": S.spearman(lam_m, lam_t),
+                    "log_rmse": float(
+                        np.sqrt(np.nanmean((np.log(np.maximum(lam_m, 1e-12)) - np.log(lam_t)) ** 2))
+                    ),
+                    "mass_model": float(lam_m.sum() * cell * dt_slice),
+                    "mass_true": float(lam_t.sum() * cell * dt_slice),
+                    "n_events_window": int(((t > lo) & (t <= t[-1])).sum()),
+                }
+            )
             all_m.append(lam_m.ravel())
             all_t.append(lam_t.ravel())
         am, at = np.concatenate(all_m), np.concatenate(all_t)
@@ -504,11 +610,18 @@ class Evaluator:
             "slice_pearson_mean": float(np.nanmean(slice_r)),
             "pooled_pearson": S.pearson(am, at),
             "spearman": S.spearman(am, at),
-            "log_rmse": float(np.sqrt(np.nanmean((np.log(np.maximum(am, 1e-12)) - np.log(at)) ** 2))),
-            "mass_ratio_model_over_true": float(sum(p["mass_model"] for p in per_seq) / sum(p["mass_true"] for p in per_seq)),
-            "mass_ratio_true_over_events": float(sum(p["mass_true"] for p in per_seq) / sum(p["n_events_window"] for p in per_seq)),
+            "log_rmse": float(
+                np.sqrt(np.nanmean((np.log(np.maximum(am, 1e-12)) - np.log(at)) ** 2))
+            ),
+            "mass_ratio_model_over_true": float(
+                sum(p["mass_model"] for p in per_seq) / sum(p["mass_true"] for p in per_seq)
+            ),
+            "mass_ratio_true_over_events": float(
+                sum(p["mass_true"] for p in per_seq) / sum(p["n_events_window"] for p in per_seq)
+            ),
             "per_sequence": per_seq,
-            "grid": g, "slices": n_slices,
+            "grid": g,
+            "slices": n_slices,
         }
         self.summary["timings_sec"]["intensity"] = time.time() - t0
 
@@ -544,7 +657,11 @@ class Evaluator:
                     tau, cens = tau[:, 0], cens[:, 0]
                     ok &= ~cens
                     tau = np.where(cens, self.tau_max, tau)
-                    kw = {"grid_n": 64} if getattr(self.ad, "spatial_sampler", "") == "fine_grid" else {}
+                    kw = (
+                        {"grid_n": 64}
+                        if getattr(self.ad, "spatial_sampler", "") == "fine_grid"
+                        else {}
+                    )
                     xs, _ = self.ad.sample_space(prep, b, k, t_last + tau, rr, **kw)
                 else:
                     dt, loc = self.ad.sample_next(prep, b, k, 1)
@@ -565,9 +682,18 @@ class Evaluator:
                 for Hh in (1, 5, 10):
                     if Hh > H:
                         continue
-                    row[f"es_time_h{Hh}"] = float(S.energy_score_fair(gen_off[None, :, :Hh], true_off[None, :Hh], valid=okr[None])[0])
-                    row[f"es_space_h{Hh}"] = float(S.energy_score_fair(
-                        gen_loc[None, :, :Hh].reshape(1, M, 2 * Hh), true_loc[None, :Hh].reshape(1, 2 * Hh), valid=okr[None])[0])
+                    row[f"es_time_h{Hh}"] = float(
+                        S.energy_score_fair(
+                            gen_off[None, :, :Hh], true_off[None, :Hh], valid=okr[None]
+                        )[0]
+                    )
+                    row[f"es_space_h{Hh}"] = float(
+                        S.energy_score_fair(
+                            gen_loc[None, :, :Hh].reshape(1, M, 2 * Hh),
+                            true_loc[None, :Hh].reshape(1, 2 * Hh),
+                            valid=okr[None],
+                        )[0]
+                    )
                 rows.append(row)
         res = {"H": H, "M": M, "n_starts": len(rows), "start_indices": [int(x) for x in starts]}
         for key in rows[0] if rows else []:
@@ -580,7 +706,9 @@ class Evaluator:
     # ------------------------------------------------------------------
     def save(self):
         A = self.arrays
-        np.savez_compressed(self.out / "per_context.npz", **{k: np.asarray(v) for k, v in A.items()})
+        np.savez_compressed(
+            self.out / "per_context.npz", **{k: np.asarray(v) for k, v in A.items()}
+        )
         if getattr(self, "rollout_rows", None):
             (self.out / "rollout_rows.json").write_text(json.dumps(self.rollout_rows))
         self.summary["timings_sec"]["total"] = time.time() - self.t_start
@@ -620,12 +748,29 @@ def main(argv=None):
     p.add_argument("--roll-stride", type=int, default=40)
     p.add_argument("--max-seqs", type=int, default=None)
     a = p.parse_args(argv)
-    ev = Evaluator(a.run, a.test, a.train, a.out, device=a.device, seed=a.seed, K=a.K, K_flow=a.K_flow,
-                   ctx_stride=a.ctx_stride, ctx_stride_flow=a.ctx_stride_flow, c=a.c, tau_grid_n=a.tau_grid_n,
-                   gt_params=a.gt_params, roll_M=a.roll_M, roll_H=a.roll_H, roll_starts_stride=a.roll_stride,
-                   max_seqs=a.max_seqs)
+    ev = Evaluator(
+        a.run,
+        a.test,
+        a.train,
+        a.out,
+        device=a.device,
+        seed=a.seed,
+        K=a.K,
+        K_flow=a.K_flow,
+        ctx_stride=a.ctx_stride,
+        ctx_stride_flow=a.ctx_stride_flow,
+        c=a.c,
+        tau_grid_n=a.tau_grid_n,
+        gt_params=a.gt_params,
+        roll_M=a.roll_M,
+        roll_H=a.roll_H,
+        roll_starts_stride=a.roll_stride,
+        max_seqs=a.max_seqs,
+    )
     ev.run([x.strip() for x in a.sections.split(",") if x.strip()])
-    print(json.dumps({k: ev.summary.get(k) for k in ("nll", "timings_sec")}, indent=1, default=float))
+    print(
+        json.dumps({k: ev.summary.get(k) for k in ("nll", "timings_sec")}, indent=1, default=float)
+    )
 
 
 if __name__ == "__main__":

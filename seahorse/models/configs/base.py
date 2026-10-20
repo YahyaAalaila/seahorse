@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 # Config registry
 # ---------------------------------------------------------------------------
 
+
 @dataclasses.dataclass(frozen=True)
 class PresetDescriptor:
     """Resolved metadata for an accepted preset identifier."""
@@ -51,9 +52,7 @@ class ConfigRegistry:
     _status: ClassVar[dict[str, str]] = {}
     _is_alias: ClassVar[dict[str, bool]] = {}
     _runner_kind: ClassVar[dict[str, str]] = {}
-    _VALID_STATUSES: ClassVar[frozenset[str]] = frozenset(
-        {"canonical", "deprecated", "legacy"}
-    )
+    _VALID_STATUSES: ClassVar[frozenset[str]] = frozenset({"canonical", "deprecated", "legacy"})
 
     @classmethod
     def _validate_status(cls, status: str) -> str:
@@ -67,7 +66,8 @@ class ConfigRegistry:
     def register(cls, name: str, *, status: str = "canonical", runner_kind: str = "nnstpp"):
         """Decorator that registers a config class under a preset name."""
         status = cls._validate_status(status)
-        if runner_kind not in {"nnstpp", "statstpp"}: raise ValueError("runner_kind must be nnstpp or statstpp")
+        if runner_kind not in {"nnstpp", "statstpp"}:
+            raise ValueError("runner_kind must be nnstpp or statstpp")
 
         def decorator(config_cls):
             if name in cls._registry:
@@ -78,6 +78,7 @@ class ConfigRegistry:
             cls._is_alias[name] = False
             cls._runner_kind[name] = runner_kind
             return config_cls
+
         return decorator
 
     @classmethod
@@ -111,9 +112,7 @@ class ConfigRegistry:
         canonical = cls.resolve_name(name)
         config_cls = cls._registry.get(canonical)
         if config_cls is None:
-            raise ValueError(
-                f"Unknown preset {name!r}. Known presets: {sorted(cls._registry)}"
-            )
+            raise ValueError(f"Unknown preset {name!r}. Known presets: {sorted(cls._registry)}")
         lookup = name if name in cls._registry else canonical
         return PresetDescriptor(
             name=lookup,
@@ -142,9 +141,7 @@ class ConfigRegistry:
         """Build a UnifiedSTPP from a preset name and override dict."""
         canonical = cls.resolve_name(name)
         if canonical not in cls._registry:
-            raise ValueError(
-                f"Unknown preset {name!r}. Known presets: {sorted(cls._registry)}"
-            )
+            raise ValueError(f"Unknown preset {name!r}. Known presets: {sorted(cls._registry)}")
         cfg_cls = cls._registry[canonical]
         return cfg_cls.from_dict(copy.deepcopy(overrides), **dims).build_model()
 
@@ -218,6 +215,7 @@ class ConfigRegistry:
 # ---------------------------------------------------------------------------
 # Base config class
 # ---------------------------------------------------------------------------
+
 
 @dataclasses.dataclass
 class BaseModelConfig:
@@ -297,11 +295,13 @@ class BaseModelConfig:
     def build_state_model(self) -> "StateModel":
         """Build and return the state model via registry lookup."""
         from seahorse.models.model_registry import get_state_cls
+
         return get_state_cls(self._STATE_MODEL)(**self._state_kwargs())
 
     def build_event_model(self) -> "EventModel":
         """Build and return the event model via registry lookup."""
         from seahorse.models.model_registry import get_event_cls
+
         return get_event_cls(self._EVENT_MODEL)(**self._event_kwargs())
 
     def build_model(self) -> "UnifiedSTPP":
@@ -312,6 +312,7 @@ class BaseModelConfig:
         (e.g. constructor-injection of pre-built modules) may override this.
         """
         from seahorse.models.unified_model import UnifiedSTPP
+
         return UnifiedSTPP(
             state_model=self.build_state_model(),
             event_model=self.build_event_model(),

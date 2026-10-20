@@ -35,8 +35,10 @@ class _WindowBase(FamilyAdapter):
         self.sm = sm
         ns = runner.norm_stats or {}
         if bool(ns.get("normalize", False)):
-            tm = float(ns.get("time_mean", 0.0)); ts = float(ns.get("time_std", 1.0))
-            lm = np.asarray(ns.get("loc_mean", [0, 0]), float); ls = np.asarray(ns.get("loc_std", [1, 1]), float)
+            tm = float(ns.get("time_mean", 0.0))
+            ts = float(ns.get("time_std", 1.0))
+            lm = np.asarray(ns.get("loc_mean", [0, 0]), float)
+            ls = np.asarray(ns.get("loc_std", [1, 1]), float)
             if abs(tm) > 0 or abs(ts - 1) > 0 or np.any(lm != 0) or np.any(ls != 1):
                 raise NotImplementedError("windowed adapters assume identity runner norm_stats")
         if bool(sm.input_normalized_flag.item() > 0.5):
@@ -154,8 +156,15 @@ class AutoSTPPAdapter(_WindowBase):
             t_diff = a + dt_y[:, None]
             st = torch.cat([s_y[:, None, :] - s, t_diff[..., None]], dim=-1)
             lam = self.kernel.forward(st.reshape(-1, 3)).view(R, L).sum(-1) + self._bg()
-            lam_t = self.kernel.lamb_t_stpp(s.reshape(-1, 2), t_diff.reshape(-1, 1)).view(R, L).sum(-1) + self._bg()
-            ints = self.kernel.int_lamb_stpp(s.reshape(-1, 2), a.reshape(-1, 1), t_diff.reshape(-1, 1)).view(R, L).sum(-1)
+            lam_t = (
+                self.kernel.lamb_t_stpp(s.reshape(-1, 2), t_diff.reshape(-1, 1)).view(R, L).sum(-1)
+                + self._bg()
+            )
+            ints = (
+                self.kernel.int_lamb_stpp(s.reshape(-1, 2), a.reshape(-1, 1), t_diff.reshape(-1, 1))
+                .view(R, L)
+                .sum(-1)
+            )
             ints = ints + dt_y * self._bg()
             out["log_lambda"][k + 1] = to_np(torch.log(lam)) - self.log_jac_t - self.log_jac_s
             out["d_lambda"][k + 1] = to_np(ints)
@@ -188,8 +197,13 @@ class AutoSTPPAdapter(_WindowBase):
             s, a, _ = self._window_arrays(prep, b_idx[sl], k_idx[sl])
             R, L = s.shape[0], s.shape[1]
             ts = self.t(np.maximum(self._tau_scaled(tq[sl]), 0.0))
-            v = self.kernel.int_lamb_stpp(s.reshape(-1, 2), a.reshape(-1, 1),
-                                          (a + ts[:, None]).reshape(-1, 1)).view(R, L).sum(1)
+            v = (
+                self.kernel.int_lamb_stpp(
+                    s.reshape(-1, 2), a.reshape(-1, 1), (a + ts[:, None]).reshape(-1, 1)
+                )
+                .view(R, L)
+                .sum(1)
+            )
             out[sl] = to_np(v + self._bg() * ts)
         return out
 
@@ -203,7 +217,11 @@ class AutoSTPPAdapter(_WindowBase):
             tk = prep.times[b_idx[sl], k_idx[sl]]
             tau = self.t(np.maximum(self._tau_scaled(tq[sl] - tk), 0.0))
             R, L = s.shape[0], s.shape[1]
-            v = self.kernel.lamb_t_stpp(s.reshape(-1, 2), (a + tau[:, None]).reshape(-1, 1)).view(R, L).sum(-1)
+            v = (
+                self.kernel.lamb_t_stpp(s.reshape(-1, 2), (a + tau[:, None]).reshape(-1, 1))
+                .view(R, L)
+                .sum(-1)
+            )
             out.append(to_np(v + self._bg()) / self.dt_range)
         return np.concatenate(out)
 
@@ -218,7 +236,7 @@ class AutoSTPPAdapter(_WindowBase):
         M = pts_hat.shape[1]
         dx = pts_hat[:, None, :, 0] - s_win[:, :, None, 0]  # (R,L,M)
         dy = pts_hat[:, None, :, 1] - s_win[:, :, None, 1]
-        tt = (a + tau_hat[:, None])  # (R,L)
+        tt = a + tau_hat[:, None]  # (R,L)
         total = torch.zeros(R, M, device=self.device)
         for sign, sp in ((3.0, self.kernel.M), (-3.0, self.kernel.L)):
             for net in sp.nets:
@@ -248,7 +266,12 @@ class AutoSTPPAdapter(_WindowBase):
             inside = np.all((ph >= 0) & (ph <= 1), axis=-1)
             lam = to_np(self._lambda_scaled_at(s, a, tau, self.t(ph)))
             r = s.shape[0]
-            lam_t = to_np(self.kernel.lamb_t_stpp(s.reshape(-1, 2), (a + tau[:, None]).reshape(-1, 1)).view(r, -1).sum(-1) + self._bg())
+            lam_t = to_np(
+                self.kernel.lamb_t_stpp(s.reshape(-1, 2), (a + tau[:, None]).reshape(-1, 1))
+                .view(r, -1)
+                .sum(-1)
+                + self._bg()
+            )
             lp = np.log(np.maximum(lam, 1e-300)) - np.log(lam_t)[:, None] - self.log_jac_s
             lp[~inside] = -np.inf
             out[sl] = lp
@@ -348,7 +371,9 @@ class DeepSTPPAdapter(_WindowBase):
             for sl in chunked(len(missing), 4096):
                 part = missing[sl]
                 win = torch.stack([hs[b, k - L + 1 : k + 1] for b, k in part], 0)
-                z, _, _, _ = self.sm._encode_windows(win, sample_latent=bool(getattr(self.sm, "vae", False)))
+                z, _, _, _ = self.sm._encode_windows(
+                    win, sample_latent=bool(getattr(self.sm, "vae", False))
+                )
                 for (b, k), zz in zip(part, z):
                     cache[(b, k)] = zz
         return torch.stack([cache[kk] for kk in keys], 0)
@@ -371,7 +396,9 @@ class DeepSTPPAdapter(_WindowBase):
     def event_terms(self, prep) -> EventTerms:
         T = prep.T
         L = self.lookback
-        out = dict(log_lambda=np.full(T, np.nan), d_lambda=np.full(T, np.nan), log_ps=np.full(T, np.nan))
+        out = dict(
+            log_lambda=np.full(T, np.nan), d_lambda=np.full(T, np.nan), log_ps=np.full(T, np.nan)
+        )
         k = np.arange(L - 1, T - 1)
         if len(k):
             b = np.zeros_like(k)
@@ -394,8 +421,11 @@ class DeepSTPPAdapter(_WindowBase):
         """log sum_i softmax(log_v)_i N(pts | centers_i, diag(sigma_i)); pts (R,M,2)."""
         log_vn = log_v - torch.logsumexp(log_v, -1, keepdim=True)
         d = pts[:, :, None, :] - centers[:, None, :, :]  # (R,M,m,2)
-        lg = (-0.5 * torch.log(sigma).sum(-1)[:, None, :] - math.log(2 * math.pi)
-              - 0.5 * (d * d / sigma[:, None, :, :]).sum(-1))
+        lg = (
+            -0.5 * torch.log(sigma).sum(-1)[:, None, :]
+            - math.log(2 * math.pi)
+            - 0.5 * (d * d / sigma[:, None, :, :]).sum(-1)
+        )
         return torch.logsumexp(log_vn[:, None, :] + lg, -1)
 
     @torch.no_grad()
@@ -432,7 +462,10 @@ class DeepSTPPAdapter(_WindowBase):
             tau = self.t(np.maximum(self._tau_scaled(tq[sl] - tk), 0.0))
             t_ti = (tn + tau[:, None]).clamp(min=1e-6)
             log_v = torch.log(w) - bs * t_ti
-            out[sl] = to_np(self._mix_logpdf(log_v, centers, sigma, self.t(self._scale_locs(pts[sl])))) - self.log_jac_s
+            out[sl] = (
+                to_np(self._mix_logpdf(log_v, centers, sigma, self.t(self._scale_locs(pts[sl]))))
+                - self.log_jac_s
+            )
         return out
 
     @torch.no_grad()

@@ -1,28 +1,47 @@
 """Analytic limits, causality, quadrature, gradients and reporting for DNSK."""
+
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
-from seahorse.evaluation.likelihood import compute_next_event_test_nll, _prefix_difference_next_event_nlls
+from seahorse.evaluation.likelihood import (
+    compute_next_event_test_nll,
+    _prefix_difference_next_event_nlls,
+)
 from seahorse.models.event_models.dnsk import DNSKEventModel
 from seahorse.registry import build_model
 
 
 def _model(**kwargs):
     torch.manual_seed(3)
-    return build_model(preset="dnsk", config={"decoder": {
-        "width": 8, "temporal_nodes": 17, "spatial_nodes": 12,
-        "barrier_time_nodes": 2, "barrier_space_nodes": 3, **kwargs,
-    }})
+    return build_model(
+        preset="dnsk",
+        config={
+            "decoder": {
+                "width": 8,
+                "temporal_nodes": 17,
+                "spatial_nodes": 12,
+                "barrier_time_nodes": 2,
+                "barrier_space_nodes": 3,
+                **kwargs,
+            }
+        },
+    )
 
 
 def _batch():
-    return {"times": torch.tensor([[0.1, 0.2, 0.35, 0.5], [0.2, 0.4, 0.0, 0.0]]),
-            "locations": torch.tensor([[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]],
-                                       [[0.8, 0.2], [0.4, 0.6], [0.0, 0.0], [0.0, 0.0]]]),
-            "lengths": torch.tensor([4, 2])}
+    return {
+        "times": torch.tensor([[0.1, 0.2, 0.35, 0.5], [0.2, 0.4, 0.0, 0.0]]),
+        "locations": torch.tensor(
+            [
+                [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]],
+                [[0.8, 0.2], [0.4, 0.6], [0.0, 0.0], [0.0, 0.0]],
+            ]
+        ),
+        "lengths": torch.tensor([4, 2]),
+    }
 
 
 def test_zero_kernel_is_exact_poisson_on_finite_rectangle():
@@ -42,8 +61,13 @@ def test_temporal_antiderivative_matches_interpolated_basis():
     table = event._tables()
     integral = event.temporal_basis(times, table, integral=True).sum(-1)
     derivative = torch.autograd.grad(integral.sum(), times)[0]
-    torch.testing.assert_close(derivative, event.temporal_basis(times, table).sum(-1), atol=1e-9, rtol=1e-9)
-    torch.testing.assert_close(event.temporal_basis(torch.tensor([-1.0], dtype=torch.float64), table, integral=True), torch.zeros(1, 2, dtype=torch.float64))
+    torch.testing.assert_close(
+        derivative, event.temporal_basis(times, table).sum(-1), atol=1e-9, rtol=1e-9
+    )
+    torch.testing.assert_close(
+        event.temporal_basis(torch.tensor([-1.0], dtype=torch.float64), table, integral=True),
+        torch.zeros(1, 2, dtype=torch.float64),
+    )
 
 
 def test_finite_region_spatial_integral_respects_boundaries():
@@ -59,31 +83,51 @@ def test_finite_region_spatial_integral_respects_boundaries():
 
 def test_raw_query_intensity_and_density_jacobian():
     from seahorse.data.transforms import ZScoreTransformArtifact
-    transform = ZScoreTransformArtifact(time_std=2., loc_mean=(10., 20.), loc_std=(3., 4.))
-    model = build_model(preset="dnsk", config={"input_transform": transform.serialize(), "decoder": {"width": 4, "mu": 2.}})
+
+    transform = ZScoreTransformArtifact(time_std=2.0, loc_mean=(10.0, 20.0), loc_std=(3.0, 4.0))
+    model = build_model(
+        preset="dnsk",
+        config={"input_transform": transform.serialize(), "decoder": {"width": 4, "mu": 2.0}},
+    )
     model.event_model.alpha.data.zero_()
-    state = model.state_model.encode_history(times=torch.tensor([[.2, .4]]),
-        locations=torch.tensor([[[10.3, 20.4], [10.6, 20.8]]]), lengths=torch.tensor([2]))
-    rate = model.event_model.intensity(state=state, query_times=torch.tensor([[.6]]),
-                                       query_locations=torch.tensor([[[11.5, 22.]]]))
-    torch.testing.assert_close(rate, torch.tensor([[2. / (2. * 3. * 4.)]]))
+    state = model.state_model.encode_history(
+        times=torch.tensor([[0.2, 0.4]]),
+        locations=torch.tensor([[[10.3, 20.4], [10.6, 20.8]]]),
+        lengths=torch.tensor([2]),
+    )
+    rate = model.event_model.intensity(
+        state=state,
+        query_times=torch.tensor([[0.6]]),
+        query_locations=torch.tensor([[[11.5, 22.0]]]),
+    )
+    torch.testing.assert_close(rate, torch.tensor([[2.0 / (2.0 * 3.0 * 4.0)]]))
 
 
 def test_signed_inhibition_and_invalid_intensity_are_not_clipped():
-    model = _model(temporal_rank=1, spatial_rank=1, mu=2.)
+    model = _model(temporal_rank=1, spatial_rank=1, mu=2.0)
     event = model.event_model
     for bank in (event.psi, event.phi, event.u, event.v):
         for net in bank.nets:
-            for p in net.parameters(): p.data.zero_()
-            net[-1].bias.data.fill_(1.)
-    event.alpha.data.fill_(-.5)
-    state = model.state_model.encode_history(times=torch.tensor([[.1]]),
-        locations=torch.tensor([[[.5, .5]]]), lengths=torch.tensor([1]))
-    value = event.intensity(state=state, query_times=torch.tensor([[.2]]), query_locations=torch.tensor([[[.5, .5]]]))
+            for p in net.parameters():
+                p.data.zero_()
+            net[-1].bias.data.fill_(1.0)
+    event.alpha.data.fill_(-0.5)
+    state = model.state_model.encode_history(
+        times=torch.tensor([[0.1]]),
+        locations=torch.tensor([[[0.5, 0.5]]]),
+        lengths=torch.tensor([1]),
+    )
+    value = event.intensity(
+        state=state, query_times=torch.tensor([[0.2]]), query_locations=torch.tensor([[[0.5, 0.5]]])
+    )
     torch.testing.assert_close(value, torch.tensor([[1.5]]))
-    event.alpha.data.fill_(-3.)
+    event.alpha.data.fill_(-3.0)
     with pytest.raises(ValueError, match="non-positive"):
-        event.intensity(state=state, query_times=torch.tensor([[.2]]), query_locations=torch.tensor([[[.5, .5]]]))
+        event.intensity(
+            state=state,
+            query_times=torch.tensor([[0.2]]),
+            query_locations=torch.tensor([[[0.5, 0.5]]]),
+        )
 
 
 def test_gradients_and_checkpointed_barrier_schedule():
@@ -103,8 +147,11 @@ def test_eventwise_scores_match_prefix_recomputation_and_are_causal():
     model = _model().eval()
     batch = _batch()
     seq = {"times": batch["times"][0].numpy(), "locations": batch["locations"][0].numpy()}
-    runner = SimpleNamespace(model=model, norm_stats={"normalize": False},
-                             config=SimpleNamespace(training=SimpleNamespace(test_nll_space="native")))
+    runner = SimpleNamespace(
+        model=model,
+        norm_stats={"normalize": False},
+        config=SimpleNamespace(training=SimpleNamespace(test_nll_space="native")),
+    )
     with torch.no_grad():
         actual = compute_next_event_test_nll(runner, [seq], device=torch.device("cpu"))
         expected = _prefix_difference_next_event_nlls(runner, seq, device=torch.device("cpu"))

@@ -40,7 +40,9 @@ class ETASContract:
     model_id: str = "seahorse_etas"
 
     def validate(self) -> None:
-        dates = pd.to_datetime([self.auxiliary_start, self.timewindow_start, self.timewindow_end, self.testwindow_end])
+        dates = pd.to_datetime(
+            [self.auxiliary_start, self.timewindow_start, self.timewindow_end, self.testwindow_end]
+        )
         if not bool(np.all(np.diff(dates.view("i8")) > 0)):
             raise ValueError("require auxiliary_start < train start < test start < test end")
         if not self.shape_coords or len(self.shape_coords) < 3:
@@ -57,13 +59,18 @@ class ETASAuthorAdapter:
     required_columns = ("id", "latitude", "longitude", "time", "magnitude")
 
     def __init__(self, contract: ETASContract):
-        contract.validate(); self.contract = contract; self.metadata: dict[str, Any] | None = None
+        contract.validate()
+        self.contract = contract
+        self.metadata: dict[str, Any] | None = None
 
     def catalog_metadata(self, catalog: pd.DataFrame, *, data_path: str | Path) -> dict[str, Any]:
         missing = set(self.required_columns).difference(catalog.columns)
         if missing:
             raise ValueError(f"ETAS catalog missing required columns: {sorted(missing)}")
-        if catalog.id.duplicated().any() or not pd.to_datetime(catalog.time, errors="coerce").notna().all():
+        if (
+            catalog.id.duplicated().any()
+            or not pd.to_datetime(catalog.time, errors="coerce").notna().all()
+        ):
             raise ValueError("ETAS requires unique IDs and parseable occurrence times")
         for col in ("latitude", "longitude", "magnitude"):
             if not np.isfinite(pd.to_numeric(catalog[col], errors="coerce")).all():
@@ -89,15 +96,20 @@ class ETASAuthorAdapter:
     def fit(self, catalog: pd.DataFrame, *, data_path: str | Path) -> dict[str, Any]:
         metadata = self.catalog_metadata(catalog, data_path=data_path)
         calculation, _ = _author_etas()
-        fit = calculation(metadata); fit.prepare(); parameters = fit.invert()
+        fit = calculation(metadata)
+        fit.prepare()
+        parameters = fit.invert()
         # The pinned implementation concatenates file names rather than using
         # pathlib, so preserve the directory separator supplied in metadata.
         fit.store_results(metadata["data_path"])
         return parameters
 
-    def score_author_test_window(self, fitted_metadata: dict[str, Any], *, quadrature_n: int = 1_000_000) -> dict[str, float]:
+    def score_author_test_window(
+        self, fitted_metadata: dict[str, Any], *, quadrature_n: int = 1_000_000
+    ) -> dict[str, float]:
         _, likelihood = _author_etas()
-        calc = likelihood(fitted_metadata); calc.prepare(n=int(quadrature_n))
+        calc = likelihood(fitted_metadata)
+        calc.prepare(n=int(quadrature_n))
         scores = calc.evaluate()
         # Author API returns {"nll", "tll", "sll"}, despite the old example
         # scripts assigning it as though it were a tuple.
@@ -123,7 +135,9 @@ class ETASAuthorAdapter:
             from etas.simulation import simulate_catalog_continuation  # type: ignore
             from shapely.geometry import Polygon
         except ImportError as exc:
-            raise RuntimeError("ETAS simulation needs the pinned author package and Shapely") from exc
+            raise RuntimeError(
+                "ETAS simulation needs the pinned author package and Shapely"
+            ) from exc
         return simulate_catalog_continuation(
             auxiliary_catalog=auxiliary_catalog,
             auxiliary_start=pd.to_datetime(self.contract.auxiliary_start),
