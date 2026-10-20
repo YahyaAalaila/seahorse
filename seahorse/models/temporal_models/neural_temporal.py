@@ -161,7 +161,7 @@ class RMTPPTemporalProcess(nn.Module):
         log_lambda = torch.log(a + 1e-20) - b * delta_t         # (B, T)
 
         # Compensator over each inter-event interval (closed form)
-        comp_per = (a / b) * (1.0 - torch.exp(-b * delta_t))   # (B, T)
+        comp_per = (a / b) * (-torch.expm1(-b * delta_t))   # (B, T)
 
         event_ll = (log_lambda - comp_per) * input_mask          # (B, T)
 
@@ -173,7 +173,7 @@ class RMTPPTemporalProcess(nn.Module):
         b_last = F.softplus(ab_last[:, 1]).clamp(min=1e-6)
         t_last = event_times[arange_B, (seq_lens - 1).clamp(min=0)]
         dt_surv = (t1 - t_last).clamp(min=0.0)
-        survival = (a_last / b_last) * (1.0 - torch.exp(-b_last * dt_surv))  # (B,)
+        survival = (a_last / b_last) * (-torch.expm1(-b_last * dt_surv))  # (B,)
 
         return event_ll, survival
 
