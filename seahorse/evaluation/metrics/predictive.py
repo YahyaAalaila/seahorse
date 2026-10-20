@@ -404,7 +404,6 @@ class TemporalMAE(Metric):
 
     def compute(self, ctx: "EvalContext") -> MetricResult:
         samples = ctx.samples_predictive
-        true_iets = (samples.true_next_times - samples.history_end_times).astype(np.float64)
         pred_iets = (samples.next_times - samples.history_end_times[:, None]).astype(np.float64)
         pred_median_iet = np.median(pred_iets, axis=1)  # (N,)
         pred_t = samples.history_end_times.astype(np.float64) + pred_median_iet
@@ -417,6 +416,31 @@ class TemporalMAE(Metric):
             value=float(np.nanmean(per_event)),
             per_event=per_event,
             method=samples.sampling_backend,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Temporal RMSE uses the predictive mean, complementing median-based MAE.
+# ---------------------------------------------------------------------------
+
+
+@register_metric
+class TemporalRMSE(Metric):
+    """Root mean squared next-event waiting-time error, in raw time units."""
+
+    name = "temporal_rmse"
+    requires = frozenset({"samples_predictive"})
+    artifact_families = frozenset({PREDICTIVE_SAMPLES})
+    cost_class = "sampling_heavy"
+
+    def compute(self, ctx: "EvalContext") -> MetricResult:
+        samples = ctx.samples_predictive
+        waits = samples.next_times.astype(np.float64) - samples.history_end_times[:, None]
+        observed = samples.true_next_times.astype(np.float64) - samples.history_end_times
+        squared = _nan_out_failed_contexts((waits.mean(axis=1) - observed) ** 2, samples)
+        return MetricResult(
+            value=float(np.sqrt(np.nanmean(squared))),
+            per_event=np.sqrt(squared), method=samples.sampling_backend,
         )
 
 

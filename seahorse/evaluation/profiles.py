@@ -67,6 +67,7 @@ PREDICTIVE_METRICS = (
     "spatial_pit",
     "coverage_at_distance",
     "temporal_mae",
+    "temporal_rmse",
     "spatial_mae",
     "spatial_rmse",
     "joint_distance",

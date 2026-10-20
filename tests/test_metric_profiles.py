@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -237,3 +238,26 @@ class TestMetricProfiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_temporal_rmse_uses_predictive_mean():
+    from seahorse.evaluation.artifacts import PredictiveSamples
+    from seahorse.evaluation.registry import metric_by_name
+
+    samples = PredictiveSamples(
+        next_times=np.asarray([[1.0, 3.0], [2.0, 2.0]], dtype=np.float64),
+        next_locs=np.zeros((2, 2, 2), dtype=np.float32),
+        true_next_times=np.asarray([2.0, 1.0], dtype=np.float64),
+        true_next_locs=np.zeros((2, 2), dtype=np.float32),
+        history_end_times=np.asarray([0.0, 0.0], dtype=np.float64),
+        sequence_index=np.asarray([0, 0]),
+        target_event_index=np.asarray([1, 2]),
+        history_length=np.asarray([1, 2]),
+        is_last_context=np.asarray([False, True]),
+        sampling_succeeded=np.asarray([True, True]),
+        sampling_backend="native_next_event_sampler",
+    )
+    ctx = SimpleNamespace(samples_predictive=samples)
+    result = metric_by_name("temporal_rmse").compute(ctx)
+    # predictive means are 2.0 and 2.0; errors 0 and 1 -> RMSE sqrt(0.5)
+    assert abs(result.value - np.sqrt(0.5)) < 1e-12
