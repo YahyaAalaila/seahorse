@@ -1,0 +1,26 @@
+model:
+  preset: dnsk
+  spatial_dim: 2
+  decoder:
+    type: dnsk
+    temporal_rank: 2
+    spatial_rank: 2
+    width: 64
+    tau_max: 0.25
+    radius: 1.0
+    temporal_nodes: 65
+    spatial_nodes: 24
+    barrier_time_nodes: 8
+    barrier_space_nodes: 8
+    barrier_weight: 1.0
+    barrier_decay: 1.001
+    barrier_epsilon: 0.0001
+training:
+  optimizer: adam
+  lr: 0.1
+  batch_size: 64
+  n_epochs: 50
+  test_nll_space: raw
+data:
+  protocol: raw
+  normalize: false

@@ -31,11 +31,12 @@ def test_flat_generative_targets_keep_matching_condition_and_target():
     assert float(state["diff_total_events"]) == 2
 
 
-@pytest.mark.parametrize("preset", ["auto_stpp", "deep_stpp", "thp_gmm", "rmtpp_gmm", "gaussian_poisson", "static_hawkes"])
+@pytest.mark.parametrize("preset", ["auto_stpp", "deep_stpp", "thp_gmm", "rmtpp_gmm", "dnsk", "gaussian_poisson", "static_hawkes"])
 def test_model_common_final_target_equals_its_eventwise_score(preset):
     torch.manual_seed(7)
     cfg = {"decoder": {"lookback": 3, "max_history": 3, "n_prodnet": 2, "hidden_size": 8, "num_layers": 1}} if preset == "auto_stpp" else {}
     if preset == "deep_stpp": cfg = {"decoder": {"seq_len": 3, "num_points": 2, "n_layers": 1}, "encoder": {"num_layers": 1}}
+    if preset == "dnsk": cfg = {"decoder": {"width": 4, "barrier_space_nodes": 2, "barrier_time_nodes": 2}}
     model = build_model(preset=preset, config=cfg, hidden_dim=8).eval()
     t = torch.tensor([[.1, .2, .3, .4]])
     x = torch.tensor([[[.1, .2], [.3, .2], [.4, .3], [.5, .6]]])
@@ -44,3 +45,23 @@ def test_model_common_final_target_equals_its_eventwise_score(preset):
     assert int(last["total_events"]) == 1
     torch.testing.assert_close(last["nll"], full["nll_matrix"][0, -1])
 
+
+def test_glide_test_does_not_log_diagnostic_as_nll():
+    from seahorse.training.lightning_module import STPPLightningModule
+    from seahorse.config.schema import TrainingConfig
+    model = build_model(preset="glide", config={"encoder": {"d_model": 16}, "decoder": {"hidden_units": 16, "timesteps": 3}})
+    lm = STPPLightningModule(model, TrainingConfig(loss_target_scope="last"))
+    logged = {}; lm.log = lambda name, value, **kwargs: logged.update({name: value})
+    lm.test_step({"times": torch.tensor([[0., .1, .2]]), "locations": torch.rand(1, 3, 2), "lengths": torch.tensor([3])}, 0)
+    assert "test/nll" not in logged
+    assert any(k.startswith("test/") for k in logged)
+
+
+def test_glide_validation_logs_objective_once():
+    from seahorse.training.lightning_module import STPPLightningModule
+    from seahorse.config.schema import TrainingConfig
+    model=build_model(preset="glide",config={"encoder":{"d_model":16},"decoder":{"hidden_units":16,"timesteps":3}})
+    lm=STPPLightningModule(model,TrainingConfig(loss_target_scope="last"))
+    names=[];lm.log=lambda name,*args,**kwargs:names.append(name)
+    lm.validation_step({"times":torch.tensor([[0.,.1,.2]]),"locations":torch.rand(1,3,2),"lengths":torch.tensor([3])},0)
+    assert names.count("val/glide_loss") == 1

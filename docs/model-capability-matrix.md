@@ -38,6 +38,10 @@ Use this table to choose a metric profile and evaluation path for each preset.
 | Poisson + TVCNF | `PoissonTVCNF` | `poisson_tvcnf` | Exact (factorized) | Yes | — |
 | Hawkes + TVCNF | `HawkesTVCNF` | `hawkes_tvcnf` | Exact (factorized) | Yes | — |
 | Self-correcting + TVCNF | `SelfCorrectingTVCNF` | `selfcorrecting_tvcnf` | Exact (factorized) | Yes | — |
+| Static Gaussian Hawkes | `STPPEstimator("static_hawkes")` | `static_hawkes` | Exact | Yes | — |
+| Gaussian Poisson | `STPPEstimator("gaussian_poisson")` | `gaussian_poisson` | Exact | Yes | — |
+| DNSK + Barrier (available; not benchmarked in the paper) | `STPPEstimator("dnsk")` | `dnsk` | Quadrature | Yes | — |
+| GLIDE (available; not benchmarked in the paper) | `STPPEstimator("glide")` | `glide` | None (diffusion objective) | Native | — |
 
 ## Choose This If…
 

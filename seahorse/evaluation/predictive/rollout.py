@@ -169,6 +169,8 @@ def _denormalize_spatial_samples(runner: STPPRunner, sample_tokens: np.ndarray) 
     state_model = runner.model.state_model
     spatial_dim = int(getattr(state_model, "spatial_dim", 2))
     spatial_tokens = sample_tokens[:, -spatial_dim:]
+    if runner.config.model.preset == "glide":
+        return spatial_tokens * state_model.loc_range.detach().cpu().numpy() + state_model.loc_min.detach().cpu().numpy()
     loc_min = state_model.token_loc_min.detach().cpu().numpy().astype(np.float32)
     loc_range = state_model.token_loc_range.detach().cpu().numpy().astype(np.float32)
     return spatial_tokens * loc_range + loc_min
@@ -178,6 +180,8 @@ def _denormalize_time_samples(runner: STPPRunner, sample_tokens: np.ndarray) -> 
     preset = runner.config.model.preset
     state_model = runner.model.state_model
     token_t = sample_tokens[:, 0].astype(np.float32)
+    if preset == "glide":
+        return token_t * float(state_model.delta_range) + float(state_model.delta_min)
     if preset == "diffusion_stpp":
         t_min = float(state_model.token_delta_t_min.detach().cpu().item())
         t_range = float(state_model.token_delta_t_range.detach().cpu().item())

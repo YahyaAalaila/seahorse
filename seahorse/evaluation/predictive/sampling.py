@@ -211,6 +211,14 @@ def _batched_native_next_events_for_sequence(
             batch_size=total_samples,
             device=device,
         )
+    elif preset == "glide":
+        cond_last = state_ctx.payload.get("glide_cond_last")
+        if not isinstance(cond_last, torch.Tensor):
+            return None
+        out = runner.model.event_model.sample_native(
+            state=StateContext(payload={"glide_cond_last": cond_last.repeat_interleave(int(k), dim=0)}),
+            batch_size=total_samples,
+        )
     else:
         return None
 

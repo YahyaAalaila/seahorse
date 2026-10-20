@@ -5,6 +5,7 @@ from .smash import SMASHStateModel
 from .diffusion import DiffusionStateModel
 from .factorized import FactorizedStateModel
 from .nsmpp_deepbasis import NSMPPDeepBasisStateModel
+from .glide import GLIDEStateModel
 
 __all__ = [
     "NeuralSTPPStateModel",
@@ -14,4 +15,5 @@ __all__ = [
     "DiffusionStateModel",
     "FactorizedStateModel",
     "NSMPPDeepBasisStateModel",
+    "GLIDEStateModel",
 ]

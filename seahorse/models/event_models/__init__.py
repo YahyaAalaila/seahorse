@@ -5,6 +5,8 @@ from .smash import SMASHEventModel
 from .diffusion import DiffusionEventModel
 from .factorized import FactorizedEventModel
 from .nsmpp_deepbasis import NSMPPDeepBasisEventModel
+from .dnsk import DNSKEventModel
+from .glide import GLIDEEventModel
 from .parametric_kernels import (
     GaussianPoissonEventModel,
     ParametricHawkesEventModel,
@@ -19,6 +21,8 @@ __all__ = [
     "DiffusionEventModel",
     "FactorizedEventModel",
     "NSMPPDeepBasisEventModel",
+    "DNSKEventModel",
+    "GLIDEEventModel",
     "GaussianPoissonEventModel",
     "ParametricHawkesEventModel",
     "StaticGaussianHawkesEventModel",

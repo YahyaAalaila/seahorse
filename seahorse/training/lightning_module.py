@@ -127,6 +127,10 @@ class STPPLightningModule(pl.LightningModule):
     def test_step(self, batch, _batch_idx):
         result = self.model.compute_loss(self.eval_forward(batch))
         n_ev = max(1, int(result.total_events.item()))
+        if self.model.event_model.capabilities.nll_kind == "none":
+            self.log(f"test/{self._train_key}", result.nll, on_step=False, on_epoch=True, batch_size=n_ev)
+            self._log_extra_metrics("test", result.extra_metrics, n_ev)
+            return
         test_nll, temporal_nll, spatial_nll, extra_metrics = self._resolve_test_reporting(result)
         self.log("test/nll", test_nll, on_step=False, on_epoch=True, batch_size=n_ev)
         if temporal_nll is not None:
@@ -150,3 +154,7 @@ class STPPLightningModule(pl.LightningModule):
         projector = getattr(self.model, "project_parameters", None)
         if callable(projector):
             projector()
+        for name in ("update_ema", "advance_barrier_schedule"):
+            hook = getattr(self.model.event_model, name, None)
+            if callable(hook):
+                hook()

@@ -1,0 +1,41 @@
+# GLIDE (Zhou et al., 2026) independent paper-based integration.
+# It is a sample/prediction baseline.  It is deliberately excluded from exact-NLL ranking.
+model:
+  preset: glide
+  hidden_dim: 128
+  spatial_dim: 2
+  n_marks: 0
+  encoder:
+    type: glide
+    d_model: 64
+    # AONE-NLP/GLIDE DEFAULT_CONFIG (preprocess.py), applied causally here.
+    temporal_windows: "64,32,8,2"
+    spatial_windows: "64,32,8,2"
+    spatial_grid_sizes: "0.2,0.1,0.02,0.005"
+    graph_layers: 2
+    # Use the source's no-neighbour setting used for its named datasets;
+    # consecutive causal graph edges remain enabled.
+    graph_time_scales: "0,0,0"
+    graph_neighbors: "0,0,0"
+    num_time_harmonics: 8
+  decoder:
+    type: glide
+    hidden_units: 64
+    timesteps: 500
+    start_ratio: 0.5
+    guidance: 0.2
+    ema_decay: 0.999
+
+training:
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  grad_clip: 0.5
+  n_epochs: 200
+  batch_size: 64
+  lr_schedule: cosine
+
+data:
+  protocol: standard
+  normalize: true
+  num_workers: 0
