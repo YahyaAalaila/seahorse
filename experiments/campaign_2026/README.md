@@ -15,5 +15,5 @@ Paths inside the specs (`campaign_inputs/...`, `campaign_outputs/...`, `third_pa
 relative to the campaign working directory; the prepared-data root comes from
 `SEAHORSE_PREPARED_DATA_ROOT`. Compile and verify a campaign with
 `seahorse campaign prepare --spec <spec> --out <dir>`; see `seahorse campaign --help`.
-The byte-exact specs used by the worker snapshot are preserved on the `paper/neurips2026` branch
-(tag `paper/neurips2026-v9`).
+The byte-exact specs and worker snapshot behind the published numbers are archived by the authors
+and available on request; the copies here differ only in the removal of cluster-local paths.
