@@ -115,6 +115,80 @@ class DeepBasisKernel(nn.Module):
             total = total + weight * (q * h).sum(dim=-1)
         return total
 
+    def sum_over_prefix_history(
+        self,
+        query: Tensor,
+        prefix_counts: Tensor,
+        history: Tensor,
+        history_valid: Tensor,
+    ) -> Tensor:
+        """Return ``sum_{j < prefix_counts[b, i]} K(query[b, i], history[b, j])``.
+
+        This is mathematically identical to :meth:`sum_over_history` called with a
+        prefix mask ``mask[b, i, j] = (j < prefix_counts[b, i]) & history_valid[b, j]``,
+        but it costs O(1) rather than O(n_history) per query.
+
+        The saving is exact, not an approximation: the kernel is finite rank,
+
+            K(x, y) = sum_r w_r <f_r(x), g_r(y)>,
+
+        so the masked history sum factorizes as
+
+            sum_{j<n} K(q, y_j) = sum_r w_r <f_r(q), sum_{j<n} g_r(y_j)>,
+
+        and the inner history sums are a cumulative sum over the event axis that can
+        be computed once and gathered per query. This is what makes a per-interval
+        compensator affordable (see ``NSMPPDeepBasisEventModel._interval_compensators``).
+        """
+        if query.ndim != 3 or history.ndim != 3:
+            raise ValueError(
+                "sum_over_prefix_history expects query/history with shape (B, N, D)/(B, H, D)."
+            )
+        if query.shape[0] != history.shape[0] or query.shape[-1] != history.shape[-1]:
+            raise ValueError(
+                f"Incompatible query/history shapes {tuple(query.shape)} vs {tuple(history.shape)}."
+            )
+        if prefix_counts.shape != query.shape[:2]:
+            raise ValueError(
+                "prefix_counts must have shape (B, N_query), "
+                f"got {tuple(prefix_counts.shape)}."
+            )
+        if history_valid.shape != history.shape[:2]:
+            raise ValueError(
+                "history_valid must have shape (B, N_history), "
+                f"got {tuple(history_valid.shape)}."
+            )
+
+        batch, n_query, data_dim = query.shape
+        n_history = history.shape[1]
+        valid = history_valid.to(dtype=query.dtype).unsqueeze(-1)
+        counts = prefix_counts.clamp(min=0, max=n_history).to(dtype=torch.long)
+
+        total = query.new_zeros(batch, n_query)
+        for weight, x_basis, y_basis in zip(
+            self.positive_weights(),
+            self.x_basis,
+            self.y_basis,
+        ):
+            q_feat = x_basis(query.reshape(-1, data_dim)).reshape(
+                batch, n_query, self.basis_dim
+            )
+            h_feat = y_basis(history.reshape(-1, data_dim)).reshape(
+                batch, n_history, self.basis_dim
+            )
+            cumulative = torch.cumsum(h_feat * valid, dim=1)
+            # Prepend a zero row so ``cumulative[:, n]`` is the sum over ``j < n``.
+            cumulative = torch.cat(
+                [cumulative.new_zeros(batch, 1, self.basis_dim), cumulative], dim=1
+            )
+            gathered = torch.gather(
+                cumulative,
+                1,
+                counts.unsqueeze(-1).expand(batch, n_query, self.basis_dim),
+            )
+            total = total + weight * (q_feat * gathered).sum(dim=-1)
+        return total
+
     def sum_over_history(self, query: Tensor, history: Tensor, history_mask: Tensor) -> Tensor:
         """Return ``sum_j K(query_i, history_j)`` under an explicit history mask."""
         if query.ndim != 3 or history.ndim != 3:
