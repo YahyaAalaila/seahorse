@@ -70,6 +70,7 @@ nav:
       - Execution Contract: learn/execution-contract.md
       - Model Capability Matrix: model-capability-matrix.md
       - Evaluation Semantics: learn/evaluation-semantics.md
+      - Exact Evaluation Metrics: reference/exact-evaluation.md
       - Reproduce Paper Results: paper-reproduction.md
       - FAQ / Common Errors: learn/faq.md
       - Cite Seahorse: cite.md
