@@ -24,7 +24,7 @@ without Ray installed.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 import warnings
 
 from pydantic import BaseModel, field_validator, model_validator
