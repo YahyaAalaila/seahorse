@@ -9,7 +9,7 @@ description = "Seahorse: unified benchmarking for spatio-temporal point-process 
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license-files = ["LICENSE", "NOTICE", "seahorse/models/statistical/_hawkes_source/LICENSE"]
 authors = [
   { name = "Yahya Aalaila" },
   { name = "Gerrit Großmann" },
@@ -83,6 +83,8 @@ include = ["seahorse", "seahorse.*"]
 
 [tool.setuptools.package-data]
 seahorse = ["configs/*.yaml"]
+"seahorse.models.statistical" = ["NOTICE.md"]
+"seahorse.models.statistical._hawkes_source" = ["LICENSE", "SOURCE_MANIFEST.json"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

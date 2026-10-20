@@ -4,3 +4,8 @@ Copyright 2026 Deutsches Forschungszentrum für Künstliche Intelligenz GmbH (DF
 This product includes software developed with support from the German Federal
 Ministry of Education and Research (Bundesministerium für Bildung und Forschung,
 BMBF) under Grant No. 01W23005 (project EVENTFUL).
+
+The statistical Hawkes presets include TheHawkesPackage by Jens Fischer,
+commit 37e83bc30b3bd5781551ea1fc1e72ba657608ebb, under the MIT license.
+Its source, license, and provenance are retained in
+seahorse/models/statistical/_hawkes_source/ and the adjacent NOTICE.md.

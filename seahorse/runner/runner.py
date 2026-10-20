@@ -108,6 +108,8 @@ class STPPRunner:
     """
 
     def __init__(self, config: STPPConfig):
+        if ConfigRegistry.runner_kind(config.model.preset) == "statstpp":
+            raise TypeError("Use RunnerRegistry.create or STPPRunner.from_* for statistical presets.")
         self.config = config
         self._lightning_module: Optional[STPPLightningModule] = None
         self._data_module: Optional[STPPDataModule] = None
@@ -121,12 +123,12 @@ class STPPRunner:
     @classmethod
     def from_preset(cls, preset: str) -> "STPPRunner":
         """Build a runner from a bundled preset YAML (e.g. ``"auto_stpp"``)."""
-        return cls(STPPConfig.from_preset(preset))
+        return RunnerRegistry.create(STPPConfig.from_preset(preset))
 
     @classmethod
     def from_yaml(cls, path) -> "STPPRunner":
         """Build a runner from a custom YAML config file."""
-        return cls(STPPConfig.from_yaml(path))
+        return RunnerRegistry.create(STPPConfig.from_yaml(path))
 
     @classmethod
     def from_config_source(
@@ -142,7 +144,7 @@ class STPPRunner:
         ``config`` takes precedence when both parameters are provided.
         Programmatic callers must supply at least one source.
         """
-        return cls(
+        return RunnerRegistry.create(
             STPPConfig.from_source(
                 preset=preset,
                 config=config,
@@ -572,6 +574,9 @@ class STPPRunner:
         if not cfg_path.exists():
             cfg_path = p / "config.yaml"
         config = STPPConfig.from_yaml(cfg_path, sanitize=False)
+        if ConfigRegistry.runner_kind(config.model.preset) == "statstpp":
+            from .statistical import StatisticalSTPPRunner
+            return StatisticalSTPPRunner.load(p)
         runner = cls(config)
         model = config.model.build_model()
         model.load_state_dict(load_state_dict(p, selection=config.training.checkpoint_select))
@@ -579,3 +584,12 @@ class STPPRunner:
         runner._run_dir = p
         runner._norm_stats = load_norm_stats(p)
         return runner
+
+
+class RunnerRegistry:
+    @staticmethod
+    def create(config):
+        if ConfigRegistry.runner_kind(config.model.preset) == "statstpp":
+            from .statistical import StatisticalSTPPRunner
+            return StatisticalSTPPRunner(config)
+        return STPPRunner(config)

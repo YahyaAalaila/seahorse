@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from seahorse.config import BenchmarkConfig, STPPConfig
-from seahorse.runner import STPPRunner, RunResult
+from seahorse.runner import STPPRunner, RunnerRegistry, RunResult
 from seahorse.utils import deep_update
 
 from .results import BenchmarkTable
@@ -30,7 +30,7 @@ def _run_single(
     cfg = copy.deepcopy(config)
     cfg.data.seed = seed
 
-    runner = STPPRunner(cfg)
+    runner = RunnerRegistry.create(cfg)
     return runner.fit(train_seqs, val_seqs, test_seqs, dataset_id=dataset_id)
 
 
@@ -238,7 +238,7 @@ class Benchmark:
             for preset, dataset_id, seed, cfg, tr, va, te in jobs:
                 cfg_copy = copy.deepcopy(cfg)
                 cfg_copy.data.seed = seed
-                runner = STPPRunner(cfg_copy)
+                runner = RunnerRegistry.create(cfg_copy)
                 results.append(runner.fit(tr, va, te, dataset_id=dataset_id))
         else:
             results = self._run_parallel(jobs, self.config.n_workers, self.config.backend)

@@ -439,6 +439,8 @@ class STPPConfig(BaseModel):
     training: TrainingConfig
     logging: LoggingConfig = LoggingConfig()
     tuning: Optional[TuningConfig] = None
+    statistical: dict[str, Any] = Field(default_factory=dict)
+    """Native statistical inference controls, e.g. method/mle/maxiter; never SGD."""
     """HPO procedure config. ``None`` means no tuning section (the common case)."""
 
     @model_validator(mode="after")
@@ -638,7 +640,23 @@ class STPPConfig(BaseModel):
 
         # 1. Validate — supported protocols declared on model config, not hardcoded
         supported = ConfigRegistry.get_supported_protocols(preset)
-        if supported and protocol not in supported:
+        # ``prepared`` is an immutable-source adapter whose numerical view is
+        # explicitly selected as standard/raw in adapter_kwargs.  Reuse that
+        # underlying compatibility declaration instead of requiring every
+        # model config to list a source-specific alias.
+        compatibility_protocol = protocol
+        if protocol == "prepared":
+            compatibility_protocol = str(
+                (getattr(self.data, "adapter_kwargs", None) or {}).get(
+                    "base_protocol", "standard"
+                )
+            )
+            if compatibility_protocol not in {"raw", "standard"}:
+                raise ValueError(
+                    "prepared protocol requires data.adapter_kwargs.base_protocol "
+                    "to be 'raw' or 'standard'."
+                )
+        if supported and compatibility_protocol not in supported:
             raise ValueError(
                 f"Protocol {protocol!r} is not supported by preset {preset!r}. "
                 f"Supported: {sorted(supported)}"
@@ -648,6 +666,17 @@ class STPPConfig(BaseModel):
         train_ds, val_ds, test_ds = DataRegistry.build_datasets(
             protocol, self.data, train_seqs, val_seqs, test_seqs
         )
+
+        prepared_n_marks = getattr(train_ds, "prepared_n_marks", None)
+        if prepared_n_marks is not None:
+            resolved_marks = int(prepared_n_marks)
+            configured_marks = int(self.model.n_marks)
+            if configured_marks not in (0, resolved_marks):
+                raise ValueError(
+                    "prepared protocol resolved train-only n_marks="
+                    f"{resolved_marks}, but model.n_marks={configured_marks}."
+                )
+            self.model.n_marks = resolved_marks
 
         # 3. Resolve collate — name declared on model config
         collate = DataRegistry.get_collate(ConfigRegistry.get_collate_key(preset))

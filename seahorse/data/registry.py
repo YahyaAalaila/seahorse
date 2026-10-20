@@ -216,6 +216,14 @@ def _build_raw_datasets(data_config, train_seqs, val_seqs, test_seqs):
     return train_ds, val_ds, test_ds
 
 
+@register_dataset("prepared")
+def _build_prepared_datasets(data_config, train_seqs, val_seqs, test_seqs):
+    """Immutable prepared-data route with explicit mark and window policy."""
+    from seahorse.data.prepared_protocol import build_prepared_protocol_datasets
+
+    return build_prepared_protocol_datasets(data_config, train_seqs, val_seqs, test_seqs)
+
+
 @register_dataset("sliding_window")
 def _build_sliding_window_datasets(data_config, train_seqs, val_seqs, test_seqs):
     from sklearn.preprocessing import MinMaxScaler

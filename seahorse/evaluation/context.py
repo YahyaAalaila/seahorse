@@ -12,6 +12,7 @@ import torch
 
 from seahorse.runner.runner import STPPRunner
 from seahorse.evaluation.artifacts import PredictiveSamples
+from seahorse.evaluation.backends import evaluation_capabilities, is_statistical_runner
 from seahorse.evaluation.profiles import (
     GENERATIVE_ROLLOUTS,
     INTENSITY_GRID,
@@ -181,7 +182,9 @@ class EvalContext:
             raise ValueError("artifact_mode='load_only' requires artifact_dir.")
         self.artifact_events: dict[str, dict[str, Any]] = {}
 
-        if device is None:
+        if is_statistical_runner(runner):
+            self.device = torch.device("cpu")
+        elif device is None:
             try:
                 self.device = next(runner.model.parameters()).device
             except StopIteration:
@@ -189,7 +192,7 @@ class EvalContext:
         else:
             self.device = torch.device(device)
 
-        self.caps = runner.model.event_model.capabilities
+        self.caps = evaluation_capabilities(runner)
 
     def _require_planned_artifact(self, family: str) -> None:
         if family not in self.planned_artifact_families:
@@ -250,7 +253,8 @@ class EvalContext:
         # satisfy at least one of these conditions.
         if self.caps.has_intensity or self.caps.has_native_sampler:
             caps.add("samples_predictive")
-            caps.add("samples_generative")
+            if not is_statistical_runner(self.runner):
+                caps.add("samples_generative")
 
         # --- Optional context inputs ---
         if self.ground_truth is not None:
@@ -362,6 +366,8 @@ class EvalContext:
         from .predictive.rollout import compute_generative_rollouts
 
         self._require_planned_artifact(GENERATIVE_ROLLOUTS)
+        if is_statistical_runner(self.runner):
+            raise MetricPlanError("statstpp currently supports the shared next-event predictive profile; fixed-depth neural rollout artifacts are not a statistical forecast contract.")
         return compute_generative_rollouts(
             self.runner,
             self.test_seqs,
@@ -377,6 +383,8 @@ class EvalContext:
         from .intensity import compute_intensity_grid
 
         self._require_planned_artifact(INTENSITY_GRID)
+        if is_statistical_runner(self.runner):
+            raise MetricPlanError("statstpp intensity-grid evaluation requires a declared statistical query grid; use the predictive profile for the shared walk-forward comparison.")
         generative_rollouts = None
         if not self.caps.has_intensity:
             self._require_planned_artifact(GENERATIVE_ROLLOUTS)

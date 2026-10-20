@@ -22,7 +22,7 @@ class ApiEstimatorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "val_seqs is required"):
             estimator.fit([{"times": [0.0], "locations": [[0.0, 0.0]]}])
 
-    @patch("seahorse.api.estimator.STPPRunner")
+    @patch("seahorse.runner.RunnerRegistry.create")
     @patch("seahorse.api.estimator.STPPConfig")
     def test_fit_builds_config_and_delegates_to_runner(self, config_cls, runner_cls):
         config = Mock(name="config")

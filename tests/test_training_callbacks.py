@@ -40,6 +40,7 @@ class PeriodicTestNLLCallbackTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             run_dir = Path(td)
             config = types.SimpleNamespace(
+                model=types.SimpleNamespace(preset="deep_stpp"),
                 training=types.SimpleNamespace(
                     n_epochs=10,
                     predictive_test_nll_samples=128,

@@ -24,6 +24,7 @@ from .factorized import (
     FactorizedCNFConfig, PoissonCNFConfig, HawkesCNFConfig, SelfCorrectingCNFConfig,
     PoissonTVCNFConfig, HawkesTVCNFConfig, SelfCorrectingTVCNFConfig,
 )
+from . import statistical as _statistical  # noqa: F401  (registers the statstpp presets)
 
 __all__ = [
     "BaseModelConfig",

@@ -489,8 +489,9 @@ def _execute_metrics(args) -> None:
             raise SystemExit(str(exc)) from None
     device = resolve_device(str(args.device))
     runner = STPPRunner.load(run_dir)
-    runner.model.to(device)
-    runner.model.eval()
+    if getattr(runner, "runner_name", "nnstpp") != "statstpp":
+        runner.model.to(device)
+        runner.model.eval()
 
     try:
         report = evaluate(

@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 from seahorse.evaluation.profiles import PREDICTIVE_SAMPLES
-from seahorse.evaluation.backends import evaluation_capabilities
+from seahorse.evaluation.backends import evaluation_capabilities, is_statistical_runner
 
 PREDICTIVE_SAMPLES_SCHEMA_VERSION = 3
 ARTIFACT_MANIFEST_FILENAME = "manifest.json"
@@ -185,6 +185,16 @@ def build_predictive_samples_key(
         "device": str(device),
         "test_data": _sequence_fingerprint(test_seqs),
     }
+    if is_statistical_runner(runner):
+        state = json.dumps(runner.model.to_state(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        metadata.update({
+            "runner": "statstpp",
+            "model_state_sha256": hashlib.sha256(state.encode("utf-8")).hexdigest(),
+            "spatial_proposal_bounds": list(runner.model.support),
+            "sampling_backend": "statstpp_native_conditional",
+            "exact_intensity_sampler": None,
+            "seed_policy": "SeedSequence([seed, sequence_index, target_event_index])",
+        })
     canonical = _canonical_json(metadata)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
     return ArtifactKey(
@@ -205,6 +215,7 @@ def _run_file_fingerprints(run_dir: Path | None) -> dict[str, Any]:
         "checkpoint_best": run_dir / "checkpoints" / "best.ckpt",
         "checkpoint_last": run_dir / "checkpoints" / "last.ckpt",
         "model_ckpt": run_dir / "model.ckpt",
+        "statistical_checkpoint": run_dir / "statistical_checkpoint.json",
     }
     return {name: _file_stat(path) for name, path in files.items() if path.exists()}
 

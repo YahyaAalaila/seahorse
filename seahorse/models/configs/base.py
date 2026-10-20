@@ -38,6 +38,7 @@ class PresetDescriptor:
     canonical_status: str
     config_cls: type
     is_alias: bool
+    runner_kind: str = "nnstpp"
 
 
 class ConfigRegistry:
@@ -49,6 +50,7 @@ class ConfigRegistry:
     _canonical_name: ClassVar[dict[str, str]] = {}
     _status: ClassVar[dict[str, str]] = {}
     _is_alias: ClassVar[dict[str, bool]] = {}
+    _runner_kind: ClassVar[dict[str, str]] = {}
     _VALID_STATUSES: ClassVar[frozenset[str]] = frozenset(
         {"canonical", "deprecated", "legacy"}
     )
@@ -62,9 +64,10 @@ class ConfigRegistry:
         return status
 
     @classmethod
-    def register(cls, name: str, *, status: str = "canonical"):
+    def register(cls, name: str, *, status: str = "canonical", runner_kind: str = "nnstpp"):
         """Decorator that registers a config class under a preset name."""
         status = cls._validate_status(status)
+        if runner_kind not in {"nnstpp", "statstpp"}: raise ValueError("runner_kind must be nnstpp or statstpp")
 
         def decorator(config_cls):
             if name in cls._registry:
@@ -73,6 +76,7 @@ class ConfigRegistry:
             cls._canonical_name[name] = name
             cls._status[name] = status
             cls._is_alias[name] = False
+            cls._runner_kind[name] = runner_kind
             return config_cls
         return decorator
 
@@ -90,6 +94,7 @@ class ConfigRegistry:
         cls._canonical_name[alias] = canonical
         cls._status[alias] = status
         cls._is_alias[alias] = True
+        cls._runner_kind[alias] = cls._runner_kind[canonical]
 
     @classmethod
     def is_registered(cls, name: str) -> bool:
@@ -117,7 +122,12 @@ class ConfigRegistry:
             canonical_status=cls._status[canonical],
             config_cls=config_cls,
             is_alias=cls._is_alias[lookup],
+            runner_kind=cls._runner_kind[lookup],
         )
+
+    @classmethod
+    def runner_kind(cls, name: str) -> str:
+        return cls.describe(name).runner_kind
 
     @classmethod
     def preset_status(cls, name: str) -> str:

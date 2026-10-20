@@ -12,7 +12,7 @@ import torch
 from seahorse.config import STPPConfig
 from seahorse.evaluation.likelihood import compute_next_event_test_nll, compute_seq_nlls
 from seahorse.evaluation.predictive.sampling import compute_predictive_samples
-from seahorse.runner import RunResult, STPPRunner
+from seahorse.runner import RunResult, STPPRunner, RunnerRegistry
 
 from .model_class_map import friendly_name_for_preset, resolve_preset
 
@@ -80,6 +80,8 @@ class STPPEstimator:
         return self._fit_result
 
     def _model_device(self) -> torch.device:
+        if getattr(self.runner, "runner_name", "nnstpp") == "statstpp":
+            return torch.device("cpu")
         try:
             return next(self.model.parameters()).device
         except StopIteration:
@@ -132,7 +134,7 @@ class STPPEstimator:
                 batch_size=batch_size,
             ),
         )
-        runner = STPPRunner(config)
+        runner = RunnerRegistry.create(config)
         self._fit_result = runner.fit(
             train_seqs,
             val_seqs,
@@ -192,6 +194,25 @@ class STPPEstimator:
         """
         if not self._is_fitted:
             raise RuntimeError("Model is not fitted. Call fit() first.")
+
+        if getattr(self.runner, "runner_name", "nnstpp") == "statstpp":
+            from seahorse.evaluation.statistical import compute_statistical_predictive_samples
+
+            samples = compute_statistical_predictive_samples(
+                self.runner, sequences, k=int(n_samples),
+                seed=self.seed if seed is None else int(seed),
+            )
+            return {
+                "next_times": samples.next_times, "next_locations": samples.next_locs,
+                "true_next_times": samples.true_next_times,
+                "true_next_locations": samples.true_next_locs,
+                "history_end_times": samples.history_end_times,
+                "sequence_index": samples.sequence_index,
+                "target_event_index": samples.target_event_index,
+                "history_length": samples.history_length,
+                "sampling_succeeded": samples.sampling_succeeded,
+                "sampling_backend": samples.sampling_backend,
+            }
 
         caps = self.model.event_model.capabilities
         if not caps.has_native_sampler and caps.nll_kind != "exact":
@@ -263,8 +284,12 @@ class STPPEstimator:
                 results["sampling_backend"] = backend
 
         if "mean_seq_nll" in metrics:
-            seq_nlls = compute_seq_nlls(self.runner, test_seqs, device=device)
-            results["mean_seq_nll"] = float(np.nanmean(seq_nlls)) if len(seq_nlls) else float("nan")
+            if getattr(self.runner, "runner_name", "nnstpp") == "statstpp":
+                values = [self.model.full_window_nll(seq) for seq in test_seqs]
+                results["mean_seq_nll"] = float(np.nanmean(values)) if values else float("nan")
+            else:
+                seq_nlls = compute_seq_nlls(self.runner, test_seqs, device=device)
+                results["mean_seq_nll"] = float(np.nanmean(seq_nlls)) if len(seq_nlls) else float("nan")
         return results
 
     def plot_intensity(self, context: dict, **kwargs: Any) -> dict[str, Any]:

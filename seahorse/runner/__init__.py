@@ -1,4 +1,5 @@
 from .results import RunResult
-from .runner import STPPRunner
+from .runner import STPPRunner, RunnerRegistry
+from .statistical import StatisticalSTPPRunner
 
-__all__ = ["STPPRunner", "RunResult"]
+__all__ = ["STPPRunner", "StatisticalSTPPRunner", "RunnerRegistry", "RunResult"]

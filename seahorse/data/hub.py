@@ -238,6 +238,20 @@ def download_dataset(
     local_files_only: bool = False,
 ) -> Path:
     """Resolve a dataset path from a local path, curated fallback, or HF cache."""
+    # Immutable prepared real-data views are intentionally kept outside the
+    # repository/HF hub.  Delegate their explicit ``prepared:<cohort>:<view>``
+    # IDs before attempting local or curated/HF resolution, leaving all legacy
+    # hub behavior unchanged.
+    from seahorse.data.prepared import is_prepared_dataset_id, resolve_prepared_dataset
+
+    if is_prepared_dataset_id(name):
+        if revision is not None:
+            raise ValueError(
+                "Prepared datasets are pinned by their local dataset_meta.json and split "
+                "checksums; data.dataset_revision is not supported for prepared: IDs."
+            )
+        return resolve_prepared_dataset(name).view_root
+
     local_input = _resolve_local_input(name)
     if local_input is not None:
         return local_input

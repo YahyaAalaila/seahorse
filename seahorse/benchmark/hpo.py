@@ -447,27 +447,24 @@ def run_hpo(
             )
 
         trial_cfg = STPPConfig(**merged_nested)
-        bundle = trial_cfg.build_data_bundle(trial_train, trial_val, None)
-        dm = STPPDataModule(
-            bundle,
-            batch_size=trial_cfg.data.batch_size,
-            num_workers=trial_cfg.data.num_workers,
-            seed=trial_cfg.data.seed,
-        )
+        from seahorse.models.configs import ConfigRegistry
+        is_stat = ConfigRegistry.runner_kind(trial_cfg.model.preset) == "statstpp"
+        dm = None if is_stat else STPPDataModule(trial_cfg.build_data_bundle(trial_train, trial_val, None), batch_size=trial_cfg.data.batch_size, num_workers=trial_cfg.data.num_workers, seed=trial_cfg.data.seed)
         rss_after_dataset_mb = _current_rss_mb()
         _emit_mem_event(
             "trial_after_dataset_build",
             train_estimated_mb=round(train_estimated_mb, 2),
             val_estimated_mb=round(val_estimated_mb, 2),
-            train_dataset_len=len(dm.train_dataset),
+            train_dataset_len=None if dm is None else len(dm.train_dataset),
         )
-        runner = STPPRunner(trial_cfg)
+        from seahorse.runner import RunnerRegistry
+        runner = RunnerRegistry.create(trial_cfg)
         result = runner.fit(
             trial_train,
             trial_val,
             dataset_id=dataset_id,
             data_module=dm,
-            extra_callbacks=[RayTuneValidationReportCallback()],
+            extra_callbacks=[] if is_stat else [RayTuneValidationReportCallback()],
         )
         tune.report({
             "val_objective": result.val_objective,

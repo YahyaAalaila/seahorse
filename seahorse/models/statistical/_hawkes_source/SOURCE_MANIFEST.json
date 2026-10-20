@@ -1,0 +1,10 @@
+{
+  "upstream_repository": "https://github.com/jeMATHfischer/TheHawkesPackage",
+  "upstream_commit": "37e83bc30b3bd5781551ea1fc1e72ba657608ebb",
+  "upstream_release": "v1.0.0",
+  "license": "MIT",
+  "source_subtree": "src/hawkes_package",
+  "file_count": 43,
+  "ordered_sha256_manifest": "5068fe3c5a2f5e29a9bc09b61d0e91c91c2af1993b9e683475aa0b9a81c33a44",
+  "verification": "SHA-256 each .py file in lexical path order, formatted as '<sha256>  hawkes_package/<relative-path>\n', then SHA-256 of that manifest."
+}
