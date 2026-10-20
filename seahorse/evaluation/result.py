@@ -26,6 +26,8 @@ class Metric:
         produces    — dict mapping MetricResult field names to their types (documentation only)
         artifact_families — Evaluation artifacts this metric may consume.
         cost_class  — Human-readable cost class used by profile planning.
+        direction   — "lower" or "higher" when the scalar has a preferred direction;
+                      None when it is a diagnostic without one.
     """
 
     name: str
@@ -34,6 +36,7 @@ class Metric:
     artifact_families: frozenset[str] = frozenset()
     cost_class: str = "core"
     produces: dict[str, type] = {}
+    direction: str | None = None
 
     def compute(self, ctx: "EvalContext") -> "MetricResult":
         raise NotImplementedError(f"{type(self).__name__}.compute() not implemented")

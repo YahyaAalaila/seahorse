@@ -577,10 +577,17 @@ def _ripley_k_1d(times: np.ndarray, rs: np.ndarray) -> np.ndarray:
 
 @register_metric
 class RolloutCoherence(Metric):
-    """M27: Sequential coherence — W₁ between generated and real continuations.
+    """M27: Sequential coherence — W₁ distance between generated and real continuations.
 
-    Evaluates at fixed horizon H ∈ {1, 5, 10} events and returns as a curve.
-    The scalar value is the H=10 result.
+    The value is a Wasserstein-1 distance (energy-distance fallback without POT)
+    between the pooled generated continuation and the observed continuation,
+    after per-sequence scale normalisation: **lower is better**, 0 is perfect.
+    Evaluates at fixed horizon H ∈ {1, 5, 10} events and returns a curve; the
+    scalar value is the H=10 result.
+
+    Deprecated: prefer the proper scoring rules ``ar_temporal_crps_h*`` and
+    ``ar_spatial_energy_score_h*``, which score each rollout against the truth
+    instead of a pooled point cloud.
     """
 
     name = "rollout_coherence"
@@ -588,6 +595,8 @@ class RolloutCoherence(Metric):
     requires = frozenset({"samples_generative"})
     artifact_families = frozenset({GENERATIVE_ROLLOUTS})
     cost_class = "sampling_heavy"
+    direction = "lower"
+    deprecated = True
 
     _H_VALUES = (1, 5, 10)
 

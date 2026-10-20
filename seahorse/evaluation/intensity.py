@@ -478,9 +478,10 @@ def compute_intensity_grid(
         dtype=np.float32,
     )
 
-    if test_seqs:
-        t0 = float(test_seqs[0]["times"][0])
-        t1 = float(test_seqs[0]["times"][-1])
+    nonempty = [seq for seq in test_seqs if np.asarray(seq["times"]).shape[0] > 0]
+    if nonempty:
+        t0 = min(float(np.asarray(seq["times"])[0]) for seq in nonempty)
+        t1 = max(float(np.asarray(seq["times"])[-1]) for seq in nonempty)
     else:
         t0, t1 = 0.0, 1.0
     ts = np.linspace(t0, t1, int(spec["t_resolution"]), dtype=np.float32)
@@ -518,11 +519,15 @@ def _direct_intensity_grid(
     device: torch.device,
     chunk_size: int = 512,
 ) -> np.ndarray:
-    """Evaluate intensity on the grid using the first test sequence as conditioning."""
+    """Evaluate the intensity on the grid conditioned on every test sequence.
+
+    At each grid time the surface is the mean of ``lambda(t, s | H_i(t))`` over
+    the test sequences ``i`` that have at least one event at or before ``t``;
+    with a single test sequence this is that sequence's conditional intensity.
+    """
     if not test_seqs:
         return np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
 
-    seq = test_seqs[0]
     norm_stats = runner.norm_stats
     normalize = bool(norm_stats.get("normalize", False))
     t_mean = float(norm_stats.get("time_mean", 0.0)) if normalize else 0.0
@@ -541,39 +546,44 @@ def _direct_intensity_grid(
         else np.ones(2, dtype=np.float32)
     )
 
-    result = np.zeros((len(ts), len(xs), len(ys)), dtype=np.float32)
+    total = np.zeros((len(ts), len(xs), len(ys)), dtype=np.float64)
+    count = np.zeros(len(ts), dtype=np.int64)
     xx, yy = np.meshgrid(xs, ys, indexing="ij")
     s_grid = np.stack([xx.ravel(), yy.ravel()], axis=1).astype(np.float32)
 
     runner.model.eval()
     with torch.no_grad():
-        for ti, t_query in enumerate(ts):
+        for seq in test_seqs:
             times = np.asarray(seq["times"], dtype=np.float32)
-            hist_mask = times <= float(t_query)
-            if not hist_mask.any():
-                continue
             locs_full = np.asarray(seq["locations"], dtype=np.float32)
-            history = {
-                "times": times[hist_mask].copy(),
-                "locations": locs_full[hist_mask].copy(),
-            }
-            intensity_vals = eval_intensity(
-                model=runner.model,
-                t_query=float(t_query),
-                s_grid=s_grid,
-                history_times=history["times"],
-                history_locs=history["locations"],
-                t_bias=t_mean,
-                t_scale=t_std,
-                s_bias=loc_mean,
-                s_scale=loc_std,
-                device=device,
-                correct_for_normalization=normalize,
-                query_chunk_size=int(chunk_size),
-            )
-            result[ti] = intensity_vals.reshape(len(xs), len(ys))
+            for ti, t_query in enumerate(ts):
+                hist_mask = times <= float(t_query)
+                if not hist_mask.any():
+                    continue
+                history = {
+                    "times": times[hist_mask].copy(),
+                    "locations": locs_full[hist_mask].copy(),
+                }
+                intensity_vals = eval_intensity(
+                    model=runner.model,
+                    t_query=float(t_query),
+                    s_grid=s_grid,
+                    history_times=history["times"],
+                    history_locs=history["locations"],
+                    t_bias=t_mean,
+                    t_scale=t_std,
+                    s_bias=loc_mean,
+                    s_scale=loc_std,
+                    device=device,
+                    correct_for_normalization=normalize,
+                    query_chunk_size=int(chunk_size),
+                )
+                total[ti] += np.asarray(intensity_vals, dtype=np.float64).reshape(len(xs), len(ys))
+                count[ti] += 1
 
-    return result
+    scored = count > 0
+    total[scored] /= count[scored, None, None]
+    return total.astype(np.float32)
 
 
 def _kde_intensity_grid(
