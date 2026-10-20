@@ -78,7 +78,7 @@ def test_card_hashes_are_read_from_the_front_matter():
 def test_load_verifies_every_split_against_the_card(fake_hub):
     root, digests, calls = fake_hub
     splits = hf.load_released_dataset("comcat_california", config="native")
-    assert len(splits["train"]) == 1 and len(splits["test"]) == 3
+    assert len(splits["train"]) == 1 and len(splits["test"][0]["times"]) == 3
     assert all(rec["verified"] for rec in splits["__provenance__"])
     assert {rec["sha256"] for rec in splits["__provenance__"]} == set(digests.values())
     spec = hf.released_dataset("comcat_california")
