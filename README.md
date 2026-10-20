@@ -32,7 +32,8 @@ Documentation: https://yahyaaalaila.github.io/seahorse/
 
 ## 🗞️ News [[Back&nbsp;to&nbsp;Top](#top)]
 
-- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The **Seahorse** paper is out on [arXiv](https://arxiv.org/abs/2607.01022) — and `v0.1.0` is on PyPI: `pip install seahorse-stpp`.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; `v1.0.0`, the NeurIPS 2026 camera-ready release: corrected likelihood reporting, exact compensator-based evaluation and calibration, frozen campaigns and hash-verified datasets ([changelog](CHANGELOG.md)). `pip install seahorse-stpp`.
+- ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; The **Seahorse** paper is out on [arXiv](https://arxiv.org/abs/2607.01022).
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; **HawkesNest**, our synthetic STPP stress-test suite, is released: [code](https://github.com/YahyaAalaila/HawkesNest) · [paper](https://arxiv.org/abs/2606.16863).
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [24-05-2025] Presentation at [Machine Learning &amp; Global Health Network (MLGH)](https://mlgh.net/), London, UK.
 - ![NEW](https://img.shields.io/badge/NEW-red?style=flat)&nbsp; [01-04-2025] Our [knowledgebase website](https://events2025.github.io/) is finally up.
@@ -263,7 +264,7 @@ To cite the software release specifically, use the Zenodo DOI:
   title   = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
   author  = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
   year    = {2026},
-  version = {0.1.0},
+  version = {1.0.0},
   doi     = {10.5281/zenodo.21078077},
   url     = {https://github.com/YahyaAalaila/seahorse},
   license = {Apache-2.0}

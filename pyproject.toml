@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seahorse-stpp"
-version = "0.1.0"
+version = "1.0.0"
 description = "Seahorse: unified benchmarking for spatio-temporal point-process models"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,7 +24,7 @@ keywords = [
   "pytorch",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -57,15 +57,17 @@ dev = [
   "ruff>=0.6.0",
   "pre-commit>=3.7.0",
 ]
-runner = []
 hpo = [
   "ray[tune]>=2.43.0",
+]
+viz = [
+  "plotly>=5.18",
 ]
 docs = [
   "mkdocs-material>=9.5",
 ]
 all = [
-  "seahorse-stpp[runner,hpo,docs]",
+  "seahorse-stpp[hpo,viz,docs]",
 ]
 
 [project.urls]
@@ -73,6 +75,7 @@ Homepage = "https://github.com/YahyaAalaila/seahorse"
 Repository = "https://github.com/YahyaAalaila/seahorse"
 Documentation = "https://yahyaaalaila.github.io/seahorse/"
 Issues = "https://github.com/YahyaAalaila/seahorse/issues"
+Changelog = "https://github.com/YahyaAalaila/seahorse/blob/main/CHANGELOG.md"
 
 [project.scripts]
 seahorse = "seahorse.__main__:main"

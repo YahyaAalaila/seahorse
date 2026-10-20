@@ -1,0 +1,17 @@
+{
+  "title": "Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes",
+  "description": "A modular, research-grade framework for end-to-end development, training, and evaluation of spatio-temporal point-process (STPP) models.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "Apache-2.0",
+  "creators": [
+    {"name": "Aalaila, Yahya", "orcid": "0000-0002-0661-317X", "affiliation": "German Research Center for Artificial Intelligence (DFKI)"},
+    {"name": "Großmann, Gerrit", "orcid": "0000-0002-4933-447X", "affiliation": "German Research Center for Artificial Intelligence (DFKI)"},
+    {"name": "Vollmer, Sebastian", "orcid": "0000-0003-2831-1401", "affiliation": "German Research Center for Artificial Intelligence (DFKI)"}
+  ],
+  "keywords": ["spatio-temporal point process", "Hawkes process", "neural STPP", "benchmarking", "PyTorch"],
+  "related_identifiers": [
+    {"identifier": "arXiv:2607.01022", "relation": "isSupplementTo", "resource_type": "publication-article", "scheme": "arxiv"}
+  ],
+  "notes": "Except for seahorse/models/spatial_models/independent_cnf.py, adapted from facebookresearch/neural_stpp under CC BY-NC 4.0; see NOTICE."
+}

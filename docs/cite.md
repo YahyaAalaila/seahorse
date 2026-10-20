@@ -27,7 +27,7 @@ The Seahorse preprint is on [arXiv:2607.01022](https://arxiv.org/abs/2607.01022)
   year    = {2026},
   doi     = {10.5281/zenodo.21078077},
   url     = {https://github.com/YahyaAalaila/seahorse},
-  version = {0.1.0},
+  version = {1.0.0},
   license = {Apache-2.0}
 }
 ```

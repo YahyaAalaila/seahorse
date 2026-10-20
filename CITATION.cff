@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use Seahorse in your research, please cite the software (and the accompanying paper once it is public)."
+message: "If you use Seahorse in your research, please cite the paper (preferred-citation) and the software release."
 title: "Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes"
 abstract: "A modular, research-grade framework for end-to-end development, training, and evaluation of spatio-temporal point-process (STPP) models."
 type: software
@@ -13,7 +13,7 @@ authors:
   - family-names: Vollmer
     given-names: Sebastian
     orcid: "https://orcid.org/0000-0003-2831-1401"
-version: 0.1.0
+version: 1.0.0
 license: Apache-2.0
 repository-code: "https://github.com/YahyaAalaila/seahorse"
 url: "https://yahyaaalaila.github.io/seahorse/"
@@ -24,7 +24,7 @@ keywords:
   - benchmarking
   - PyTorch
 doi: "10.5281/zenodo.21078077"
-date-released: 2026-06-30
+date-released: 2026-10-20
 identifiers:
   - type: doi
     value: "10.5281/zenodo.21078077"
