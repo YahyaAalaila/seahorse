@@ -1,3 +1,12 @@
+# This module is adapted from facebookresearch/neural_stpp
+# (https://github.com/facebookresearch/neural_stpp, Chen, Amos and Nickel,
+# "Neural Spatio-Temporal Point Processes", ICLR 2021), files
+# models/spatial/cnf.py and diffeq_layers/, Copyright (c) Facebook, Inc. and its
+# affiliates, licensed under the Creative Commons Attribution-NonCommercial 4.0
+# International License (CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/).
+# The maths is unchanged; the package structure was adapted for Seahorse.
+# Unlike the rest of Seahorse (Apache-2.0), this file carries the CC BY-NC 4.0
+# terms of its upstream: it may not be used for commercial purposes.
 """Independent CNF spatial model for factorized STPP baselines.
 
 Each event's spatial distribution is modelled independently via a continuous

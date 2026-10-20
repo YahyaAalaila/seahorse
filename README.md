@@ -264,6 +264,8 @@ GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) o
 
 Seahorse is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
+**Licensing.** Apache-2.0, except the CNF spatial decoder (`seahorse/models/spatial_models/independent_cnf.py`), which is adapted from [neural_stpp](https://github.com/facebookresearch/neural_stpp) and remains under CC BY-NC 4.0 (non-commercial). The vendored Hawkes source under `seahorse/models/statistical/_hawkes_source/` is MIT.
+
 ---
 
 ## 🙏 Acknowledgment [[Back&nbsp;to&nbsp;Top](#top)]

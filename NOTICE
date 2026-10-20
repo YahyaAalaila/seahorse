@@ -9,3 +9,12 @@ The statistical Hawkes presets include TheHawkesPackage by Jens Fischer,
 commit 37e83bc30b3bd5781551ea1fc1e72ba657608ebb, under the MIT license.
 Its source, license, and provenance are retained in
 seahorse/models/statistical/_hawkes_source/ and the adjacent NOTICE.md.
+
+seahorse/models/spatial_models/independent_cnf.py is adapted from
+facebookresearch/neural_stpp (Chen, Amos and Nickel, "Neural Spatio-Temporal
+Point Processes", ICLR 2021), Copyright (c) Facebook, Inc. and its affiliates,
+licensed under the Creative Commons Attribution-NonCommercial 4.0 International
+License (CC BY-NC 4.0). That file keeps its upstream licence and is excluded
+from the Apache-2.0 grant: it may not be used for commercial purposes. The
+other model families wrap or reimplement upstream code released under permissive
+licences (AutoSTPP MIT, DeepSTPP MIT, ffjord MIT); see the module docstrings.
