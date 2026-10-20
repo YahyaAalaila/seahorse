@@ -323,6 +323,14 @@ class STPPRunner:
     def _build_model(self, dm: STPPDataModule):
         """Construct and return the UnifiedSTPP model."""
         data_overrides = ConfigRegistry.data_init_overrides(self.config.model.preset, dm)
+        # A declared observation domain takes precedence over the training
+        # extrema used by a family's default initializer. This is also needed
+        # when a caller supplies pre-transformed, fixed-domain data.
+        data_overrides = dict(data_overrides or {})
+        declared = self.config.model.build_overrides
+        for key in ("support_space_min", "support_space_max", "support_t0", "support_t1"):
+            if key in declared:
+                data_overrides[key] = declared[key]
         self._effective_model_overrides = data_overrides or {}
         return self.config.model.build_model(extra_overrides=data_overrides or None)
 
@@ -531,16 +539,23 @@ class STPPRunner:
     # ------------------------------------------------------------------
 
     def save(self, path) -> Path:
-        """Save config YAML + model weights to *path* directory.
+        """Save the fitted configuration, preprocessing and weights to *path*.
 
-        Creates two files: ``config.yaml`` and ``model.ckpt`` (state_dict).
+        Includes data-initialized model settings and runner normalization;
+        weights alone are insufficient to reconstruct predictive behavior.
         """
         if self._lightning_module is None:
             raise RuntimeError("Call fit() before save().")
 
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
-        self.config.to_yaml(out / "config.yaml")
+        import json
+        effective = STPPConfig.model_validate(self._effective_config_dump())
+        effective.to_yaml(out / "config.yaml")
+        if self._norm_stats is not None:
+            (out / "norm_stats.json").write_text(
+                json.dumps(self._norm_stats, indent=2, allow_nan=False) + "\n"
+            )
         torch.save(self.model.state_dict(), out / "model.ckpt")
         return out
 

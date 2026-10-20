@@ -33,7 +33,14 @@ def _yaml_safe_obj(value):
 
 
 def make_run_id() -> str:
-    """Return a unique run ID: ``YYYYMMDD_HHMMSS_{8-char-git-hash}``."""
+    """Return a unique run ID: ``YYYYMMDD_HHMMSS_{8-char-git-hash}_{proc-tag}``.
+
+    The trailing process tag is what makes the id unique. Timestamp and git
+    hash are both shared by concurrent sweep shards -- same repo, same second
+    -- so those two alone collide, and two runs then share one run directory,
+    one ``checkpoints/best.ckpt`` and one metrics log. A cell can then restore
+    another cell's checkpoint, which is wrong silently rather than loudly.
+    """
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     try:
         h = subprocess.check_output(
@@ -42,7 +49,8 @@ def make_run_id() -> str:
         ).decode().strip()
     except Exception:
         h = hashlib.md5(os.urandom(8)).hexdigest()[:8]
-    return f"{ts}_{h}"
+    tag = f"{os.getpid():x}{hashlib.md5(os.urandom(8)).hexdigest()[:4]}"
+    return f"{ts}_{h}_{tag}"
 
 
 def make_bench_run_id() -> str:
@@ -229,7 +237,11 @@ def load_state_dict(run_dir: Path, selection: str = "best") -> dict:
 
 
 def load_norm_stats(run_dir: Path) -> "Optional[dict]":
-    """Load ``norm_stats`` from ``run_result.json`` in *run_dir*, or ``None``."""
+    """Read exported preprocessing, with compatibility for full fit artifacts."""
+    standalone = run_dir / "norm_stats.json"
+    if standalone.exists():
+        with standalone.open() as f:
+            return json.load(f)
     result_json = run_dir / "run_result.json"
     if result_json.exists():
         with open(result_json) as f:
