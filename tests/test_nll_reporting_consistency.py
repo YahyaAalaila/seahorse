@@ -59,6 +59,7 @@ from seahorse.runner.results import resolve_loss_result_reporting
 
 #: Every preset in the exact-likelihood cohort compared by the HawkesNest suites.
 EXACT_PRESETS_DECLARED = (
+    "static_hawkes",
     "nsmpp",
     "thp_gmm",
     "rmtpp_gmm",

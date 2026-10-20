@@ -31,7 +31,7 @@ def test_flat_generative_targets_keep_matching_condition_and_target():
     assert float(state["diff_total_events"]) == 2
 
 
-@pytest.mark.parametrize("preset", ["auto_stpp", "deep_stpp", "thp_gmm", "rmtpp_gmm"])
+@pytest.mark.parametrize("preset", ["auto_stpp", "deep_stpp", "thp_gmm", "rmtpp_gmm", "gaussian_poisson", "static_hawkes"])
 def test_model_common_final_target_equals_its_eventwise_score(preset):
     torch.manual_seed(7)
     cfg = {"decoder": {"lookback": 3, "max_history": 3, "n_prodnet": 2, "hidden_size": 8, "num_layers": 1}} if preset == "auto_stpp" else {}
