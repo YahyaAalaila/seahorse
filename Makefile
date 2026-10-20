@@ -1,11 +1,11 @@
 .PHONY: lint test format
 
 lint:
-	ruff check tests scripts
+	ruff check seahorse tests scripts
 
 test:
 	pytest
 
 format:
-	ruff format tests scripts
+	ruff format seahorse tests scripts
 
