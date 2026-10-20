@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from seahorse.data.contract import validate_sequence_records
+from seahorse.data.hf import RELEASED_DATASETS
 from seahorse.utils import load_jsonl
 
 
@@ -14,26 +15,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_HF_DATASET_REPO = os.environ.get("SEAHORSE_HF_DATASET_REPO")
 _SPLIT_NAMES = ("train", "val", "test")
 
-# Consolidated Hugging Face organization holding the ready-to-use datasets.
-_SEAHORSE_HF_ORG = "seahorse-stpp"
-
-# Short, friendly names for the curated real-world datasets, each mapping to its
-# repo under the seahorse-stpp org. These let users pass `--dataset citibike`
-# instead of the full `seahorse-stpp/citibike-stpp` id.
-_REAL_WORLD_DATASETS = {
-    "citibike": "citibike-stpp",
-    "uber_pickups": "uber_pickups_nyc_stpp",
-    "us_accidents": "us_accidents_stpp",
-    "chicago_crime": "chicago_crime_stpp",
-    "la_crime": "la_crime_stpp",
-    "gtd": "gtd_stpp",
-    "austin_311": "austin_311_stpp",
-    "earthquakes": "earthquakes-stpp",
-    "us_wildfires": "us_wildfires_stpp",
-    "covid": "covid-stpp",
-    "gowalla": "gowalla_checkins_stpp",
-    "brightkite": "brightkite_checkins_stpp",
-    "bold5000": "bold5000-stpp",
+# The released benchmark datasets (``seahorse.data.hf``) are curated under their
+# short names at the pinned release revision, so `--dataset covid` resolves to
+# the same files as `load_released_dataset("covid")`. Older short names stay as
+# aliases.
+_SHORT_NAME_ALIASES = {
+    "austin_311": "austin311",
+    "uber_pickups": "uber_nyc",
+    "citibike": "citibike_legacy",
 }
 
 
@@ -47,6 +36,7 @@ class CuratedDatasetSpec:
     repo_id: str | None = _DEFAULT_HF_DATASET_REPO
     revision: str | None = None
     aliases: tuple[str, ...] = ()
+    script_only: bool = False
 
 
 def _candidate_path(path_str: str) -> Path:
@@ -124,13 +114,17 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
         )
     )
 
-    specs.extend(
-        CuratedDatasetSpec(
-            name=name,
-            repo_id=f"{_SEAHORSE_HF_ORG}/{repo_leaf}",
+    for name, released in RELEASED_DATASETS.items():
+        specs.append(
+            CuratedDatasetSpec(
+                name=name,
+                repo_id=released.repo_id,
+                repo_path="" if released.layout == "root" else released.default_config,
+                revision=released.revision,
+                aliases=tuple(a for a, target in _SHORT_NAME_ALIASES.items() if target == name),
+                script_only=released.form == "script-only",
+            )
         )
-        for name, repo_leaf in _REAL_WORLD_DATASETS.items()
-    )
 
     catalog: dict[str, CuratedDatasetSpec] = {}
     for spec in specs:
@@ -284,6 +278,12 @@ def download_dataset(
         raise FileNotFoundError(
             f"Dataset '{key}' was not found locally and no Hugging Face repo is configured "
             "for this curated entry."
+        )
+    if spec.script_only:
+        raise FileNotFoundError(
+            f"Dataset '{key}' ({spec.repo_id}) is not hosted: its licence only permits a rebuild "
+            "script. Run the repository's rebuild script, then pass the local directory here or "
+            f"use load_released_dataset('{spec.name}', local_root=...) for hash verification."
         )
 
     return _snapshot_repo_path(

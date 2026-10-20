@@ -51,6 +51,51 @@ from seahorse import load_jsonl
 train = load_jsonl("cache/my_dataset/train.jsonl")
 ```
 
+## Released benchmark datasets (hash-verified)
+
+The datasets of the Seahorse paper are published under the
+[`seahorse-stpp`](https://huggingface.co/seahorse-stpp) organisation. `seahorse.data.hf`
+pins every repository to its release commit and verifies each downloaded split against the
+`split_sha256` block of the dataset card before parsing:
+
+```python
+from seahorse.data import list_released_datasets, load_released_dataset
+
+list_released_datasets(in_paper=True)
+splits = load_released_dataset("austin311")                      # default config: jittered_seed20260910
+native = load_released_dataset("austin311", config="native")
+synthetic = load_released_dataset("synthetic", config="gamma_renewal")
+splits["__provenance__"]                                         # repo, revision, config, sha256, verified
+```
+
+| Short name | Repository | Configs | Licence (see card) |
+| --- | --- | --- | --- |
+| `comcat_california` | `comcat_california_stpp` | `native` | public domain (USGS) |
+| `geonet_nz` | `geonet_nz_stpp` | `jittered_seed20260910`, `native` | CC BY 3.0 NZ |
+| `austin311` | `austin_311_stpp` | `jittered_seed20260910`, `native` | public domain (City of Austin) |
+| `nyc311` | `nyc311_stpp` | `jittered_seed20260910`, `native` | NYC Open Data terms |
+| `nyc_collisions` | `nyc_collisions_stpp` | `jittered_seed20260910`, `native` | NYC Open Data terms |
+| `chicago_crime` | `chicago_crime_stpp` | `jittered_seed20260910`, `native` | City of Chicago terms |
+| `la_crime` | `la_crime_stpp` | `jittered_seed20260910`, `native` | CC0 1.0 |
+| `uber_nyc` | `uber_pickups_nyc_stpp` | `jittered_seed20260910`, `native` | CC0 1.0 |
+| `synthetic` | `seahorse_synthetic_stpp` | `homogeneous_poisson`, `moving_seasonal_poisson`, `gamma_renewal` | CC BY 4.0 |
+| `covid` (legacy) | `covid-stpp` | `default` | CC BY-NC 4.0 |
+| `earthquakes` (legacy) | `earthquakes-stpp` | `default` | public domain (USGS) |
+
+**Script-only repositories.** `seattle_fire911` (`seattle_fire911_stpp`), `citibike_nyc`
+(`nyc_bikeshare_2019_stpp`) and `citibike_legacy` (`nyc_bikeshare_legacy_stpp`) do not host data,
+because the source licences or the content (address-level emergency calls) do not allow it. Each
+repository ships `rebuild/rebuild.py`, `verify.py` and the expected split hashes; after rebuilding,
+pass `local_root=<directory>` to `load_released_dataset`, which verifies the rebuilt splits against
+the card:
+
+```python
+splits = load_released_dataset("seattle_fire911", config="native", local_root="data/seattle_fire911")
+```
+
+The legacy cards (`covid`, `earthquakes`) declare no split hashes; they load with `verified=False`
+in `__provenance__` at the pinned revision.
+
 ## Hosting Your Own Dataset on HuggingFace
 
 To make a dataset work with `--dataset`, the repository must:

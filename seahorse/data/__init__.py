@@ -18,6 +18,7 @@ from .contract import (
     validate_sequence_records,
 )
 from .hub import CuratedDatasetSpec, download_dataset, load_dataset
+from .hf import list_released_datasets, load_released_dataset
 from .dataset import (
     PaperSlidingWindowDataset,
     SlidingWindowSTPPDataset,
@@ -45,6 +46,8 @@ _DIRECT_EXPORTS = {
     "CuratedDatasetSpec": CuratedDatasetSpec,
     "download_dataset": download_dataset,
     "load_dataset": load_dataset,
+    "list_released_datasets": list_released_datasets,
+    "load_released_dataset": load_released_dataset,
     "CoordinateTransformArtifact": CoordinateTransformArtifact,
     "IdentityTransformArtifact": IdentityTransformArtifact,
     "PaperAffineTransformArtifact": PaperAffineTransformArtifact,

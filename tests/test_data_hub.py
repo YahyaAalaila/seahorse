@@ -237,6 +237,24 @@ class TestDatasetHub(unittest.TestCase):
 
         self.assertEqual(loaded, records[:1])
 
+    def test_released_datasets_are_curated_at_their_pinned_revision(self):
+        from seahorse.data.hf import RELEASED_DATASETS
+        from seahorse.data.hub import _CURATED_DATASETS
+
+        for name, released in RELEASED_DATASETS.items():
+            spec = _CURATED_DATASETS[name]
+            self.assertEqual(spec.repo_id, released.repo_id, name)
+            self.assertEqual(spec.revision, released.revision, name)
+            self.assertEqual(spec.script_only, released.form == "script-only", name)
+        self.assertIs(_CURATED_DATASETS["citibike"], _CURATED_DATASETS["citibike_legacy"])
+        self.assertIs(_CURATED_DATASETS["uber_pickups"], _CURATED_DATASETS["uber_nyc"])
+
+    def test_script_only_released_datasets_are_not_downloaded(self):
+        with patch("seahorse.data.hub._snapshot_download") as download_mock:
+            with self.assertRaisesRegex(FileNotFoundError, "rebuild"):
+                download_dataset("seattle_fire911")
+        download_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
