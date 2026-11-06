@@ -428,79 +428,90 @@ class ScoreMatchingProcess(nn.Module):
         return -(one_hot * log_prb).sum(dim=-1)
 
     @torch.no_grad()
+    def nll_terms(
+        self,
+        x_start: Tensor,
+        cond: Tensor,
+        n_quad: int = 20,
+    ) -> Dict[str, Tensor]:
+        """Per-event terms of the framework-added surrogate NLL (SMASH defines no likelihood).
+
+        The network is trained on tokens mapped to ``y = 2u - 1`` (see :meth:`forward`), so it is
+        queried in those coordinates here as well; ``x_start`` holds the ``[0, 1]`` tokens ``u``
+        from ``smash_img``.
+
+        Temporal: ``-log f(u_t)`` with ``f`` the density of the model's implicit intensity
+            ``lambda(y)`` on the time token, ``log f_y(y_t) = log lambda(y_t) - int_{-1}^{y_t}
+            lambda(y) dy`` (trapezoid rule, ``n_quad`` nodes), converted to the ``[0, 1]`` token
+            with ``log f_u = log f_y + log 2``. Score matching identifies ``lambda`` only up to a
+            Riccati family and ``f`` may have total mass below one, so this is the NLL of a
+            sub-density (an upper bound on the NLL of its normalised version).
+        Spatial: Tweedie surrogate ``sigma^2 |s(y)|^2 / 2 + (d/2) log(2 pi sigma^2)`` at the fixed
+            ``sigma_s`` of the ``y`` coordinates. This is ``-log N(y; y + sigma^2 s(y), sigma^2 I)``,
+            not a density of the event location, and is dominated by the ``sigma_s`` constant.
+
+        Parameters
+        ----------
+        x_start : (N, 1, 1+loc_dim) ``[0, 1]`` tokens ``[u_t, u_s1, u_s2]`` from ``smash_img``
+        cond    : (N, 1, cond_dim) per-event conditioning from ``smash_cond``
+        n_quad  : number of quadrature nodes for the compensator integral
+
+        Returns
+        -------
+        dict with per-event tensors ``temporal`` (nats per unit of the ``[0, 1]`` time token) and
+        ``spatial_surrogate`` (Tweedie value in the ``y`` coordinates).
+        """
+        N_total = x_start.shape[0]
+        device = x_start.device
+        dtype = x_start.dtype
+
+        x = normalize_to_neg_one_to_one(x_start)  # training coordinates
+        y_t = x[:, 0, 0]
+
+        # ---- Temporal: compensator on [-1, y_t] -----------------------------------
+        t_frac = torch.linspace(0.0, 1.0, n_quad, device=device, dtype=dtype)
+        t_grid = -1.0 + (y_t + 1.0).unsqueeze(1) * t_frac.unsqueeze(0)  # (N, n_quad)
+        cond_flat = cond.repeat_interleave(n_quad, dim=0)
+        lambda_grid = (
+            self.model.get_intensity(t_grid.reshape(N_total * n_quad, 1, 1), cond_flat)
+            .sum(-1)
+            .squeeze(1)
+            .reshape(N_total, n_quad)
+        )
+        widths = t_grid[:, 1:] - t_grid[:, :-1]
+        compensator = (0.5 * (lambda_grid[:, :-1] + lambda_grid[:, 1:]) * widths).sum(dim=1)
+
+        lambda_at_t = self.model.get_intensity(y_t.view(N_total, 1, 1), cond).sum(-1).squeeze(1)
+        log_f_y = torch.log(lambda_at_t.clamp(min=1e-10)) - compensator
+        temporal_nll = -(log_f_y + math.log(2.0))  # density w.r.t. u_t = (y_t + 1) / 2
+
+        # ---- Spatial: Tweedie surrogate at fixed sigma_s (not a density) -------------
+        sigma_s_sq = float(self.sigma[1].item()) ** 2
+        score_s = self.model.get_score_loc(x, cond).squeeze(1)  # (N, loc_dim)
+        loc_dim = score_s.shape[-1]
+        spatial_surrogate = (
+            sigma_s_sq * (score_s ** 2).sum(dim=-1) / 2.0
+            + (loc_dim / 2.0) * math.log(2.0 * math.pi * sigma_s_sq)
+        )
+        return {"temporal": temporal_nll, "spatial_surrogate": spatial_surrogate}
+
+    @torch.no_grad()
     def NLL_cal(
         self,
         x_start: Tensor,
         cond: Tensor,
         n_quad: int = 20,
     ) -> Tuple[float, float, float]:
-        """Approximate NLL via native SMASH mechanics.
-
-        Temporal: exact log-density of the model's implicit TPP (intensity quadrature).
-        Spatial:  Tweedie approximation at the model's fixed sigma_s.
-
-        Neither uses sampling, KDE, or external density estimators.
-
-        Parameters
-        ----------
-        x_start : (N_total, 1, 1+loc_dim) — [delta_t, s1, s2] from smash_img
-        cond    : (N_total, 1, cond_dim) — per-event conditioning from smash_cond
-        n_quad  : number of quadrature points for the compensator integral
+        """Framework-added surrogate NLL summed over events; see :meth:`nll_terms`.
 
         Returns
         -------
-        (nll_total, nll_temporal, nll_spatial) — floats, nat-sums over N_total events
+        (nll_total, nll_temporal, nll_spatial_surrogate) — floats, nat-sums over the events.
+        The spatial part is not a density, so the total is a surrogate, not a likelihood.
         """
-        N_total = x_start.shape[0]
-        device = x_start.device
-        dtype = x_start.dtype
-
-        # ---- Temporal NLL via compensator integral --------------------------------
-        delta_t = x_start[:, 0, 0]  # (N_total,) — inter-arrival times
-
-        # t_grid[i, j] = delta_t[i] * j / (n_quad-1)  — (N_total, n_quad)
-        t_frac = torch.linspace(0.0, 1.0, n_quad, device=device, dtype=dtype)
-        t_grid = delta_t.unsqueeze(1) * t_frac.unsqueeze(0)  # (N_total, n_quad)
-
-        # Batched intensity query: reshape to (N_total*n_quad, 1, 1)
-        t_flat = t_grid.reshape(N_total * n_quad, 1, 1)
-        cond_flat = cond.repeat_interleave(n_quad, dim=0)  # (N_total*n_quad, 1, cond_dim)
-        lambda_flat = self.model.get_intensity(t_flat, cond_flat)  # (..., 1, num_types)
-        lambda_flat = lambda_flat.sum(-1).squeeze(1)              # (N_total*n_quad,)
-        lambda_grid = lambda_flat.reshape(N_total, n_quad)        # (N_total, n_quad)
-
-        # Trapezoid rule: compensator[i] = integral_0^{delta_t[i]} lambda(u) du
-        widths = t_grid[:, 1:] - t_grid[:, :-1]                  # (N_total, n_quad-1)
-        compensator = (0.5 * (lambda_grid[:, :-1] + lambda_grid[:, 1:]) * widths).sum(dim=1)
-
-        # log lambda at the actual event time delta_t_i
-        lambda_at_dt = self.model.get_intensity(
-            delta_t.view(N_total, 1, 1), cond
-        )  # (N_total, 1, num_types)
-        lambda_at_dt = lambda_at_dt.sum(-1).squeeze(1)            # (N_total,)
-        log_lambda = torch.log(lambda_at_dt.clamp(min=1e-10))     # (N_total,)
-
-        temporal_logp = log_lambda - compensator                  # (N_total,)
-
-        # ---- Spatial NLL via Tweedie approximation at fixed sigma_s ---------------
-        # Evaluate score_loc at the clean (unperturbed) event location.
-        # Tweedie approximation: log p_{sigma_s}(s | H) ≈
-        #     -sigma_s^2 * ||score_loc(s, cond)||^2 / 2 - (d/2) * log(2*pi*sigma_s^2)
-        sigma_s = self.sigma[1].to(device=device, dtype=dtype)    # scalar
-
-        score_loc = self.model.get_score_loc(x_start, cond)       # (N_total, 1, loc_dim)
-        score_s = score_loc.squeeze(1)                             # (N_total, loc_dim)
-        loc_dim = score_s.shape[-1]
-
-        score_s_norm_sq = (score_s ** 2).sum(dim=-1)              # (N_total,)
-        sigma_s_sq = sigma_s ** 2
-        spatial_logp = (
-            -sigma_s_sq * score_s_norm_sq / 2.0
-            - (loc_dim / 2.0) * math.log(2.0 * math.pi * float(sigma_s_sq.item()))
-        )  # (N_total,)
-
-        nll_temporal = float(-temporal_logp.sum().item())
-        nll_spatial  = float(-spatial_logp.sum().item())
+        terms = self.nll_terms(x_start, cond, n_quad=n_quad)
+        nll_temporal = float(terms["temporal"].sum().item())
+        nll_spatial = float(terms["spatial_surrogate"].sum().item())
         return nll_temporal + nll_spatial, nll_temporal, nll_spatial
 
     def forward(self, img: Tensor, cond: Tensor, *args, **kwargs) -> Tensor:
@@ -562,10 +573,11 @@ class SMASHEventModel(EventModel):
             nll_kind="approx",
             nll_path="surrogate",
             nll_description=(
-                "framework-added approx NLL: exact temporal "
-                "(intensity quadrature) + Tweedie spatial at fixed σ_s"
+                "framework-added surrogate, not a likelihood (SMASH defines none): "
+                "temporal sub-density NLL of the implicit intensity (quadrature) "
+                "+ Tweedie spatial surrogate at fixed σ_s (not a density)"
             ),
-            nll_footnote="‡ framework-added approx NLL",
+            nll_footnote="‡ framework-added surrogate; SMASH defines no likelihood",
             has_score=True,
             has_native_sampler=True,
         )
@@ -646,14 +658,15 @@ class SMASHEventModel(EventModel):
         marks: Optional[Tensor] = None,
         device=None,
     ) -> Dict[str, Tensor]:
-        """Framework-added approximate per-event NLL for benchmark reporting.
+        """Framework-added surrogate per-event NLL; SMASH itself defines no likelihood.
 
-        Temporal NLL: exact log-density of the model's implicit TPP
-            (numerical quadrature of the compensator integral).
-        Spatial NLL:  Tweedie approximation at the model's fixed sigma_s.
+        Temporal: NLL of the sub-density implied by the model's intensity on the time token,
+            evaluated in the training coordinates (see ``ScoreMatchingProcess.nll_terms``).
+        Spatial:  Tweedie surrogate at the model's fixed sigma_s; not a density.
 
-        This metric is separate from the SMASH training objective.
-        Neither component uses sampling, KDE, or any external density estimator.
+        The total is therefore not a likelihood and is labelled ``approx``/``surrogate``.
+        Values are in token units (no Jacobian to raw units). This metric is separate from
+        the SMASH training objective; neither component uses sampling or KDE.
         val/sm (validation/training) remains the score-matching objective;
         this method is invoked only at test time for benchmark reporting.
         """
