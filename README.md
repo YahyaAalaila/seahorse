@@ -21,6 +21,7 @@ The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Dataset
 
 ## 🗞️ News [[Back&nbsp;to&nbsp;Top](#top)]
 
+- `v1.0.1`: SMASH surrogate NLL evaluated in the model's training coordinates; scripts for the paper's DSTPP and SMASH NLL rows; HawkesNest entanglement suite loader ([changelog](CHANGELOG.md)).
 - `v1.0.0`, the NeurIPS 2026 camera-ready release: corrected likelihood reporting, exact compensator-based evaluation and calibration, frozen campaigns and hash-verified datasets ([changelog](CHANGELOG.md)). `pip install seahorse-stpp`.
 - The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Datasets). Preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
 
@@ -242,7 +243,7 @@ To cite the software release, use the Zenodo concept DOI (it resolves to the lat
   title   = {Seahorse: Unified Benchmarking for Spatio-Temporal Point Processes},
   author  = {Aalaila, Yahya and Gro{\ss}mann, Gerrit and Vollmer, Sebastian},
   year    = {2026},
-  version = {1.0.0},
+  version = {1.0.1},
   doi     = {10.5281/zenodo.21078077},
   url     = {https://github.com/YahyaAalaila/seahorse},
   license = {Apache-2.0}

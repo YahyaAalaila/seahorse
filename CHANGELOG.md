@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.1 — 2026-11-06
+
+### Fixed
+- SMASH: the framework surrogate NLL (`ScoreMatchingProcess.NLL_cal`, `eval_nll`) queried the network on the `[0, 1]` tokens, while the network is trained on `y = 2u − 1`. The intensity and the location score are now evaluated in the training coordinates, the compensator is integrated from `y = −1`, and the temporal term carries the `log 2` Jacobian back to the `[0, 1]` token. On the homogeneous Poisson control the temporal NLL in raw units moves from −2.51 to −3.37 (true −3.38). Per-event terms are available from `ScoreMatchingProcess.nll_terms`.
+- SMASH defines no likelihood. The spatial Tweedie term of the framework value is not a density (it is dominated by the fixed σ constant), so the reported value stays labelled as a surrogate (`nll_kind="approx"`, `nll_path="surrogate"`); capability descriptions and docstrings say so.
+
+### Added
+- `scripts/approx_nll/`: evaluation-only scripts for the camera-ready DSTPP and SMASH NLL rows. `dstpp_bound.py` computes DSTPP's full variational bound per target in raw units (summed over token dimensions, with the Jacobians of the token normalisation and the campaign coordinates); `smash_grid_density.py` computes SMASH's temporal NLL and a grid estimate of the spatial density of its score model (least-squares Poisson solve on a regular grid, normalised), with a stratified subsample option. Formulas in the directory README.
+- `load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L0" … "_L3")`: the HawkesNest entanglement suite in `seahorse-stpp/seahorse_synthetic_stpp` (folder `hawkesnest_entanglement/`), pinned revision, splits verified against the suite's `SHA256SUMS`.
+
+SMASH values produced with 1.0.0 `eval_nll` should be recomputed.
+
 ## 1.0.0 — 2026-10-20
 
 ### Fixed
