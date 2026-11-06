@@ -119,7 +119,7 @@ def _build_catalog() -> dict[str, CuratedDatasetSpec]:
             CuratedDatasetSpec(
                 name=name,
                 repo_id=released.repo_id,
-                repo_path="" if released.layout == "root" else released.default_config,
+                repo_path="" if released.layout == "root" else released.config_dir(released.default_config),
                 revision=released.revision,
                 aliases=tuple(a for a, target in _SHORT_NAME_ALIASES.items() if target == name),
                 script_only=released.form == "script-only",

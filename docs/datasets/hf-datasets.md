@@ -66,6 +66,7 @@ list_released_datasets(in_paper=True)
 splits = load_released_dataset("austin311")                      # default config: jittered_seed20260910
 native = load_released_dataset("austin311", config="native")
 synthetic = load_released_dataset("synthetic", config="gamma_renewal")
+entangled = load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L2")
 splits["__provenance__"]                                         # repo, revision, config, sha256, verified
 ```
 
@@ -80,6 +81,7 @@ splits["__provenance__"]                                         # repo, revisio
 | `la_crime` | `la_crime_stpp` | `jittered_seed20260910`, `native` | CC0 1.0 |
 | `uber_nyc` | `uber_pickups_nyc_stpp` | `jittered_seed20260910`, `native` | CC0 1.0 |
 | `synthetic` | `seahorse_synthetic_stpp` | `homogeneous_poisson`, `moving_seasonal_poisson`, `gamma_renewal` | CC BY 4.0 |
+| `hawkesnest_entanglement` | `seahorse_synthetic_stpp` (folder `hawkesnest_entanglement/`) | `hawkesnest_entanglement_L0` … `_L3` | CC BY 4.0 |
 | `covid` (legacy) | `covid-stpp` | `default` | CC BY-NC 4.0 |
 | `earthquakes` (legacy) | `earthquakes-stpp` | `default` | public domain (USGS) |
 

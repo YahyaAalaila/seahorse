@@ -113,3 +113,31 @@ def test_legacy_cards_without_hashes_load_unverified(tmp_path, monkeypatch):
     splits = hf.load_released_dataset("covid", splits=("train",))
     assert len(splits["train"]) == 1
     assert splits["__provenance__"][0]["verified"] is False
+
+
+def test_hawkesnest_entanglement_configs_map_to_the_suite_folder():
+    spec = hf.released_dataset("hawkesnest_entanglement")
+    assert spec.repo_id == "seahorse-stpp/seahorse_synthetic_stpp"
+    assert spec.configs == tuple(f"hawkesnest_entanglement_L{i}" for i in range(4))
+    assert spec.split_path("hawkesnest_entanglement_L2", "validation") == "hawkesnest_entanglement/L2/val.jsonl"
+    assert set(spec.split_sha256) == set(spec.configs)
+    assert hf.released_dataset("synthetic").split_path("gamma_renewal", "test") == "gamma_renewal/test.jsonl"
+
+
+def test_pinned_hashes_verify_configs_the_card_does_not_list(tmp_path, monkeypatch):
+    root = tmp_path / "synthetic"
+    (root / "hawkesnest_entanglement" / "L1").mkdir(parents=True)
+    (root / "README.md").write_text(CARD.format(train="a" * 64, val="b" * 64, test="c" * 64))
+    payload = _jsonl([{"times": [0.1, 0.2], "locations": [[0.1, 0.1], [0.2, 0.2]]}])
+    (root / "hawkesnest_entanglement" / "L1" / "test.jsonl").write_bytes(payload)
+    monkeypatch.setattr(hf, "_hub_download", lambda repo_id, filename, *, revision, cache_dir=None: root / filename)
+    spec = hf.released_dataset("hawkesnest_entanglement")
+    pinned = {"hawkesnest_entanglement_L1": {"test": hashlib.sha256(payload).hexdigest()}}
+    monkeypatch.setattr(hf, "RELEASED_DATASETS", {**hf.RELEASED_DATASETS, spec.name: hf.ReleasedDataset(
+        spec.name, spec.repo, spec.revision, spec.configs, spec.default_config, spec.license,
+        config_paths=spec.config_paths, split_sha256=pinned)})
+    splits = hf.load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L1", splits=("test",))
+    assert splits["__provenance__"][0]["verified"] is True
+    (root / "hawkesnest_entanglement" / "L1" / "test.jsonl").write_bytes(payload + b"\n")
+    with pytest.raises(hf.HashMismatchError):
+        hf.load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L1", splits=("test",))

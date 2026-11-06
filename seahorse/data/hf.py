@@ -55,10 +55,17 @@ class ReleasedDataset:
     in_paper: bool = True
     notes: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    # Directory of a config inside the repository when it differs from the config name.
+    config_paths: dict[str, str] = field(default_factory=dict)
+    # Split hashes pinned here for configs whose card declares none: {config: {split: sha256}}.
+    split_sha256: dict[str, dict[str, str]] = field(default_factory=dict)
 
     @property
     def repo_id(self) -> str:
         return f"{HF_ORG}/{self.repo}"
+
+    def config_dir(self, config: str) -> str:
+        return self.config_paths.get(config, config)
 
     def split_path(self, config: str, split: str) -> str:
         split = _SPLIT_ALIASES.get(split, split)
@@ -68,10 +75,34 @@ class ReleasedDataset:
             raise ValueError(f"{self.name}: unknown config {config!r}; available: {list(self.configs)}.")
         if self.layout == "root":
             return _SPLIT_FILES[split]
-        return f"{config}/{_SPLIT_FILES[split]}"
+        return f"{self.config_dir(config)}/{_SPLIT_FILES[split]}"
 
 
 _PAPER_URBAN = ("jittered_seed20260910", "native")
+
+_HAWKESNEST_LEVELS = tuple(f"hawkesnest_entanglement_L{i}" for i in range(4))
+_HAWKESNEST_SHA256 = {
+    "hawkesnest_entanglement_L0": {
+        "train": "1177d2a007891edbda8f2ac5c295a17544523d6e5a5818da9906f54c01016633",
+        "val": "e4618c60c5ea64d04117eda3e1d38e83381a65fe2f74cde85717c6936618533e",
+        "test": "7b95f2a0896c818576cd61a350a7bf404cd1432fd88463c48d1522e50332ddbd",
+    },
+    "hawkesnest_entanglement_L1": {
+        "train": "0891ec57535a30c3edc2763ace80590906bc69fb72be9ed7a216de669e1b83af",
+        "val": "e521701cfd03122b45f018467da4a6b3d31957e3e7f179f32bdceb8595a98221",
+        "test": "bc3f02f1ff15bfd6f5b78cd6443b86c2da89a94a09c0453eaf26ed0c57f6c13e",
+    },
+    "hawkesnest_entanglement_L2": {
+        "train": "b05c32aaadd0c7ccff6cb2e2d396f2988989f8a4e8539a4c32960190dd4dc0f5",
+        "val": "6916d4c966cccc51988e46011186b51f7214302bf091ddfcfcfba8f37b006f76",
+        "test": "e86ff8d2465d9c7741b26719c66d1e396992a04738743f31323c32a22a09f7f5",
+    },
+    "hawkesnest_entanglement_L3": {
+        "train": "61242168a16cc074f3783180468a618703686d5807608b2167eb606f0287bf93",
+        "val": "92fcd8bab74e10ba8e95f5242da32612890bdc03c05fbdca9477d07ff118100e",
+        "test": "b86391e2ccd9c19ae53bf3073baedb8d5934ed4f14cfad401dff6d8b835347fc",
+    },
+}
 
 RELEASED_DATASETS: dict[str, ReleasedDataset] = {
     # Table 3 (prepared real-data corpora of the camera-ready campaign)
@@ -114,6 +145,14 @@ RELEASED_DATASETS: dict[str, ReleasedDataset] = {
         "synthetic", "seahorse_synthetic_stpp", "4563558bae8ff0bb4349df001bb7df62d023b616",
         ("homogeneous_poisson", "moving_seasonal_poisson", "gamma_renewal"), "homogeneous_poisson",
         "CC BY 4.0 (Seahorse)", notes="Synthetic controls with analytic ground truth."),
+    "hawkesnest_entanglement": ReleasedDataset(
+        "hawkesnest_entanglement", "seahorse_synthetic_stpp", "a7e79c5a3006c10a60e2699fd2a3851c7f952575",
+        _HAWKESNEST_LEVELS, "hawkesnest_entanglement_L0", "CC BY 4.0 (Seahorse, HawkesNest)",
+        config_paths={c: f"hawkesnest_entanglement/{c.rsplit('_', 1)[1]}" for c in _HAWKESNEST_LEVELS},
+        split_sha256=_HAWKESNEST_SHA256,
+        notes="HawkesNest entanglement suite L0-L3 (space-time entanglement rho = 0, 1, 2, 3); "
+              "folder hawkesnest_entanglement/ of the synthetic repository. Split hashes from its "
+              "provenance/SHA256SUMS."),
     # Table 2 (legacy Neural-STPP benchmark splits)
     "covid": ReleasedDataset(
         "covid", "covid-stpp", "597ca57c801dbb87b9a903083ec45e1a0a23330d",
@@ -238,7 +277,7 @@ def download_released_split(
     expected = None
     if verify:
         hashes = card_split_hashes(fetch_card(spec, revision=revision, cache_dir=cache_dir))
-        expected = hashes.get(config, {}).get(split_key)
+        expected = hashes.get(config, {}).get(split_key) or spec.split_sha256.get(config, {}).get(split_key)
     if local_root is not None:
         path = Path(local_root) / (relative if spec.layout == "config_dirs" else _SPLIT_FILES[split_key])
         if not path.exists():

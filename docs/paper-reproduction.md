@@ -120,6 +120,12 @@ The datasets load by short name at their pinned revisions
 The exact-evaluation layer behind the reported NLL and calibration metrics is
 documented in [Exact Evaluation Metrics](reference/exact-evaluation.md).
 
+The NLL rows of the two generative presets (DSTPP's variational bound in raw units; SMASH's
+temporal term and grid density) come from the evaluation-only scripts in `scripts/approx_nll/`,
+which re-score the campaign checkpoints on the same targets; their README gives the formulas.
+The HawkesNest entanglement suite (L0–L3) loads with
+`load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L0")`.
+
 ## Public Tutorials
 
 For a runnable end-to-end walkthrough, use the Colab notebooks linked from
