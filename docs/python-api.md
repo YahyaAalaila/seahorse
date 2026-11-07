@@ -39,7 +39,7 @@ The Python API exposes friendly classes for registered presets, including:
 - `NeuralJumpCNF`, `NeuralAttnCNF`
 - `DeepSTPP`, `AutoSTPP`, `SMASH`, `DiffusionSTPP`, `NSMPP`
 
-The Neural-STPP GMM preset (jump-ODE state model with a conditional-GMM decoder, Chen et al. 2021) is available through `STPPEstimator("njsde")` or its alias `neural_stpp_gmm`.
+The Neural Jump SDE preset (Jia & Benson 2019, as implemented in the Neural STPP codebase of Chen et al. 2021: jump-ODE state model with a conditional-GMM decoder) is available through `STPPEstimator("njsde")` or its alias `neural_stpp_gmm`.
 
 Programmatic discovery is available:
 

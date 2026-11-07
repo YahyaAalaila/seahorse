@@ -27,7 +27,7 @@ SMASH values produced with 1.0.0 `eval_nll` should be recomputed.
 ### Changed
 - `EventCapabilities.nll_path` and `nll_label` distinguish closed-form, numerical-quadrature (NSMPP, THP-GMM) and sample-based likelihoods; DSTPP's benchmark value is labelled a joint sample-KDE estimate, not a variational bound.
 - Intensity thinning requires declared proposal bounds and emits a `DeprecationWarning` for predictive metrics; factorized GMM presets sample by inverse temporal hazard.
-- `njsde` is documented as the Neural-STPP jump-ODE model with a conditional-GMM decoder (alias `neural_stpp_gmm`).
+- `njsde` is documented as the Neural Jump SDE baseline of Jia & Benson (2019) as implemented in the Neural STPP codebase (jump-ODE state model + conditional-GMM decoder; alias `neural_stpp_gmm`); the preset wraps that implementation, not the original NJSDE code.
 - Run ids carry a process tag; `save()` writes the effective config and `norm_stats.json`.
 - Prepared-data and campaign roots come from `SEAHORSE_*` environment variables; no default paths.
 - Observation metadata (ids, window bounds, time axis) is carried through datasets and CLI evaluation.
