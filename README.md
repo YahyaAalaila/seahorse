@@ -220,12 +220,19 @@ class MyPresetConfig(BaseModelConfig):
     def build_model(self): ...          # return UnifiedSTPP(state_model, event_model)
 ```
 
-```bash
-python -m seahorse bench --presets my_preset auto_stpp deep_stpp static_hawkes \
-  --dataset nyc_collisions --seeds 1 2 3 --out runs/my_preset
+```python
+# seahorse_cli.py: makes the CLI see a preset registered outside the package
+import my_preset  # noqa: F401
+from seahorse.__main__ import main
+main()
 ```
 
-For a number that sits next to the paper's tables (same targets, raw units, same tuning budget), add the preset to a campaign spec in `experiments/campaign_2026/`. Guide: [Add your model and benchmark it](https://yahyaaalaila.github.io/seahorse/benchmark/your-model/). Pull requests with new presets and issues with results are welcome.
+```bash
+python seahorse_cli.py bench --presets my_preset auto_stpp deep_stpp static_hawkes \
+  --dataset nyc_collisions --seeds 1 2 3 --n_workers 1 --out runs/my_preset
+```
+
+For a number that sits next to the paper's tables (same targets, raw units, same tuning budget), add the preset to a campaign spec in `experiments/campaign_2026/` and run it on a prepared-data root built from the Hub (steps in the guide). Guide: [Add your model and benchmark it](https://yahyaaalaila.github.io/seahorse/benchmark/your-model/). Pull requests with new presets and issues with results are welcome.
 
 ---
 

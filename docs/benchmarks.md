@@ -71,7 +71,8 @@ python -m seahorse bench \
   --out runs/bench
 ```
 
-Replace `my_preset` with your registered name, and point `--splits_dir` at a
+Replace `my_preset` with your registered name (a preset registered outside the package needs a
+small launcher script, see [Add your model and benchmark it](benchmark/your-model.md#2-make-the-cli-see-it)), and point `--splits_dir` at a
 directory of released benchmark datasets (see the [dataset cards](datasets/index.md)).
 To place a new model next to the paper's numbers, follow
 [Add your model and benchmark it](benchmark/your-model.md). For a first run, the
