@@ -9,7 +9,7 @@ A benchmark and library for spatio-temporal point processes: 13 real datasets, a
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-yahyaaalaila.github.io%2Fseahorse-blue)](https://yahyaaalaila.github.io/seahorse/)
 
-The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Datasets); preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
+The Seahorse paper is accepted at NeurIPS E&D 2026; preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
 
 </div>
 
@@ -31,7 +31,7 @@ The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Dataset
 
 - `v1.0.1`: SMASH surrogate NLL evaluated in the model's training coordinates; scripts for the paper's DSTPP and SMASH NLL rows; HawkesNest entanglement suite loader ([changelog](CHANGELOG.md)).
 - `v1.0.0`, the NeurIPS 2026 camera-ready release: corrected likelihood reporting, exact compensator-based evaluation and calibration, frozen campaigns and hash-verified datasets ([changelog](CHANGELOG.md)). `pip install seahorse-stpp`.
-- The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Datasets). Preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
+- The Seahorse paper is accepted at NeurIPS E&D 2026. Preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
 
 <details>
 <summary>More news</summary>

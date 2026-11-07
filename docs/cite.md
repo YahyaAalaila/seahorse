@@ -5,7 +5,7 @@ version matters, the Zenodo release.
 
 ## Paper
 
-The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Datasets).
+The Seahorse paper is accepted at NeurIPS E&D 2026.
 Preprint: [arXiv:2607.01022](https://arxiv.org/abs/2607.01022).
 
 ```bibtex

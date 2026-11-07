@@ -19,7 +19,7 @@ one evaluation protocol with exact likelihoods and calibration.
 Seahorse couples declarative YAML configuration with PyTorch Lightning
 execution, Ray Tune hyper-parameter optimisation, and versioned run artifacts
 for reproducible benchmarking of event data. The Seahorse paper is accepted at
-NeurIPS 2026 (Track on Evaluations and Datasets); see [Cite Seahorse](cite.md).
+NeurIPS E&D 2026; see [Cite Seahorse](cite.md).
 
 <div class="sh-home-grid" markdown="0">
 <a class="sh-home-card sh-home-card--primary" href="python-api/">
