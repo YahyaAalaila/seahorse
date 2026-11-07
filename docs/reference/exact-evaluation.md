@@ -78,7 +78,7 @@ $$\mathrm{CRPS}_c(F_k,y_k)=\int_0^{c}\big(F_k(\tau)-\mathbf 1\{\tau\ge y_k\}\big
 
 - **Propriety.** This is the CRPS with weight $w(\tau)=\mathbf 1\{\tau\le c\}$ (Gneiting & Ranjan 2011), which is a proper scoring rule. It equals the ordinary CRPS of the censored variables $\min(X,c)$ vs $\min(y,c)$.
 - **Why truncate.** The truncation keeps the score finite and comparable for *defective* waiting-time laws: RMTPP's $\lambda(t)=a e^{-b(t-t_k)}$ puts mass $e^{-a/b}$ on "no further event". It also needs no tail extrapolation.
-- **Threshold $c$.** $c$ is fixed per dataset, independent of every model. It is the maximum training inter-event time, rounded up to 0.1. HawkesNest Suite 3: $c=1.0$ at every level (max train IET 0.925 / 0.82). The residual survival $1-F_k(c)$ is reported (`surv_at_c_mean`).
+- **Threshold $c$.** $c$ is fixed per dataset, independent of every model. It is the maximum training inter-event time, rounded up to 0.1. HawkesNest entanglement suite: $c=2$ at every level, the largest training inter-event time over all four levels rounded up (max train IET 1.75 / 1.71 / 1.61 / 1.98 at L0–L3, recomputed from the released train splits), so CRPS is comparable across levels; the per-level default would give 1.8 / 1.8 / 1.7 / 2.0. The residual survival $1-F_k(c)$ is reported (`surv_at_c_mean`).
 - **Exact estimator** (intensity presets, `method = exact_compensator`):
   1. $\Lambda_k$ is computed on the grid $\tau_j=4c\,(j/1023)^2$, $j=0..1023$, with one batched solve or closed-form evaluation per sequence.
      - Neural-STPP: one ODE solve of $(\Lambda,h)$ from the post-jump state at $t_k$.
