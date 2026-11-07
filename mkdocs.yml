@@ -9,7 +9,7 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   custom_dir: overrides
-  logo: assets/logofv.png
+  logo: assets/logo_glyph.png
   favicon: assets/favicon.svg
   palette:
     scheme: slate

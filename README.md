@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/YahyaAalaila/STPPGC/docs/camera-ready-site/docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/YahyaAalaila/STPPGC/docs/camera-ready-site/docs/assets/logo_dark.png">
+  <img src="https://raw.githubusercontent.com/YahyaAalaila/STPPGC/docs/camera-ready-site/docs/assets/logo_light.png" alt="Seahorse" width="320"/>
+</picture>
 
 A benchmark and library for spatio-temporal point processes: 13 real datasets, a controlled synthetic suite, 28 model presets (19 benchmarked in the paper), one evaluation protocol with exact likelihoods and calibration. NeurIPS 2026.
 
