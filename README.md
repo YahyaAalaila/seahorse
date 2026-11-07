@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/main/docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
+<img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/docs/camera-ready-site/docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
 
 A benchmark and library for spatio-temporal point processes: 13 real datasets, a controlled synthetic suite, 28 model presets (19 benchmarked in the paper), one evaluation protocol with exact likelihoods and calibration. NeurIPS 2026.
 
@@ -20,7 +20,7 @@ The Seahorse paper is accepted at NeurIPS E&D 2026; preprint: [arXiv:2607.01022]
 ---
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/main/docs/assets/figures/teaser.png" alt="Seahorse overview: recent New York City collisions before now; models answer when and where the next event happens as an event rate, a probability density or samples; Seahorse evaluates them under one protocol." width="900"/>
+  <img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/docs/camera-ready-site/docs/assets/figures/teaser.png" alt="Seahorse overview: recent New York City collisions before now; models answer when and where the next event happens as an event rate, a probability density or samples; Seahorse evaluates them under one protocol." width="900"/>
 </p>
 
 <sub>Models that answer the same question, when and where the next event occurs, with an event rate, a probability density or samples, are trained and evaluated under one protocol. Figure from the NeurIPS 2026 paper.</sub>
@@ -57,7 +57,7 @@ The Seahorse paper is accepted at NeurIPS E&D 2026; preprint: [arXiv:2607.01022]
 ## 📈 Results at a glance [[Back&nbsp;to&nbsp;Top](#top)]
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/main/docs/assets/figures/main_results.png" alt="(a) Gap in test NLL to the best preset on each of the 13 real datasets; (b) median training time per seed against mean normalized NLL rank." width="900"/>
+  <img src="https://raw.githubusercontent.com/YahyaAalaila/seahorse/docs/camera-ready-site/docs/assets/figures/main_results.png" alt="(a) Gap in test NLL to the best preset on each of the 13 real datasets; (b) median training time per seed against mean normalized NLL rank." width="900"/>
 </p>
 
 <sub>(a) Gap in test NLL to the best preset on each of the 13 real datasets (nats/event, log scale). (b) Median training time per seed against the mean normalized within-dataset NLL rank (0 = best); generative models are placed by approximate likelihoods, for orientation only. Figure from the NeurIPS 2026 paper.</sub>
