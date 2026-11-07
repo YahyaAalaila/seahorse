@@ -2,7 +2,7 @@
 
 <p class="sh-ds-eyebrow">Synthetic stress test</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><span class="sh-ds-chip sh-ds-chip--synth">synthetic</span><code class="sh-ds-id">hawkesnest_entanglement</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--synth">synthetic</span><code class="sh-ds-id">hawkesnest_entanglement</code></div>
 
 Spatiotemporal Hawkes process on the unit square with tunable space–time coupling, levels L0–L3.
 

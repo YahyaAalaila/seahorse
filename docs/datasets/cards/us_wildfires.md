@@ -2,7 +2,7 @@
 
 <p class="sh-ds-eyebrow">Released, not benchmarked in the paper</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--muted">not benchmarked</span><code class="sh-ds-id">us_wildfires</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--muted">not in paper</span><code class="sh-ds-id">us_wildfires</code></div>
 
 Wildfire ignitions in the United States (USFS RDS-2013-0009.4).
 

@@ -1606,3 +1606,76 @@
 @media screen and (max-width: 44rem) {
   .sh-fig-grid { grid-template-columns: 1fr; }
 }
+
+/* Dataset index tiles: silhouette thumbnail, one status mark, equal heights. */
+.sh-ds-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 100%;
+  min-height: 21rem;
+  padding: 0.8rem 0.95rem 0.85rem;
+  border: 1px solid var(--seahorse-border);
+  border-radius: 0.55rem;
+  background: var(--md-default-bg-color--light, #141b26);
+  color: var(--md-default-fg-color);
+  text-decoration: none;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+.sh-ds-tile:hover {
+  border-color: var(--seahorse-accent-hover);
+  transform: translateY(-2px);
+}
+[data-md-color-scheme="default"] .sh-ds-tile { background: var(--seahorse-panel); }
+.md-typeset img.sh-ds-thumb,
+.sh-ds-tile .sh-ds-thumb {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  aspect-ratio: 400 / 340;
+  margin: 0 0 0.3rem;
+  background: transparent;
+  object-fit: contain;
+}
+.sh-ds-tile .sh-ds-thumb--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--seahorse-border);
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color--lighter);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sh-ds-tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.sh-ds-tile .sh-ds-name { font-size: 0.82rem; }
+.sh-ds-tile .sh-ds-chip { flex: none; }
+.sh-ds-tile-id {
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.66rem;
+  color: var(--md-default-fg-color--lighter);
+}
+.sh-ds-tile-desc {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--md-default-fg-color--light);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sh-ds-tile .sh-ds-size { margin-top: auto; }
+.sh-ds-grid--tiles {
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+  max-width: 64rem;
+}
+.sh-ds-grid--tiles .sh-ds-tile { min-height: 17.5rem; }
+.md-typeset .sh-ds-grid--tiles img.sh-ds-thumb,
+.sh-ds-grid--tiles .sh-ds-thumb { height: 9.5rem; width: 100%; aspect-ratio: auto; }

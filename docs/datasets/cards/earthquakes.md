@@ -2,7 +2,7 @@
 
 <p class="sh-ds-eyebrow">Real data, Neural STPP benchmark splits</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><span class="sh-ds-chip sh-ds-chip--muted">Neural STPP split</span><code class="sh-ds-id">earthquakes</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><code class="sh-ds-id">earthquakes</code></div>
 
 Earthquakes of magnitude ≥ 2.5 around Japan (USGS ComCat).
 

@@ -2,7 +2,7 @@
 
 <p class="sh-ds-eyebrow">Released, not benchmarked in the paper</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--synth">synthetic</span><span class="sh-ds-chip sh-ds-chip--muted">not benchmarked</span><code class="sh-ds-id">synthetic</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--synth">synthetic</span><code class="sh-ds-id">synthetic</code></div>
 
 Homogeneous Poisson, moving seasonal Poisson and gamma renewal processes on the unit square.
 

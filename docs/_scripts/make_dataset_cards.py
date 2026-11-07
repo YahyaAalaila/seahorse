@@ -19,6 +19,19 @@ Usage (repository root):
     python docs/_scripts/make_dataset_cards.py --only austin311 covid
 
 Requires huggingface_hub, numpy, matplotlib. The download is about 1.5 GB (cached by huggingface_hub).
+Per-dataset plot data (location subsample, daily counts, gaps; no raw records) is cached in
+~/.cache/seahorse-docs/plotdata/<name>.npz and re-used by --offline; it is never committed.
+
+Script-only datasets (citibike_nyc, citibike_legacy, seattle_fire911) are not on the Hub. Their
+plot data was computed with docs/_scripts/plotdata.py next to the campaign's prepared copies
+(read-only) and copied to the cache above; every train split's SHA-256 equals the dataset card's
+expected rebuild hash:
+  citibike_nyc, seattle_fire911: Pegasus, /netscratch/aalaila/seahorse_iclr2027_20260916/data/
+      seahorse_data_v2/processed/<corpus>/jittered_seed20260910/{train,val,test}.jsonl
+  citibike_legacy (days): Unicorn, /scratch/aalaila/seahorse_campaigns/iclr2027/
+      nnstat_legacy3_v1_inputs/data/citibike_stpp/{train,val,test}.jsonl
+Alternatively run plotdata.py on a local rebuild. Without a
+cached .npz a script-only card gets no plot.
 """
 
 from __future__ import annotations
@@ -35,9 +48,16 @@ sys.path.insert(0, str(ROOT))
 
 from seahorse.data.hf import RELEASED_DATASETS, ReleasedDataset  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plotdata as PD  # noqa: E402
+
+PLOTDATA_CACHE = Path.home() / ".cache" / "seahorse-docs" / "plotdata"
+THUMB_INK = "#5b8ac2"  # mid-tone blue: >= 3:1 against both the light (#fff) and dark (#141b26) card surface
+
 DOCS = ROOT / "docs"
 CARDS_DIR = DOCS / "datasets" / "cards"
 IMG_DIR = DOCS / "assets" / "datasets"
+THUMB_DIR = IMG_DIR / "thumbs"
 STATS_PATH = DOCS / "_scripts" / "dataset_stats.json"
 SPLITS = ("train", "val", "test")
 MAX_POINTS = 30_000  # plotted locations per dataset (subsampled)
@@ -208,48 +228,12 @@ def parse_start(value) -> datetime | None:
         return None
 
 
-def split_stats(spec: ReleasedDataset, config: str, rng, want_points: bool = True) -> dict:
-    import numpy as np
+def hub_plotdata(spec: ReleasedDataset, config: str) -> dict:
+    return PD.plotdata_from_files({sp: fetch(spec, spec.split_path(config, sp)) for sp in SPLITS})
 
-    out: dict = {"config": config, "splits": {}}
-    for split in SPLITS:
-        path = fetch(spec, spec.split_path(config, split))
-        n_seq, counts, starts, xs, ys, gaps = 0, [], [], [], [], []
-        with open(path) as fh:
-            for line in fh:
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                times, locs = iter_events(rec)
-                n_seq += 1
-                counts.append(len(times))
-                start = parse_start(rec.get("window_start"))
-                if start is not None:
-                    starts.append(start.replace(tzinfo=None).isoformat())
-                if len(times) > 1:
-                    gaps.append(np.diff(np.asarray(times, dtype=float)))
-                if want_points and locs:
-                    arr = np.asarray(locs, dtype=float)
-                    xs.append(arr[:, 0])
-                    ys.append(arr[:, 1])
-        c = np.asarray(counts)
-        rec_out = {
-            "sequences": int(n_seq),
-            "events": int(c.sum()),
-            "events_per_seq": [int(c.min()), float(np.median(c)), int(c.max())] if n_seq else None,
-            "starts": starts if len(starts) == n_seq else None,
-            "counts": counts if len(starts) == n_seq else None,
-        }
-        if gaps:
-            g = np.concatenate(gaps)
-            g = g[g > 0]
-            rec_out["_gaps"] = rng.choice(g, size=min(len(g), 200_000), replace=False) if len(g) else g
-        if want_points and xs:
-            x, y = np.concatenate(xs), np.concatenate(ys)
-            rec_out["_points"] = (x, y)
-            rec_out["bbox"] = [float(np.nanmin(x)), float(np.nanmax(x)), float(np.nanmin(y)), float(np.nanmax(y))]
-        out["splits"][split] = rec_out
-    return out
+
+def stats_of(pd: dict, config: str) -> dict:
+    return {"config": config, "calendar": pd["calendar"], "splits": pd["stats"]}
 
 
 # --------------------------------------------------------------------------------------------
@@ -272,50 +256,40 @@ def _style():
     return plt
 
 
-def _subsample(stats: dict, rng):
+def _limits(x, y):
     import numpy as np
 
-    pts = {s: stats["splits"][s].get("_points") for s in SPLITS}
-    total = sum(len(p[0]) for p in pts.values() if p is not None)
-    frac = min(1.0, MAX_POINTS / max(total, 1))
-    out = {}
-    for s, p in pts.items():
-        if p is None:
-            continue
-        n = len(p[0])
-        k = max(1, int(round(n * frac)))
-        idx = rng.choice(n, size=k, replace=False) if k < n else np.arange(n)
-        out[s] = (p[0][idx], p[1][idx])
-    return out
-
-
-def _robust_limits(points: dict):
-    import numpy as np
-
-    x = np.concatenate([p[0] for p in points.values()])
-    y = np.concatenate([p[1] for p in points.values()])
     lo_x, hi_x = np.nanpercentile(x, [0.5, 99.5])
     lo_y, hi_y = np.nanpercentile(y, [0.5, 99.5])
     pad_x, pad_y = 0.04 * (hi_x - lo_x or 1), 0.04 * (hi_y - lo_y or 1)
     return (lo_x - pad_x, hi_x + pad_x), (lo_y - pad_y, hi_y + pad_y)
 
 
-def plot_dataset(name: str, stats: dict, rng, geographic: bool = True) -> Path:
+def _geo_aspect(y0, y1):
+    import numpy as np
+
+    return 1.0 / max(np.cos(np.deg2rad((y0 + y1) / 2)), 0.2)
+
+
+def _daily(pd: dict, split: str):
+    return pd[f"days_{split}"].astype(object), pd[f"daycounts_{split}"]
+
+
+def plot_dataset(name: str, pd: dict, geographic: bool = True) -> Path:
+    """Card-page figure: locations coloured by split, and daily counts (or gaps) by split."""
     import numpy as np
 
     plt = _style()
-    points = _subsample(stats, rng)
     fig, (ax_map, ax_time) = plt.subplots(1, 2, figsize=(9.0, 3.3), gridspec_kw={"width_ratios": [1, 1.55]})
-
-    for split in SPLITS:  # test drawn last, on top
-        if split in points:
-            x, y = points[split]
-            ax_map.scatter(x, y, s=1.2, lw=0, alpha=0.45, color=COLORS[split], rasterized=True)
-    (x0, x1), (y0, y1) = _robust_limits(points)
+    x, y, code = pd["x"], pd["y"], pd["split"]
+    for i, split in enumerate(SPLITS):  # test drawn last, on top
+        m = code == i
+        ax_map.scatter(x[m], y[m], s=1.2, lw=0, alpha=0.45, color=COLORS[split], rasterized=True)
+    (x0, x1), (y0, y1) = _limits(x, y)
     ax_map.set_xlim(x0, x1)
     ax_map.set_ylim(y0, y1)
     if geographic and -90 <= y0 and y1 <= 90:
-        ax_map.set_aspect(1.0 / max(np.cos(np.deg2rad((y0 + y1) / 2)), 0.2))
+        ax_map.set_aspect(_geo_aspect(y0, y1))
         ax_map.set_xlabel("longitude")
         ax_map.set_ylabel("latitude")
     else:
@@ -325,18 +299,12 @@ def plot_dataset(name: str, stats: dict, rng, geographic: bool = True) -> Path:
     ax_map.set_title("Event locations (subsample)", loc="left")
     ax_map.tick_params(labelsize=7.5)
 
-    has_calendar = all(stats["splits"][s].get("starts") for s in SPLITS)
-    if has_calendar:
+    if pd["calendar"]:
         import matplotlib.dates as mdates
 
         for split in SPLITS:
-            sp = stats["splits"][split]
-            d = np.array([np.datetime64(s) for s in sp["starts"]]).astype("datetime64[D]")
-            c = np.asarray(sp["counts"])
-            days, inv = np.unique(d, return_inverse=True)
-            per_day = np.bincount(inv, weights=c)
-            ax_time.plot(days.astype("datetime64[D]").astype(object), per_day, lw=1.0, color=COLORS[split],
-                         label=LABELS[split])
+            days, counts = _daily(pd, split)
+            ax_time.plot(days, counts, lw=1.0, color=COLORS[split], label=LABELS[split])
         ax_time.set_ylabel("events per day")
         ax_time.set_title("Events per day, coloured by split", loc="left")
         loc = mdates.AutoDateLocator(maxticks=7)
@@ -344,12 +312,12 @@ def plot_dataset(name: str, stats: dict, rng, geographic: bool = True) -> Path:
         ax_time.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
         ax_time.set_ylim(bottom=0)
     else:
-        gaps = [stats["splits"][s].get("_gaps") for s in SPLITS]
-        allg = np.concatenate([g for g in gaps if g is not None and len(g)])
+        gaps = [pd[f"gaps_{s}"] for s in SPLITS]
+        allg = np.concatenate([g for g in gaps if len(g)])
         lo, hi = np.percentile(np.log10(allg), [0.5, 99.9])
         bins = np.linspace(lo, hi, 41)
         for split, g in zip(SPLITS, gaps):
-            if g is not None and len(g):
+            if len(g):
                 ax_time.hist(np.log10(g), bins=bins, histtype="step", lw=1.3, color=COLORS[split],
                              label=LABELS[split], density=True)
         ticks = np.arange(np.ceil(lo), np.floor(hi) + 1)
@@ -366,6 +334,47 @@ def plot_dataset(name: str, stats: dict, rng, geographic: bool = True) -> Path:
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     path = IMG_DIR / f"{name}.png"
     fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return path
+
+
+def plot_thumb(name: str, pd: dict, geographic: bool = True) -> Path:
+    """Index thumbnail: location silhouette in one ink (4:3 box) over a sparkline of activity.
+
+    Transparent background, no axes or text. The sparkline is events per day for calendar
+    datasets, otherwise events per sequence in file order (train, val, test).
+    """
+    import numpy as np
+
+    plt = _style()
+    fig = plt.figure(figsize=(4.0, 3.4), dpi=100)
+    fig.patch.set_alpha(0)
+    ax = fig.add_axes([0.03, 0.15, 0.94, 0.83])   # about 4:3 in pixels
+    sp = fig.add_axes([0.03, 0.01, 0.94, 0.11])
+    for a in (ax, sp):
+        a.set_axis_off()
+        a.patch.set_alpha(0)
+    x, y = pd["x"], pd["y"]
+    (x0, x1), (y0, y1) = _limits(x, y)
+    keep = (x >= x0) & (x <= x1) & (y >= y0) & (y <= y1)
+    ax.scatter(x[keep], y[keep], s=1.0, lw=0, alpha=0.55, color=THUMB_INK, rasterized=True)
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y0, y1)
+    ax.set_aspect(_geo_aspect(y0, y1) if geographic and -90 <= y0 and y1 <= 90 else 1.0, adjustable="datalim")
+    if pd["calendar"]:
+        series = np.concatenate([_daily(pd, s)[1] for s in SPLITS])
+    else:
+        series = np.concatenate([pd[f"seqcounts_{s}"] for s in SPLITS])
+    series = series.astype(float)
+    if len(series) > 400:  # smooth very long series into 400 bins
+        series = np.array([b.mean() for b in np.array_split(series, 400)])
+    sp.fill_between(np.arange(len(series)), series, color=THUMB_INK, alpha=0.35, lw=0)
+    sp.plot(np.arange(len(series)), series, color=THUMB_INK, lw=0.8)
+    sp.set_xlim(0, max(len(series) - 1, 1))
+    sp.set_ylim(0, series.max() * 1.05 if series.max() > 0 else 1)
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    path = THUMB_DIR / f"{name}.png"
+    fig.savefig(path, dpi=100, transparent=True)
     plt.close(fig)
     return path
 
@@ -409,19 +418,15 @@ def fmt_int(n) -> str:
 
 
 def chips(name: str, spec: ReleasedDataset) -> str:
+    """At most one status mark: script-only > synthetic > paper > not in paper."""
     meta = PAPER[name]
-    out = []
-    if meta["group"] in ("chrono", "nstpp", "synthetic"):
-        out.append('<span class="sh-ds-chip">paper</span>')
-    if meta["group"] == "nstpp":
-        out.append('<span class="sh-ds-chip sh-ds-chip--muted">Neural STPP split</span>')
-    if meta["group"] in ("synthetic", "released") and name in ("hawkesnest_entanglement", "synthetic"):
-        out.append('<span class="sh-ds-chip sh-ds-chip--synth">synthetic</span>')
-    if meta["group"] == "released":
-        out.append('<span class="sh-ds-chip sh-ds-chip--muted">not benchmarked</span>')
     if spec.form == "script-only":
-        out.append('<span class="sh-ds-chip sh-ds-chip--muted">script-only</span>')
-    return "".join(out)
+        return '<span class="sh-ds-chip sh-ds-chip--muted">script-only</span>'
+    if name in ("hawkesnest_entanglement", "synthetic"):
+        return '<span class="sh-ds-chip sh-ds-chip--synth">synthetic</span>'
+    if meta["group"] in ("chrono", "nstpp"):
+        return '<span class="sh-ds-chip">paper</span>'
+    return '<span class="sh-ds-chip sh-ds-chip--muted">not in paper</span>'
 
 
 def load_snippet(name: str, spec: ReleasedDataset) -> str:
@@ -466,7 +471,7 @@ def rebuild_block(text: str, spec: ReleasedDataset) -> str:
     )
 
 
-def stats_table(stats: dict | None, unit: str) -> str:
+def stats_table(stats: dict | None, unit: str, source: str = "the Hub files") -> str:
     if not stats:
         return ""
     rows = ["| Split | Sequences | Events | Events per sequence (min / median / max) |",
@@ -476,7 +481,7 @@ def stats_table(stats: dict | None, unit: str) -> str:
         e = sp["events_per_seq"]
         eps = f"{e[0]:,} / {e[1]:,.0f} / {e[2]:,}" if e else "–"
         rows.append(f"| {LABELS[split]} | {fmt_int(sp['sequences'])} | {fmt_int(sp['events'])} | {eps} |")
-    note = f"\nOne sequence = {unit}. Counts of the `{stats['config']}` configuration, computed from the Hub files.\n"
+    note = f"\nOne sequence = {unit}. Counts of the `{stats['config']}` configuration, computed from {source}.\n"
     return "\n".join(rows) + "\n" + note
 
 
@@ -498,7 +503,9 @@ def write_card(name: str, spec: ReleasedDataset, stats: dict | None, text: str, 
             cap = ("Left: event locations, a random subsample of at most 30,000 events, coloured by split. Right: "
                    + ("events per calendar day." if (stats or {}).get("calendar")
                       else "distribution of the time between consecutive events within a sequence.")
-                   + f" Configuration <code>{spec.default_config}</code>.")
+                   + f" Configuration <code>{spec.default_config}</code>."
+                   + (" Computed from the campaign's prepared copy, whose split hashes equal the card's expected"
+                      " rebuild hashes; the data are not hosted." if spec.form == "script-only" else ""))
         lines += [f'<figure class="sh-figure" markdown="0"><img src="../../../assets/datasets/{name}.png" '
                   f'alt="{alt}" loading="lazy"><figcaption>{cap}</figcaption></figure>', ""]
 
@@ -522,7 +529,8 @@ def write_card(name: str, spec: ReleasedDataset, stats: dict | None, text: str, 
         lines += ['!!! warning "Licence terms"', f"    {NOTICES[name]}", ""]
 
     if stats:
-        lines += ["## Size", "", stats_table(stats, meta["unit"])]
+        lines += ["## Size", "", stats_table(stats, meta["unit"], "the campaign's prepared copy (hashes equal the card's)"
+                                             if spec.form == "script-only" else "the Hub files")]
     elif spec.form == "script-only":
         sec = card_section(text, "Statistics (of the rebuilt corpus)") or card_section(text, "Splits")
         table = None
@@ -590,25 +598,25 @@ def write_index(all_stats: dict) -> None:
              "the best presets of the paper.", ""]
     for group, title in GROUPS.items():
         names = [n for n in PAPER if PAPER[n]["group"] == group and n in RELEASED_DATASETS]
-        lines += [f"## {title}", "", '<div class="sh-ds-grid" markdown="0">']
+        lines += [f"## {title}", "", '<div class="sh-ds-grid sh-ds-grid--tiles" markdown="0">']
         for n in names:
             spec, meta = RELEASED_DATASETS[n], PAPER[n]
             st = (all_stats.get(n) or {}).get("default")
-            img = IMG_DIR / f"{n}.png"
-            thumb = (f'<img class="sh-ds-thumb" src="../assets/datasets/{n}.png" alt="" loading="lazy">'
-                     if img.exists() else '<span class="sh-ds-thumb sh-ds-thumb--empty">rebuild script</span>')
-            size = ""
+            thumb = (f'<img class="sh-ds-thumb" src="../assets/datasets/thumbs/{n}.png" alt="" loading="lazy">'
+                     if (THUMB_DIR / f"{n}.png").exists()
+                     else '<span class="sh-ds-thumb sh-ds-thumb--empty">rebuild script</span>')
+            size = "&nbsp;"
             if st:
                 ev = sum(st["splits"][s]["events"] for s in SPLITS)
                 sq = sum(st["splits"][s]["sequences"] for s in SPLITS)
-                size = f'<span class="sh-ds-size">{ev:,} events · {sq:,} sequences</span>'
+                size = f"{ev:,} events · {sq:,} sequences"
             lines.append(
-                f'<a class="sh-ds-card{" sh-ds-card--bench" if group != "released" else ""}" href="cards/{n}/">'
+                f'<a class="sh-ds-tile" href="cards/{n}/">'
                 f"{thumb}"
-                f'<span class="sh-ds-head"><span class="sh-ds-name">{meta["title"]}</span>{chips(n, spec)}</span>'
-                f'<code class="sh-ds-id">{n}</code>'
-                f'<span class="sh-ds-desc">{meta["what"]}.</span>'
-                f'{size}'
+                f'<span class="sh-ds-tile-head"><span class="sh-ds-name">{meta["title"]}</span>{chips(n, spec)}</span>'
+                f'<span class="sh-ds-tile-id">{n}</span>'
+                f'<span class="sh-ds-tile-desc">{meta["what"]}</span>'
+                f'<span class="sh-ds-size">{size}</span>'
                 "</a>")
         lines += ["</div>", ""]
 
@@ -630,12 +638,6 @@ def write_index(all_stats: dict) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-def strip_private(st: dict) -> dict:
-    drop = ("starts", "counts")
-    return {"config": st["config"], "calendar": st.get("calendar"), "splits": {s: {k: v for k, v in sp.items() if not k.startswith("_") and k not in drop}
-                                              for s, sp in st["splits"].items()}}
-
-
 def main() -> None:
     import numpy as np
 
@@ -646,24 +648,29 @@ def main() -> None:
 
     cached = json.loads(STATS_PATH.read_text()) if STATS_PATH.exists() else {}
     names = [n for n in PAPER if n in RELEASED_DATASETS and (not args.only or n in args.only)]
-    rng = np.random.default_rng(20261107)
     for name in names:
         spec = RELEASED_DATASETS[name]
         text = card_text(spec)
         stats, extra = cached.get(name, {}).get("default"), cached.get(name, {}).get("extra")
-        if spec.form != "script-only" and not args.offline:
+        cache = PLOTDATA_CACHE / f"{name}.npz"
+        pd = None
+        if cache.exists() and (args.offline or spec.form == "script-only"):
+            pd = PD.load(cache)
+        elif spec.form != "script-only" and not args.offline:
             print(f"[{name}] downloading and counting ...", flush=True)
-            full = split_stats(spec, spec.default_config, rng, want_points=name != "hawkesnest_entanglement")
+            pd = hub_plotdata(spec, spec.default_config)
+            PLOTDATA_CACHE.mkdir(parents=True, exist_ok=True)
+            PD.save(pd, cache)
+        if pd is not None:
+            geographic = name not in ("synthetic", "bold5000", "hawkesnest_entanglement")
             if name == "hawkesnest_entanglement":
                 plot_hawkesnest(spec)
             else:
-                plot_dataset(name, full, rng, geographic=name not in ("synthetic", "bold5000"))
-            stats = strip_private(full)
-            stats["calendar"] = all(full["splits"][s].get("starts") for s in SPLITS)
-            extra = None
-            if len(spec.configs) > 1 and name in ("hawkesnest_entanglement", "synthetic"):
-                extra = {c: strip_private(split_stats(spec, c, rng, want_points=False))
-                         for c in spec.configs if c != spec.default_config}
+                plot_dataset(name, pd, geographic=geographic)
+            plot_thumb(name, pd, geographic=geographic)
+            stats = stats_of(pd, spec.default_config)
+            if not args.offline and spec.form != "script-only" and name in ("hawkesnest_entanglement", "synthetic"):
+                extra = {c: stats_of(hub_plotdata(spec, c), c) for c in spec.configs if c != spec.default_config}
             cached[name] = {"default": stats, "extra": extra}
         write_card(name, spec, stats, text, extra)
         print(f"[{name}] card written", flush=True)
