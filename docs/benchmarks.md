@@ -72,7 +72,9 @@ python -m seahorse bench \
 ```
 
 Replace `my_preset` with your registered name, and point `--splits_dir` at a
-directory of released benchmark datasets (see the [dataset catalog](datasets/catalog.md)). For a first run, the
+directory of released benchmark datasets (see the [dataset cards](datasets/index.md)).
+To place a new model next to the paper's numbers, follow
+[Add your model and benchmark it](benchmark/your-model.md). For a first run, the
 [small benchmark walkthrough](examples/run-a-small-benchmark.md) is a good place
 to start.
 
@@ -122,7 +124,9 @@ exact NLL (closed-form or ODE-integrated compensator); NSMPP and THP-GMM evaluat
 their density directly and integrate the compensator by numerical quadrature; the
 generative families SMASH and DSTPP report a sample-based approximation (a KDE on
 their native samples), which is not a likelihood bound. The three labels are kept
-visible in every table. Beyond NLL, the predictive and distributional
+visible in every table. (The paper's SMASH and DSTPP rows instead use DSTPP's
+variational bound and SMASH's temporal term plus a grid density, from the scripts in
+`scripts/approx_nll/`; both stay unranked.) Beyond NLL, the predictive and distributional
 [metric profiles](evaluation.md) give a fuller account of model quality, which is
 especially useful for models whose likelihood is only approximate.
 

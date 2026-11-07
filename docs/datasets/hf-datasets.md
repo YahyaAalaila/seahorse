@@ -100,7 +100,7 @@ The legacy cards (`covid`, `earthquakes`) declare no split hashes; they load wit
 in `__provenance__` at the pinned revision.
 
 **Released, not benchmarked in the paper.** `bold5000` (`bold5000-stpp`), `us_wildfires`
-(`us_wildfires_stpp`) and `us_accidents` (`us_accidents_stpp`) load the same way
+(`us_wildfires_stpp`), `us_accidents` (`us_accidents_stpp`) and the `synthetic` controls load the same way
 (`list_released_datasets(in_paper=False)`); they are not part of the paper's comparison.
 
 ## Hosting Your Own Dataset on HuggingFace
@@ -115,7 +115,9 @@ See [Conversion Standard](conversion.md) for format details and [Add Your Datase
 ## Dataset Catalog
 
 The [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) organization holds
-**17 repositories** — 16 real datasets (13 hosted, 3 script-only) and the synthetic
-controls — spanning urban mobility, city services and crime, earthquakes, wildfires,
-traffic accidents, public health, and neuroimaging. Browse them — with load snippets
-and per-dataset space/time axes — in the **[Dataset Catalog](catalog.md)**.
+**17 public repositories**: 16 real datasets (13 hosted, 3 script-only) and one
+synthetic repository holding the HawkesNest entanglement suite and the synthetic
+controls, spanning urban mobility, city services and crime, earthquakes, wildfires,
+traffic accidents, public health, and neuroimaging. The 13 real datasets of the paper and
+the HawkesNest suite each have a **[card](index.md)**; the
+**[Dataset Catalog](catalog.md)** groups all repositories by domain.

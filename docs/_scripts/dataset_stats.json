@@ -1,0 +1,961 @@
+{
+ "geonet_nz": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 365,
+     "events": 19740,
+     "events_per_seq": [
+      22,
+      53.0,
+      152
+     ],
+     "bbox": [
+      160.3629456,
+      187.0953217,
+      -53.69208527,
+      -25.02918434
+     ]
+    },
+    "val": {
+     "sequences": 181,
+     "events": 12424,
+     "events_per_seq": [
+      23,
+      64.0,
+      234
+     ],
+     "bbox": [
+      160.342804,
+      186.7606659,
+      -53.76528931,
+      -25.01630402
+     ]
+    },
+    "test": {
+     "sequences": 184,
+     "events": 9836,
+     "events_per_seq": [
+      22,
+      50.0,
+      157
+     ],
+     "bbox": [
+      164.1564026,
+      188.1197968,
+      -49.66440964,
+      -25.04800034
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "covid": {
+  "default": {
+   "config": "default",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 1450,
+     "events": 143433,
+     "events_per_seq": [
+      8,
+      67.0,
+      289
+     ],
+     "bbox": [
+      -75.54150381313593,
+      -73.83591820873822,
+      38.85402931011634,
+      41.31529363352197
+     ]
+    },
+    "val": {
+     "sequences": 100,
+     "events": 4415,
+     "events_per_seq": [
+      16,
+      42.0,
+      80
+     ],
+     "bbox": [
+      -75.5145744208347,
+      -73.8364979458306,
+      38.907821319557016,
+      41.247639099839276
+     ]
+    },
+    "test": {
+     "sequences": 100,
+     "events": 13694,
+     "events_per_seq": [
+      27,
+      123.5,
+      265
+     ],
+     "bbox": [
+      -75.51886554297081,
+      -73.83660492267046,
+      38.86115824381855,
+      41.28588728966673
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "earthquakes": {
+  "default": {
+   "config": "default",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 950,
+     "events": 72150,
+     "events_per_seq": [
+      19,
+      70.0,
+      339
+     ],
+     "bbox": [
+      122.291,
+      147.5573,
+      22.001,
+      45.939
+     ]
+    },
+    "val": {
+     "sequences": 50,
+     "events": 3722,
+     "events_per_seq": [
+      30,
+      72.0,
+      186
+     ],
+     "bbox": [
+      122.362,
+      149.861,
+      22.0,
+      45.79
+     ]
+    },
+    "test": {
+     "sequences": 50,
+     "events": 3968,
+     "events_per_seq": [
+      32,
+      70.0,
+      545
+     ],
+     "bbox": [
+      122.328,
+      147.574,
+      22.002,
+      45.781
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "hawkesnest_entanglement": {
+  "default": {
+   "config": "hawkesnest_entanglement_L0",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 80,
+     "events": 31975,
+     "events_per_seq": [
+      277,
+      393.5,
+      587
+     ]
+    },
+    "val": {
+     "sequences": 10,
+     "events": 3925,
+     "events_per_seq": [
+      350,
+      386.5,
+      463
+     ]
+    },
+    "test": {
+     "sequences": 20,
+     "events": 8229,
+     "events_per_seq": [
+      317,
+      415.0,
+      515
+     ]
+    }
+   }
+  },
+  "extra": {
+   "hawkesnest_entanglement_L1": {
+    "config": "hawkesnest_entanglement_L1",
+    "calendar": null,
+    "splits": {
+     "train": {
+      "sequences": 80,
+      "events": 31692,
+      "events_per_seq": [
+       267,
+       388.0,
+       572
+      ]
+     },
+     "val": {
+      "sequences": 10,
+      "events": 4203,
+      "events_per_seq": [
+       326,
+       410.0,
+       552
+      ]
+     },
+     "test": {
+      "sequences": 20,
+      "events": 8354,
+      "events_per_seq": [
+       284,
+       402.0,
+       553
+      ]
+     }
+    }
+   },
+   "hawkesnest_entanglement_L2": {
+    "config": "hawkesnest_entanglement_L2",
+    "calendar": null,
+    "splits": {
+     "train": {
+      "sequences": 80,
+      "events": 32122,
+      "events_per_seq": [
+       262,
+       399.5,
+       556
+      ]
+     },
+     "val": {
+      "sequences": 10,
+      "events": 3807,
+      "events_per_seq": [
+       290,
+       387.0,
+       455
+      ]
+     },
+     "test": {
+      "sequences": 20,
+      "events": 8294,
+      "events_per_seq": [
+       270,
+       404.5,
+       581
+      ]
+     }
+    }
+   },
+   "hawkesnest_entanglement_L3": {
+    "config": "hawkesnest_entanglement_L3",
+    "calendar": null,
+    "splits": {
+     "train": {
+      "sequences": 80,
+      "events": 31723,
+      "events_per_seq": [
+       235,
+       389.0,
+       525
+      ]
+     },
+     "val": {
+      "sequences": 10,
+      "events": 3893,
+      "events_per_seq": [
+       338,
+       375.0,
+       451
+      ]
+     },
+     "test": {
+      "sequences": 20,
+      "events": 8451,
+      "events_per_seq": [
+       282,
+       423.0,
+       527
+      ]
+     }
+    }
+   }
+  }
+ },
+ "comcat_california": {
+  "default": {
+   "config": "native",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 6209,
+     "events": 40701,
+     "events_per_seq": [
+      0,
+      4.0,
+      462
+     ],
+     "bbox": [
+      -125.898,
+      -113.1001667,
+      31.067,
+      43.1705
+     ]
+    },
+    "val": {
+     "sequences": 3287,
+     "events": 14741,
+     "events_per_seq": [
+      0,
+      3.0,
+      342
+     ],
+     "bbox": [
+      -125.887,
+      -113.37,
+      31.081,
+      43.1706667
+     ]
+    },
+    "test": {
+     "sequences": 4764,
+     "events": 21889,
+     "events_per_seq": [
+      0,
+      3.0,
+      1241
+     ],
+     "bbox": [
+      -125.899,
+      -112.874,
+      31.1068333,
+      43.3633333
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "austin311": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 256,
+     "events": 268143,
+     "events_per_seq": [
+      307,
+      998.0,
+      5897
+     ],
+     "bbox": [
+      -97.99988614,
+      -97.40131899,
+      30.03008011,
+      30.59370687
+     ]
+    },
+    "val": {
+     "sequences": 36,
+     "events": 31689,
+     "events_per_seq": [
+      512,
+      946.0,
+      1270
+     ],
+     "bbox": [
+      -97.99821963,
+      -97.40695451,
+      30.05274335,
+      30.57878468
+     ]
+    },
+    "test": {
+     "sequences": 73,
+     "events": 53145,
+     "events_per_seq": [
+      242,
+      759.0,
+      1059
+     ],
+     "bbox": [
+      -97.99726932,
+      -97.40772311,
+      30.02669916,
+      30.59487366
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "nyc311": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 256,
+     "events": 2171101,
+     "events_per_seq": [
+      6123,
+      8573.0,
+      11451
+     ],
+     "bbox": [
+      -74.25495171973925,
+      -73.70037631858673,
+      40.4988067008969,
+      40.912868795316655
+     ]
+    },
+    "val": {
+     "sequences": 36,
+     "events": 348054,
+     "events_per_seq": [
+      6598,
+      9496.0,
+      17789
+     ],
+     "bbox": [
+      -74.25360801957825,
+      -73.70037631858673,
+      40.49927504096171,
+      40.912868795316655
+     ]
+    },
+    "test": {
+     "sequences": 73,
+     "events": 656989,
+     "events_per_seq": [
+      5553,
+      9193.0,
+      11385
+     ],
+     "bbox": [
+      -74.25466569642735,
+      -73.70071502508088,
+      40.49930795605515,
+      40.912868795316655
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "nyc_collisions": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 256,
+     "events": 61958,
+     "events_per_seq": [
+      171,
+      241.0,
+      349
+     ],
+     "bbox": [
+      -74.25015,
+      -73.70099,
+      40.503124,
+      40.912827
+     ]
+    },
+    "val": {
+     "sequences": 36,
+     "events": 9153,
+     "events_per_seq": [
+      179,
+      257.5,
+      292
+     ],
+     "bbox": [
+      -74.25015,
+      -73.70084,
+      40.50578,
+      40.90987
+     ]
+    },
+    "test": {
+     "sequences": 73,
+     "events": 17903,
+     "events_per_seq": [
+      144,
+      249.0,
+      335
+     ],
+     "bbox": [
+      -74.25186,
+      -73.70061,
+      40.499996,
+      40.912468
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "chicago_crime": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 256,
+     "events": 183480,
+     "events_per_seq": [
+      533,
+      712.0,
+      1009
+     ],
+     "bbox": [
+      -87.939732936,
+      -87.524638728,
+      41.644589713,
+      42.022547568
+     ]
+    },
+    "val": {
+     "sequences": 36,
+     "events": 26914,
+     "events_per_seq": [
+      634,
+      739.5,
+      900
+     ],
+     "bbox": [
+      -87.939732936,
+      -87.524541776,
+      41.644998388,
+      42.022548858
+     ]
+    },
+    "test": {
+     "sequences": 73,
+     "events": 50850,
+     "events_per_seq": [
+      110,
+      704.0,
+      817
+     ],
+     "bbox": [
+      -87.939732936,
+      -87.524531562,
+      41.644589713,
+      42.022534349
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "la_crime": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 256,
+     "events": 162886,
+     "events_per_seq": [
+      515,
+      620.5,
+      1159
+     ],
+     "bbox": [
+      -118.6676,
+      -118.1554,
+      33.7064,
+      34.3289
+     ]
+    },
+    "val": {
+     "sequences": 36,
+     "events": 23132,
+     "events_per_seq": [
+      546,
+      638.0,
+      754
+     ],
+     "bbox": [
+      -118.6673,
+      -118.1606,
+      33.7064,
+      34.3274
+     ]
+    },
+    "test": {
+     "sequences": 73,
+     "events": 46323,
+     "events_per_seq": [
+      530,
+      630.0,
+      839
+     ],
+     "bbox": [
+      -118.6652,
+      -118.16,
+      33.7064,
+      34.3275
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "uber_nyc": {
+  "default": {
+   "config": "jittered_seed20260910",
+   "calendar": true,
+   "splits": {
+    "train": {
+     "sequences": 2928,
+     "events": 2665977,
+     "events_per_seq": [
+      45,
+      851.0,
+      3298
+     ],
+     "bbox": [
+      -74.3,
+      -73.65,
+      40.5099,
+      41.0
+     ]
+    },
+    "val": {
+     "sequences": 744,
+     "events": 824057,
+     "events_per_seq": [
+      111,
+      1103.5,
+      2830
+     ],
+     "bbox": [
+      -74.2987,
+      -73.6501,
+      40.5097,
+      41.0
+     ]
+    },
+    "test": {
+     "sequences": 719,
+     "events": 1023024,
+     "events_per_seq": [
+      83,
+      1396.0,
+      3414
+     ],
+     "bbox": [
+      -74.2997,
+      -73.65,
+      40.5039,
+      40.9999
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "synthetic": {
+  "default": {
+   "config": "homogeneous_poisson",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 512,
+     "events": 40859,
+     "events_per_seq": [
+      56,
+      79.0,
+      109
+     ],
+     "bbox": [
+      1.9339902931791997e-05,
+      0.9999944139000638,
+      2.1174522769173976e-05,
+      0.9999579203471635
+     ]
+    },
+    "val": {
+     "sequences": 128,
+     "events": 10198,
+     "events_per_seq": [
+      59,
+      79.0,
+      105
+     ],
+     "bbox": [
+      5.9749303147893507e-05,
+      0.9999358075618108,
+      4.519292960425414e-05,
+      0.9999478369763677
+     ]
+    },
+    "test": {
+     "sequences": 128,
+     "events": 10141,
+     "events_per_seq": [
+      62,
+      79.0,
+      100
+     ],
+     "bbox": [
+      0.00020545679139860606,
+      0.9999216588335259,
+      0.00040593136544719854,
+      0.9998973152067728
+     ]
+    }
+   }
+  },
+  "extra": {
+   "moving_seasonal_poisson": {
+    "config": "moving_seasonal_poisson",
+    "calendar": null,
+    "splits": {
+     "train": {
+      "sequences": 512,
+      "events": 40887,
+      "events_per_seq": [
+       53,
+       79.0,
+       110
+      ]
+     },
+     "val": {
+      "sequences": 128,
+      "events": 10189,
+      "events_per_seq": [
+       59,
+       80.0,
+       101
+      ]
+     },
+     "test": {
+      "sequences": 128,
+      "events": 10277,
+      "events_per_seq": [
+       54,
+       80.0,
+       100
+      ]
+     }
+    }
+   },
+   "gamma_renewal": {
+    "config": "gamma_renewal",
+    "calendar": null,
+    "splits": {
+     "train": {
+      "sequences": 512,
+      "events": 40952,
+      "events_per_seq": [
+       58,
+       80.0,
+       97
+      ]
+     },
+     "val": {
+      "sequences": 128,
+      "events": 10214,
+      "events_per_seq": [
+       63,
+       79.5,
+       94
+      ]
+     },
+     "test": {
+      "sequences": 128,
+      "events": 10208,
+      "events_per_seq": [
+       63,
+       79.5,
+       99
+      ]
+     }
+    }
+   }
+  }
+ },
+ "bold5000": {
+  "default": {
+   "config": "default",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 70,
+     "events": 8635,
+     "events_per_seq": [
+      6,
+      61.5,
+      1273
+     ],
+     "bbox": [
+      0.046020749262051686,
+      105.99232661515782,
+      1.051734820255978,
+      105.87240896028364
+     ]
+    },
+    "val": {
+     "sequences": 10,
+     "events": 2621,
+     "events_per_seq": [
+      14,
+      44.0,
+      1740
+     ],
+     "bbox": [
+      0.18936352095653486,
+      105.86364292694992,
+      1.3536571018929635,
+      105.20513289602705
+     ]
+    },
+    "test": {
+     "sequences": 20,
+     "events": 1882,
+     "events_per_seq": [
+      27,
+      81.0,
+      301
+     ],
+     "bbox": [
+      0.11222971252615521,
+      105.95396765754273,
+      1.9179712618400044,
+      105.19661324985853
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "us_wildfires": {
+  "default": {
+   "config": "default",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 13164,
+     "events": 1316325,
+     "events_per_seq": [
+      25,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -178.80259704589844,
+      -65.25694274902344,
+      17.939722061157227,
+      69.84950256347656
+     ]
+    },
+    "val": {
+     "sequences": 2821,
+     "events": 282071,
+     "events_per_seq": [
+      71,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -168.8699951171875,
+      -65.26417541503906,
+      17.944923400878906,
+      70.33059692382812
+     ]
+    },
+    "test": {
+     "sequences": 2821,
+     "events": 282069,
+     "events_per_seq": [
+      69,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -164.41360473632812,
+      -65.27027893066406,
+      17.955278396606445,
+      70.13809967041016
+     ]
+    }
+   }
+  },
+  "extra": null
+ },
+ "us_accidents": {
+  "default": {
+   "config": "default",
+   "calendar": false,
+   "splits": {
+    "train": {
+     "sequences": 48363,
+     "events": 4836203,
+     "events_per_seq": [
+      3,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -124.62383270263672,
+      -67.11316680908203,
+      24.554800033569336,
+      49.002201080322266
+     ]
+    },
+    "val": {
+     "sequences": 11441,
+     "events": 1144049,
+     "events_per_seq": [
+      49,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -124.49756622314453,
+      -67.40354919433594,
+      24.570222854614258,
+      49.00056076049805
+     ]
+    },
+    "test": {
+     "sequences": 10050,
+     "events": 1004976,
+     "events_per_seq": [
+      76,
+      100.0,
+      100
+     ],
+     "bbox": [
+      -124.5480728149414,
+      -68.51875305175781,
+      24.56602668762207,
+      48.998443603515625
+     ]
+    }
+   }
+  },
+  "extra": null
+ }
+}

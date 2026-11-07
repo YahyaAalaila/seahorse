@@ -37,9 +37,10 @@ See [Data Format](../data-format.md) for the full contract and command support m
 
 The datasets of the Seahorse benchmark are released in the
 [`seahorse-stpp`](https://huggingface.co/seahorse-stpp) Hugging Face
-organization — urban service and incident records, bike-share and ride-hailing
-demand, earthquake catalogs, public health, synthetic controls, and a few
-supported datasets outside the paper — all in the same JSONL split format.
+organization: the 13 real datasets of the paper (urban service and incident
+records, bike-share and ride-hailing demand, earthquake catalogs, public health),
+the HawkesNest entanglement suite, and a few released datasets outside the paper,
+all in the same JSONL split format.
 Load any of them by its short name; every repository is pinned to its release
 revision and each split is verified against the hashes on the dataset card:
 
@@ -50,22 +51,25 @@ splits = load_dataset("covid")                   # downloads + caches
 splits = load_released_dataset("austin311")      # same, with hash verification
 ```
 
-Two datasets (`citibike_nyc`, `seattle_fire911`) cannot be hosted under their
-source licences; their repositories ship a rebuild script and the expected
-hashes instead.
+Three datasets (`citibike_nyc`, `citibike_legacy`, `seattle_fire911`) are not
+hosted, because of the source licence or, for Seattle, the content; their
+repositories ship a rebuild script and the expected hashes instead.
 
-Browse the full collection, with load snippets and each dataset's space/time
-axes, in the **[Dataset Catalog](catalog.md)**.
+Every dataset has a **[card](index.md)** with a plot of where and when its events
+fall, split sizes, licence, load snippet and the best presets of the paper.
 
-Need controlled ground truth? Seahorse's synthetic benchmark sequences are
-generated with [HawkesNest](https://github.com/YahyaAalaila/HawkesNest) — its
-**entanglement suite** produces spatio-temporal data with tunable space–time
-coupling for stress-testing models. See
-[Synthetic controls](catalog.md#synthetic-controls).
+Need controlled ground truth? The paper's synthetic stress test is the
+**HawkesNest entanglement suite**, generated with
+[HawkesNest](https://github.com/YahyaAalaila/HawkesNest): a spatiotemporal Hawkes
+process whose space–time coupling grows over four levels L0–L3, with the true
+intensity stored for recovery diagnostics. It loads with
+`load_released_dataset("hawkesnest_entanglement", config="hawkesnest_entanglement_L0")`;
+see its [card](cards/hawkesnest_entanglement.md).
 
 ## Next Steps
 
-- [Dataset Catalog](catalog.md) — browse the 17 released repositories (16 real datasets and the synthetic controls).
+- [Dataset Cards](index.md) — one page per released dataset, with plots and statistics.
+- [Dataset Catalog](catalog.md) — the 17 released repositories, grouped by domain.
 - [Data Format](../data-format.md) — detailed format specification and command matrix.
 - [Ready-to-use HF Datasets](hf-datasets.md) — load by repo id, or host your own.
 - [Add Your Dataset](add-dataset.md) — how to prepare your own data.

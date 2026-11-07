@@ -35,6 +35,7 @@ nav:
       - Overview: index.md
       - Quickstart: getting-started.md
       - Why Seahorse: why-seahorse.md
+      - Paper Results: results.md
   - Run Models:
       - Start Here: python-api.md
       - CLI Workflows: cli.md
@@ -46,6 +47,7 @@ nav:
       - Tutorial Notebooks: examples/colabs.md
   - Benchmark:
       - Benchmark Overview: benchmarks.md
+      - Add Your Model and Benchmark It: benchmark/your-model.md
       - Run a Small Benchmark: examples/run-a-small-benchmark.md
       - Presets and Configs: benchmark/presets.md
       - Tune Hyperparameters: benchmark/tune.md
@@ -54,6 +56,26 @@ nav:
       - Compare Results: benchmark/compare.md
   - Datasets:
       - Dataset Overview: datasets/overview.md
+      - Dataset Cards:
+          - All Datasets: datasets/index.md
+          - ComCat · California: datasets/cards/comcat_california.md
+          - GeoNet · New Zealand: datasets/cards/geonet_nz.md
+          - Citi Bike · hourly: datasets/cards/citibike_nyc.md
+          - Austin 311: datasets/cards/austin311.md
+          - Seattle fire 911: datasets/cards/seattle_fire911.md
+          - NYC 311: datasets/cards/nyc311.md
+          - NYC collisions: datasets/cards/nyc_collisions.md
+          - Chicago crime: datasets/cards/chicago_crime.md
+          - LA crime: datasets/cards/la_crime.md
+          - Uber pickups · NYC: datasets/cards/uber_nyc.md
+          - COVID-19 · New Jersey: datasets/cards/covid.md
+          - Earthquakes · Japan: datasets/cards/earthquakes.md
+          - Citi Bike · daily: datasets/cards/citibike_legacy.md
+          - HawkesNest entanglement suite: datasets/cards/hawkesnest_entanglement.md
+          - Synthetic controls: datasets/cards/synthetic.md
+          - BOLD5000: datasets/cards/bold5000.md
+          - US wildfires: datasets/cards/us_wildfires.md
+          - US traffic accidents: datasets/cards/us_accidents.md
       - Data Format: data-format.md
       - Ready-to-use HF Datasets: datasets/hf-datasets.md
       - Dataset Catalog: datasets/catalog.md
@@ -110,3 +132,4 @@ exclude_docs: |
   appendix_evaluation.md
   internal/**
   release/**
+  _scripts/**
