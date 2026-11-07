@@ -2,7 +2,7 @@
 
 Seahorse enforces a **benchmark contract** that separates what the framework controls from what each model family controls. This page explains that separation so you know where to look when adding a model, debugging a run, or interpreting results.
 
-![Seahorse execution contract — shared benchmark components fix the dataset, split, policy, and resolved configuration, while family-owned presets inject training-only support statistics and transforms before model construction.](assets/seahorse_execution_contract.png)
+![Seahorse execution contract — shared benchmark components fix the dataset, split, policy, and resolved configuration, while family-owned presets inject training-only support statistics and transforms before model construction.](assets/figures/execution_contract.png)
 
 *Figure 3 from the Seahorse paper: the execution contract. Shared components are framework-owned (left). Family-owned components control data-dependent transforms and model construction (centre). All four execution modes write a `RunResult` artifact (right).*
 

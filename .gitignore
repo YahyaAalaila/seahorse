@@ -40,6 +40,7 @@ ray_results/
 *.log
 *.gif
 *.png
+!docs/assets/**/*.png
 report*.html
 *_results.html
 *_results.json
