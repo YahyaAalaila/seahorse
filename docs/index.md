@@ -7,8 +7,14 @@ hide:
 
 <p class="hero-tagline">
 A benchmark and library for spatio-temporal point processes:<br>
-13 datasets, 28 model presets, one evaluation protocol with exact likelihoods and calibration.
+13 real datasets, a controlled synthetic suite, 28 model presets (19 benchmarked in the paper),
+one evaluation protocol with exact likelihoods and calibration.
 </p>
+
+<figure class="sh-figure" markdown="0">
+  <img src="assets/figures/teaser.png" alt="Left: recent collisions in New York City before now, on a map and a time line. Middle: Seahorse; models answer when and where the next event happens as an event rate (intensity), a probability of the next event (density), or samples of the next event (generative). Right: one protocol, likelihood on one scale and next-event prediction.">
+  <figcaption>Models that answer the same question, when and where the next event occurs, with an event rate, a probability density or samples, are trained and evaluated under one protocol and compared on a common scale. Figure from the NeurIPS 2026 paper (Fig. 1).</figcaption>
+</figure>
 
 Seahorse couples declarative YAML configuration with PyTorch Lightning
 execution, Ray Tune hyper-parameter optimisation, and versioned run artifacts
@@ -84,15 +90,35 @@ NeurIPS 2026 (Track on Evaluations and Datasets); see [Cite Seahorse](cite.md).
 
 ## Benchmarking Workflow
 
-Seahorse reads JSONL event-sequence splits from local files or compatible
-Hugging Face datasets. Every benchmark run applies a shared data contract so
-models are evaluated on the same train, validation, and test splits with the
-same metric definitions.
+Every model is expressed as a history encoder, a state evolution and a decoder; families differ in
+what fills each slot, not in how they are trained, tuned and scored.
 
-<div class="hero-figure">
-  <img src="assets/cool_figure.png" alt="Seahorse overview: event data, model, and YAML config feed into the framework, which outputs reproducible metrics and tuned results.">
-</div>
+<figure class="sh-figure sh-figure--narrow" markdown="0">
+  <img src="assets/figures/pipeline.svg" alt="Event history, then History Encoder (RNN, Transformer, set encoder), then State Evolution (piecewise constant, neural ODE plus jumps), then Decoder (mixture, CNF, integral net, score net), then next event.">
+  <figcaption>Unified model decomposition: every benchmarked method instantiates these three components. Figure from the NeurIPS 2026 paper (Fig. 2).</figcaption>
+</figure>
 
-Start with the [end-to-end case study](examples/case-study.md), run a
+Seahorse reads JSONL event-sequence splits from local files or the released Hugging Face
+datasets. Every benchmark run applies a shared data contract, so models are evaluated on the same
+train, validation and test splits, the same target events and the same metric definitions, with
+likelihoods reported in raw coordinates ([execution contract](learn/execution-contract.md)).
+
+## Results at a Glance
+
+On 13 real datasets and 19 presets **no model dominates**: Attn-CNF is best on 6 datasets,
+AutoSTPP on 4, DeepSTPP on 2 and Jump-CNF on 1; the best-calibrated model differs from the
+likelihood winner on at least 7 of the 10 chronological datasets; and DeepSTPP comes within a
+median 0.17 nats of the best model at about seven minutes of training per seed, where the CNF models
+need six to seven hours. On the HawkesNest entanglement suite only AutoSTPP stays below the
+separable reference as the space–time coupling grows.
+
+<figure class="sh-figure" markdown="0">
+  <img src="assets/figures/main_results.png" alt="Gap in test NLL to the best preset per dataset, and training time against mean rank, for the 19 presets." loading="lazy">
+  <figcaption>(a) Gap in test NLL to the best preset on each of the 13 real datasets; (b) training time per seed against mean normalized rank. Figure from the NeurIPS 2026 paper (Fig. 4).</figcaption>
+</figure>
+
+Read the [paper results](results.md), browse the [dataset cards](datasets/index.md), or
+[add your model and benchmark it](benchmark/your-model.md). To get started, follow the
+[end-to-end case study](examples/case-study.md), run a
 [small benchmark](examples/run-a-small-benchmark.md), or open the
 [tutorial notebooks](examples/colabs.md).
