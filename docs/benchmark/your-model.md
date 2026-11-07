@@ -155,15 +155,22 @@ python build_prepared_root.py prepared geonet_nz
 python seahorse_cli.py campaign prepare   --spec my_spec.json --out campaigns/my_preset
 python seahorse_cli.py campaign verify    --manifest campaigns/my_preset/manifest.json
 python seahorse_cli.py campaign preflight --manifest campaigns/my_preset/manifest.json --models my_preset poisson_gmm
+# needs a CUDA GPU; not re-verified on CPU:
 python seahorse_cli.py campaign run       --manifest campaigns/my_preset/manifest.json --job geonet_nz__my_preset__hpo0
 python seahorse_cli.py campaign report    --manifest campaigns/my_preset/manifest.json --out campaigns/my_preset/report
 ```
 
+!!! warning "`campaign run` requires a CUDA GPU"
+    By design, `campaign run` executes the neural runner only on a CUDA GPU, in the environment
+    recorded by `preflight`; on a CPU-only machine it stops with "GPU campaign evidence requires the
+    same CUDA/PyTorch environment". The CPU smoke test is `fit` / `bench` (sections 2–3), which was
+    verified end to end with a stand-in preset on `geonet_nz`, together with `campaign prepare`,
+    `verify` and `preflight`. The `campaign run` and `campaign report` steps were **not
+    re-verified on CPU**.
+
 `prepare` verifies the split hashes against the dataset manifests and writes one job per tuning
 trial, refit and seed (job ids are listed in `manifest.json`); it records `pip freeze`, so the
-environment needs `pip` (a `uv` virtual environment may not have it). `campaign run` executes the
-neural runner on a CUDA GPU in the environment recorded by `preflight`; it refuses CPU-only
-evidence. Your numbers then sit next to the published values of Table 2 (the best and second-best
+environment needs `pip` (a `uv` virtual environment may not have it). Your numbers then sit next to the published values of Table 2 (the best and second-best
 presets of each dataset are listed on its card). The full workflow is in
 [Reproduce Paper Results](../paper-reproduction.md).
 
