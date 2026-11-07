@@ -30,6 +30,10 @@ theme:
 extra_css:
   - assets/extra.css
 
+extra_javascript:
+  - assets/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
 nav:
   - Home:
       - Overview: index.md
@@ -91,6 +95,7 @@ nav:
   - Learn:
       - Architecture: architecture.md
       - Execution Contract: learn/execution-contract.md
+      - From Time Series to Point Processes: learn/time-series-to-point-processes.md
       - Model Capability Matrix: model-capability-matrix.md
       - Evaluation Semantics: learn/evaluation-semantics.md
       - Exact Evaluation Metrics: reference/exact-evaluation.md
@@ -111,6 +116,8 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.superfences
   - pymdownx.snippets
   - pymdownx.tabbed:
