@@ -2,9 +2,11 @@
 
 <p class="sh-ds-eyebrow">Real data, Neural STPP benchmark splits</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><span class="sh-ds-chip sh-ds-chip--muted">Neural STPP split</span><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">citibike_legacy</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">citibike_legacy</code></div>
 
 Bike-share trip starts in New York City, daily sequences (thinned, Neural STPP construction).
+
+<figure class="sh-figure" markdown="0"><img src="../../../assets/datasets/citibike_legacy.png" alt="Citi Bike · daily: event locations and the temporal profile of the three splits" loading="lazy"><figcaption>Left: event locations, a random subsample of at most 30,000 events, coloured by split. Right: events per calendar day. Configuration <code>citibike_stpp_days</code>. Computed from the campaign's prepared copy, whose split hashes equal the card's expected rebuild hashes; the data are not hosted.</figcaption></figure>
 
 ## Facts
 
@@ -19,13 +21,13 @@ Bike-share trip starts in New York City, daily sequences (thinned, Neural STPP c
 
 ## Size
 
-From the dataset card (statistics of the rebuilt corpus):
+| Split | Sequences | Events | Events per sequence (min / median / max) |
+| --- | ---: | ---: | --- |
+| train | 2,440 | 319,031 | 14 / 134 / 200 |
+| validation | 300 | 46,467 | 84 / 158 / 190 |
+| test | 320 | 47,276 | 86 / 149 / 204 |
 
-| split | records | events |
-|---|---:|---:|
-| train | 2440 | 319,031 |
-| validation | 300 | 46,467 |
-| test | 320 | 47,276 |
+One sequence = one day. Counts of the `citibike_stpp_days` configuration, computed from the campaign's prepared copy (hashes equal the card's).
 
 ## Load it
 

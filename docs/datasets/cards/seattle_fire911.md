@@ -2,9 +2,11 @@
 
 <p class="sh-ds-eyebrow">Real data, chronological splits</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">seattle_fire911</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">seattle_fire911</code></div>
 
 Fire-department 911 dispatches in Seattle.
+
+<figure class="sh-figure" markdown="0"><img src="../../../assets/datasets/seattle_fire911.png" alt="Seattle fire 911: event locations and the temporal profile of the three splits" loading="lazy"><figcaption>Left: event locations, a random subsample of at most 30,000 events, coloured by split. Right: events per calendar day. Configuration <code>jittered_seed20260910</code>. Computed from the campaign's prepared copy, whose split hashes equal the card's expected rebuild hashes; the data are not hosted.</figcaption></figure>
 
 ## Facts
 
@@ -19,13 +21,13 @@ Fire-department 911 dispatches in Seattle.
 
 ## Size
 
-From the dataset card (statistics of the rebuilt corpus):
+| Split | Sequences | Events | Events per sequence (min / median / max) |
+| --- | ---: | ---: | --- |
+| train | 256 | 87,657 | 255 / 341 / 436 |
+| validation | 36 | 12,723 | 320 / 350 / 397 |
+| test | 73 | 24,995 | 192 / 348 / 414 |
 
-| split | windows | events | empty windows | events/window min / median / p95 / max |
-|---|---:|---:|---:|---|
-| train | 256 | 87,657 | 0 | 255 / 341 / 396.75 / 436 |
-| validation | 36 | 12,723 | 0 | 320 / 349.5 / 393.25 / 397 |
-| test | 73 | 24,995 | 0 | 192 / 348 / 389.4 / 414 |
+One sequence = one day. Counts of the `jittered_seed20260910` configuration, computed from the campaign's prepared copy (hashes equal the card's).
 
 ## Load it
 

@@ -2,9 +2,11 @@
 
 <p class="sh-ds-eyebrow">Real data, chronological splits</p>
 
-<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip">paper</span><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">citibike_nyc</code></div>
+<div class="sh-card-chips" markdown="0"><span class="sh-ds-chip sh-ds-chip--muted">script-only</span><code class="sh-ds-id">citibike_nyc</code></div>
 
 Bike-share trip starts in New York City, hourly sequences.
+
+<figure class="sh-figure" markdown="0"><img src="../../../assets/datasets/citibike_nyc.png" alt="Citi Bike · hourly: event locations and the temporal profile of the three splits" loading="lazy"><figcaption>Left: event locations, a random subsample of at most 30,000 events, coloured by split. Right: events per calendar day. Configuration <code>jittered_seed20260910</code>. Computed from the campaign's prepared copy, whose split hashes equal the card's expected rebuild hashes; the data are not hosted.</figcaption></figure>
 
 ## Facts
 
@@ -19,13 +21,13 @@ Bike-share trip starts in New York City, hourly sequences.
 
 ## Size
 
-From the dataset card (statistics of the rebuilt corpus):
+| Split | Sequences | Events | Events per sequence (min / median / max) |
+| --- | ---: | ---: | --- |
+| train | 2,928 | 7,997,091 | 20 / 2,549 / 9,530 |
+| validation | 360 | 1,164,128 | 71 / 3,028 / 9,740 |
+| test | 384 | 1,180,096 | 91 / 2,957 / 9,310 |
 
-| split | windows | events | empty windows | events/window min / median / p95 / max |
-|---|---:|---:|---:|---|
-| train | 2,928 | 7,997,091 | 0 | 20 / 2549 / 6794 / 9530 |
-| validation | 360 | 1,164,128 | 0 | 71 / 3027.5 / 7606.1 / 9740 |
-| test | 384 | 1,180,096 | 0 | 91 / 2957 / 7140.55 / 9310 |
+One sequence = one hour. Counts of the `jittered_seed20260910` configuration, computed from the campaign's prepared copy (hashes equal the card's).
 
 ## Load it
 
