@@ -2,7 +2,7 @@
 
 <img src="docs/assets/logofv.png" alt="Seahorse logo" width="200"/>
 
-A benchmark and library for spatio-temporal point processes: 13 datasets, 28 model presets, one evaluation protocol with exact likelihoods and calibration. NeurIPS 2026.
+A benchmark and library for spatio-temporal point processes: 13 real datasets, a controlled synthetic suite, 28 model presets (19 benchmarked in the paper), one evaluation protocol with exact likelihoods and calibration. NeurIPS 2026.
 
 [![PyPI](https://img.shields.io/pypi/v/seahorse-stpp.svg)](https://pypi.org/project/seahorse-stpp/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21078077.svg)](https://doi.org/10.5281/zenodo.21078077)
@@ -15,7 +15,15 @@ The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Dataset
 
 ---
 
-| [News](#news) | [What's inside](#whats-inside) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
+| [News](#news) | [What's inside](#whats-inside) | [Results](#results-at-a-glance) | [Quick Start](#quick-start) | [Supported models](#supported-models) | [Datasets](#datasets) | [Add your model](#add-your-model) | [CLI](#cli) | [Citation](#citation) | [License](#license) | [Acknowledgment](#acknowledgment) |
+
+---
+
+<p align="center">
+  <img src="docs/assets/figures/teaser.png" alt="Seahorse overview: recent New York City collisions before now; models answer when and where the next event happens as an event rate, a probability density or samples; Seahorse evaluates them under one protocol." width="900"/>
+</p>
+
+<sub>Models that answer the same question, when and where the next event occurs, with an event rate, a probability density or samples, are trained and evaluated under one protocol. Figure from the NeurIPS 2026 paper.</sub>
 
 ---
 
@@ -39,10 +47,29 @@ The Seahorse paper is accepted at NeurIPS 2026 (Track on Evaluations and Dataset
 
 ## 🧭 What's inside [[Back&nbsp;to&nbsp;Top](#top)]
 
-- **Models** — 28 presets: 10 neural STPPs from the literature, 11 parametric and 5 statistical baselines, and `dnsk`/`glide` ([table](#supported-models)).
-- **Datasets** — the 13 benchmark datasets (10 real, 3 synthetic controls), the 3 legacy Neural-STPP splits and 3 further real datasets, on the Hugging Face Hub with pinned revisions and hash-verified splits ([list](#datasets)).
+- **Models** — 28 presets: 10 neural STPPs from the literature, 11 parametric and 5 statistical baselines, and `dnsk`/`glide`; 19 of them are benchmarked in the paper ([table](#supported-models)).
+- **Datasets** — the paper's 13 real datasets (10 with chronological splits, 3 from the Neural STPP benchmark under their original splits) and the HawkesNest entanglement suite, plus 3 further real datasets and synthetic controls, on the Hugging Face Hub with pinned revisions and hash-verified splits ([list](#datasets), [dataset cards](https://yahyaaalaila.github.io/seahorse/datasets/)).
 - **Evaluation** — next-event NLL with exact / quadrature / approximate labels; sampler-free calibration (time-rescaling PIT, threshold-weighted CRPS, spatial HPD-PIT) from the same compensator (`seahorse.evaluation.v1`).
 - **Campaigns** — frozen multi-seed campaigns: `seahorse campaign` compiles, verifies, runs, calibrates and reports them, with Slurm dispatch.
+
+---
+
+## 📈 Results at a glance [[Back&nbsp;to&nbsp;Top](#top)]
+
+<p align="center">
+  <img src="docs/assets/figures/main_results.png" alt="(a) Gap in test NLL to the best preset on each of the 13 real datasets; (b) median training time per seed against mean normalized NLL rank." width="900"/>
+</p>
+
+<sub>(a) Gap in test NLL to the best preset on each of the 13 real datasets (nats/event, log scale). (b) Median training time per seed against the mean normalized within-dataset NLL rank (0 = best); generative models are placed by approximate likelihoods, for orientation only. Figure from the NeurIPS 2026 paper.</sub>
+
+On 13 real datasets and 19 presets, **no model dominates**:
+
+- The best model changes with the dataset: Attn-CNF is best on 6 datasets, AutoSTPP on 4, DeepSTPP on 2, Jump-CNF on 1 (Kendall's W = 0.86 across datasets).
+- Cost matters: DeepSTPP is within a median 0.17 nats of the best model at about seven minutes of training per seed; Attn-CNF and Jump-CNF reach 0.15 and 0.09 at six to seven hours.
+- Likelihood is not the whole story: the best-calibrated model differs from the likelihood winner on at least 7 of the 10 chronological datasets.
+- On the HawkesNest entanglement suite (space–time coupling growing over levels L0–L3), only AutoSTPP stays below the best separable Hawkes fit as the coupling grows.
+
+Details, the rank heatmap and the runtime figures: [Paper results](https://yahyaaalaila.github.io/seahorse/results/). Reproduction: [Reproduce paper results](https://yahyaaalaila.github.io/seahorse/paper-reproduction/).
 
 ---
 
@@ -116,7 +143,7 @@ runner2 = STPPRunner.load("/tmp/my_run/")   # reloads config, normalisation and 
 
 ## 🤖 Supported models [[Back&nbsp;to&nbsp;Top](#top)]
 
-Neural presets benchmarked in the paper:
+Neural presets (all benchmarked in the paper):
 
 | No | Venue      | Preset                                  | Paper                                                                                            | Implementation |
 | :-: | ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------ | :------------: |
@@ -130,15 +157,17 @@ Neural presets benchmarked in the paper:
 | 8 | ICML'20    | `thp_gmm`                             | [Transformer Hawkes Process](https://arxiv.org/abs/2002.09291)                                      |    PyTorch    |
 | 9 | KDD'16     | `rmtpp_gmm`                           | [Recurrent Marked Temporal Point Processes](https://dl.acm.org/doi/10.1145/2939672.2939875)         |    PyTorch    |
 
-**Parametric baselines** (closed-form likelihood):
-`poisson_gmm` · `hawkes_gmm` · `selfcorrecting_gmm` · `poisson_cnf` · `hawkes_cnf` · `selfcorrecting_cnf` · `poisson_tvcnf` · `hawkes_tvcnf` · `selfcorrecting_tvcnf` · `static_hawkes` · `gaussian_poisson`
+**Parametric baselines** (closed-form likelihood; **bold**: benchmarked in the paper):
+**`poisson_gmm`** · **`hawkes_gmm`** · **`selfcorrecting_gmm`** · `poisson_cnf` · `hawkes_cnf` · `selfcorrecting_cnf` · `poisson_tvcnf` · `hawkes_tvcnf` · `selfcorrecting_tvcnf` · **`static_hawkes`** · **`gaussian_poisson`**
 
-**Statistical presets** (NumPy/SciPy, CPU, no gradient training):
-`homogeneous_poisson` · `spatial_poisson` · `seasonal_poisson` · `hawkes_exp_gaussian` · `hawkes_omori_pareto`
+**Statistical presets** (NumPy/SciPy, CPU, no gradient training; **bold**: benchmarked in the paper):
+**`homogeneous_poisson`** · **`spatial_poisson`** · **`seasonal_poisson`** · **`hawkes_exp_gaussian`** · `hawkes_omori_pareto`
+
+The paper's 19 presets are the 10 neural presets above, the 5 bold parametric baselines and the 4 bold statistical presets.
 
 **Available, not benchmarked in the paper:** `dnsk` (DNSK+Barrier, Dong et al. ICLR'23) · `glide` (GLIDE, diffusion objective, no point-process NLL).
 
-NLL labels: NSMPP and THP-GMM evaluate their density directly and integrate the compensator by numerical quadrature; SMASH and DSTPP report approximate values (sample-based estimates, not likelihood bounds). See the [capability matrix](https://yahyaaalaila.github.io/seahorse/model-capability-matrix/).
+NLL labels: NSMPP and THP-GMM evaluate their density directly and integrate the compensator by numerical quadrature; SMASH and DSTPP report approximate values (sample-based estimates, not likelihood bounds) and are not ranked; the paper's DSTPP bound and SMASH grid-density rows come from `scripts/approx_nll/`. See the [capability matrix](https://yahyaaalaila.github.io/seahorse/model-capability-matrix/).
 
 ---
 
@@ -166,14 +195,37 @@ from seahorse.data import load_released_dataset
 splits = load_released_dataset("austin311")      # {"train": [...], "val": [...], "test": [...], "__provenance__": [...]}
 ```
 
-- **Real-data benchmark (paper)** — `comcat_california`, `geonet_nz`, `austin311`, `nyc311`, `nyc_collisions`, `chicago_crime`, `la_crime`, `uber_nyc`, plus the script-only `seattle_fire911` and `citibike_nyc`.
-- **Synthetic controls (paper)** — `synthetic` (homogeneous Poisson, moving seasonal Poisson, gamma renewal).
-- **Legacy Neural-STPP splits** — `earthquakes` ([USGS](https://earthquake.usgs.gov/)), `covid` ([New York Times](https://github.com/nytimes/covid-19-data)), `citibike_legacy` (script-only).
-- **Released, not benchmarked in the paper** — `bold5000`, `us_wildfires`, `us_accidents`.
+- **Real data, chronological splits (paper, 10)** — `comcat_california`, `geonet_nz`, `austin311`, `nyc311`, `nyc_collisions`, `chicago_crime`, `la_crime`, `uber_nyc`, plus the script-only `seattle_fire911` and `citibike_nyc` (hourly).
+- **Real data, Neural STPP benchmark splits (paper, 3)** — `covid` ([New York Times](https://github.com/nytimes/covid-19-data); non-commercial use only, credit The New York Times), `earthquakes` ([USGS](https://earthquake.usgs.gov/)), `citibike_legacy` (daily; script-only).
+- **Synthetic stress test (paper)** — `hawkesnest_entanglement`, the [HawkesNest](https://github.com/YahyaAalaila/HawkesNest) entanglement suite, levels L0–L3 (`config="hawkesnest_entanglement_L0"` … `_L3`).
+- **Released, not benchmarked in the paper** — `bold5000`, `us_wildfires`, `us_accidents`, and the `synthetic` controls (homogeneous Poisson, moving seasonal Poisson, gamma renewal).
 
 The three script-only repositories cannot host their data under the source licences; they ship a rebuild script and the expected split hashes, and `load_released_dataset(name, local_root=...)` verifies a local rebuild against the card. Any other JSONL dataset on the [Hugging Face Hub](https://huggingface.co/datasets) loads via `--dataset owner/repo`.
 
-For the complete catalog see the [Datasets Documentation](https://yahyaaalaila.github.io/seahorse/datasets/catalog/).
+Each dataset has a card with a plot, split statistics, licence and load snippet: [Dataset cards](https://yahyaaalaila.github.io/seahorse/datasets/).
+
+---
+
+## 🧩 Add your model [[Back&nbsp;to&nbsp;Top](#top)]
+
+Have an STPP model? Register it as a preset and it runs on the same datasets, splits and metrics as the 19 benchmarked presets:
+
+```python
+from dataclasses import dataclass
+from seahorse.models.configs.base import BaseModelConfig, ConfigRegistry
+
+@ConfigRegistry.register("my_preset")
+@dataclass
+class MyPresetConfig(BaseModelConfig):
+    def build_model(self): ...          # return UnifiedSTPP(state_model, event_model)
+```
+
+```bash
+python -m seahorse bench --presets my_preset auto_stpp deep_stpp static_hawkes \
+  --dataset nyc_collisions --seeds 1 2 3 --out runs/my_preset
+```
+
+For a number that sits next to the paper's tables (same targets, raw units, same tuning budget), add the preset to a campaign spec in `experiments/campaign_2026/`. Guide: [Add your model and benchmark it](https://yahyaaalaila.github.io/seahorse/benchmark/your-model/). Pull requests with new presets and issues with results are welcome.
 
 ---
 
